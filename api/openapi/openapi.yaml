@@ -1,0 +1,53 @@
+openapi: 3.0.3
+info:
+  title: kartochki.online API
+  version: 0.1.0
+  description: Backend API skeleton for kartochki.online
+servers:
+  - url: http://localhost:8080
+paths:
+  /health/live:
+    get:
+      summary: Liveness probe
+      operationId: getLiveHealth
+      tags:
+        - Health
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /health/ready:
+    get:
+      summary: Readiness probe
+      operationId: getReadyHealth
+      tags:
+        - Health
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Dependencies are unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+          example: ok
