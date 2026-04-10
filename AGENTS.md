@@ -8,6 +8,63 @@ This repository contains the backend for `kartochki.online`, a SaaS product for 
 - Use `docs/architecture.md` for deeper architectural context.
 - Keep changes production-ready. Avoid shortcuts that create migration debt.
 
+## Documentation And Commenting Rules
+
+- This repository is maintained by a developer who is new to Go, so code must stay readable and educational.
+- Write comments and documentation in simple Russian.
+- Every new package, exported type, exported function, exported method, exported interface, and exported constant group should have a Go doc comment in Russian.
+- Add short Russian comments for non-obvious business rules, data flow, integration behavior, retry logic, SQL intent, and background job behavior.
+- When changing existing code, improve nearby comments if they are missing, outdated, too vague, or written in a way that is hard for a beginner to understand.
+- Do not comment every line. Comments should explain intent and reasoning, not restate obvious syntax.
+- Prefer comments that answer one of these questions:
+  - what this code is responsible for
+  - why this branch or check exists
+  - what assumptions the code relies on
+  - what side effects happen here
+  - what can break if this logic changes
+- Keep comments aligned with the code. If code changes, update or remove stale comments in the same patch.
+- When introducing a new subsystem or package, include a short package-level description in Russian if it helps explain the role of that package.
+
+### Comment Style
+
+- Keep wording direct, simple, and beginner-friendly.
+- Prefer complete short sentences over shorthand.
+- Avoid decorative comments and obvious comments like "увеличиваем i на 1".
+- For doc comments, start with the symbol name when it fits Go conventions.
+- If a function is important but the implementation is short, still document what comes in, what comes out, and what side effect matters.
+
+### Examples
+
+- Good: `// CreateProject создаёт проект и подготавливает запись для фоновой генерации.`
+- Good: `// Повторная отправка безопасна, потому что задача идемпотентно обновляет статус по external_id.`
+- Bad: `// Цикл по массиву`
+- Bad: `// Устанавливаем значение переменной`
+
+### Layer-Specific Expectations
+
+- HTTP handlers:
+  - Add a short comment when the request flow is not obvious from the function name alone.
+  - Explain important validation, authorization, response mapping, and why a request is rejected.
+- Application services and use cases:
+  - Document the business scenario the code orchestrates.
+  - Explain cross-package coordination, side effects, and why the order of steps matters.
+- Repositories and persistence code:
+  - Comment business-critical query intent when the SQL or method name is not self-explanatory.
+  - Explain locking, transactional assumptions, uniqueness guarantees, and idempotency safeguards.
+- Background jobs:
+  - Document payload meaning, retry expectations, idempotency strategy, and external side effects.
+  - Explain what makes the job safe or unsafe to run more than once.
+- Infrastructure adapters:
+  - Comment non-obvious provider behavior, fallback logic, timeout assumptions, and error translation.
+
+### Completion Checklist
+
+- Before finishing a task, quickly verify that:
+  - new exported symbols have Russian Go doc comments
+  - non-obvious logic has short Russian explanation comments nearby
+  - stale comments were updated or removed together with the code
+  - comments explain intent, not syntax
+
 ## Product Context
 
 - Primary domains:
@@ -110,5 +167,5 @@ Do not prematurely introduce separate services for these domains. Keep them modu
 2. Keep HTTP handlers thin.
 3. Put orchestration in use-case or service packages, not in transport or repository code.
 4. Update `api/openapi/openapi.yaml` for public API changes.
-5. Update `docs/architecture.md` when package boundaries or backend conventions change.
-
+5. Add or update simple Russian comments when changing code so the patch remains understandable to a Go beginner.
+6. Update `docs/architecture.md` when package boundaries or backend conventions change.

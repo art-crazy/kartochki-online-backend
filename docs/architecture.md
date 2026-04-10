@@ -23,6 +23,68 @@ The architecture should optimize for predictable growth, clear request flow, str
 - `zerolog`
 - `OpenAPI`
 
+## Code Documentation Standard
+
+This project is developed with an educational requirement: the code should be understandable to a developer who is new to Go.
+
+Because of that, code documentation is part of the production standard, not an optional cleanup task.
+
+### Primary rule
+
+Write code comments and package documentation in simple Russian.
+
+The goal of comments is not to translate Go syntax. The goal is to explain responsibility, intent, important decisions, and side effects in a way that helps a beginner read the code confidently.
+
+### What must be documented
+
+Document in Russian:
+
+- new packages when a short package description helps explain ownership
+- exported structs, interfaces, type aliases, constants, and variables when they define meaningful behavior
+- exported functions and methods
+- non-obvious branches in handlers, services, repositories, and jobs
+- retry behavior, idempotency guarantees, and external integration assumptions
+- SQL queries or persistence code when business intent is not obvious from names alone
+
+### What should usually not be documented
+
+Avoid comments that only restate the code mechanically, for example:
+
+- "цикл по массиву"
+- "присваиваем значение переменной"
+- "проверяем ошибку"
+
+Such comments create noise and make real explanations harder to notice.
+
+### Preferred comment style
+
+Comments should be:
+
+- short and direct
+- written in simple language without unnecessary jargon
+- focused on why the code exists or what responsibility it has
+- updated together with the code in the same change
+
+For Go doc comments, prefer the standard style where the comment starts with the exported name when it fits naturally.
+
+Examples:
+
+- `// ProjectService управляет сценариями работы с проектами и не знает о деталях HTTP.`
+- `// Повторный запуск безопасен: мы ищем запись по external_id и не создаём дубликат.`
+- `// Неудачный пример: смешение русского комментария и случайного английского текста.`
+
+The last style should be avoided unless there is a very strong reason to keep original terminology.
+
+### Layer-oriented guidance
+
+Use comments where they provide the most learning value:
+
+- in handlers: explain non-obvious validation, authorization, and response decisions
+- in services: explain the business scenario and important orchestration steps
+- in persistence code: explain business intent, locking, transaction boundaries, and idempotency assumptions
+- in jobs: explain payload meaning, retry safety, and repeated-run behavior
+- in infrastructure adapters: explain provider-specific behavior, timeout assumptions, and error translation
+
 ## Why This Stack
 
 ### Why Go
@@ -364,5 +426,4 @@ The next reasonable steps for this backend are:
 
 ## Documentation Rule
 
-When package boundaries, transport conventions, persistence strategy, or contract rules change, update this file.
-
+When package boundaries, transport conventions, persistence strategy, comment conventions, or contract rules change, update this file.

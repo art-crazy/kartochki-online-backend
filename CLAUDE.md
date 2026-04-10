@@ -20,6 +20,12 @@ Build and maintain the backend for `kartochki.online`.
 - Use explicit SQL and `sqlc` for typed query generation.
 - Use Asynq for retryable background work.
 - Avoid hidden abstractions that make request flow harder to trace.
+- Write code comments and documentation in simple Russian for a developer who is learning Go.
+- Every new exported package member should have a Russian Go doc comment.
+- Add short Russian comments around non-obvious logic, side effects, retries, SQL intent, and integration behavior.
+- Do not add noisy comments that only restate syntax.
+- Match comment detail to the layer: handlers, services, persistence, jobs, and adapters should explain different kinds of intent.
+- Before finishing, verify exported symbols and non-obvious logic are documented in Russian.
 
 ## Implementation Defaults
 
@@ -32,5 +38,4 @@ Build and maintain the backend for `kartochki.online`.
 
 ## Update Rule
 
-If your changes affect package boundaries, transport conventions, job execution, or public API contracts, update `docs/architecture.md`.
-
+If your changes affect package boundaries, transport conventions, job execution, comment conventions, or public API contracts, update `docs/architecture.md`.
