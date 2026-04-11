@@ -1,0 +1,473 @@
+Project kartochki_online_backend {
+  database_type: "PostgreSQL"
+  Note: '''
+  Черновая схема БД для просмотра в dbdiagram.io.
+  Это проектный артефакт перед миграциями, а не финальный SQL.
+  '''
+}
+
+TableGroup auth {
+  users
+  sessions
+  password_reset_tokens
+  oauth_accounts
+  user_settings
+  notification_preferences
+  api_keys
+  export_requests
+  account_deletion_requests
+}
+
+TableGroup billing {
+  plans
+  subscriptions
+  usage_quotas
+  addon_products
+  payments
+}
+
+TableGroup generation {
+  projects
+  assets
+  generation_jobs
+  generated_cards
+}
+
+TableGroup blog {
+  blog_posts
+  blog_post_sections
+  blog_categories
+  blog_post_categories
+  blog_tags
+  blog_post_tags
+  blog_post_metrics
+}
+
+Table users {
+  id uuid [pk]
+  email varchar [not null, unique]
+  password_hash varchar
+  name varchar
+  email_verified_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'Основной аккаунт пользователя.'
+}
+
+Table sessions {
+  id uuid [pk]
+  user_id uuid [not null]
+  token_hash varchar [not null, unique]
+  device varchar
+  platform varchar
+  location varchar
+  ip inet
+  user_agent text
+  last_seen_at timestamptz
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+  created_at timestamptz [not null]
+
+  indexes {
+    user_id
+    expires_at
+  }
+
+  Note: 'Сессии входа. Для безопасности в БД хранится хэш токена.'
+}
+
+Table password_reset_tokens {
+  id uuid [pk]
+  user_id uuid [not null]
+  token_hash varchar [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  created_at timestamptz [not null]
+
+  indexes {
+    user_id
+    expires_at
+  }
+}
+
+Table oauth_accounts {
+  id uuid [pk]
+  user_id uuid [not null]
+  provider varchar [not null]
+  provider_user_id varchar [not null]
+  email varchar
+  created_at timestamptz [not null]
+
+  indexes {
+    (provider, provider_user_id) [unique]
+    user_id
+  }
+
+  Note: 'Привязанные внешние OAuth-аккаунты.'
+}
+
+Table user_settings {
+  user_id uuid [pk]
+  default_card_count int
+  default_language varchar
+  default_marketplace varchar
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'Настройки профиля и дефолты генерации в формате 1:1 к users.'
+}
+
+Table notification_preferences {
+  id uuid [pk]
+  user_id uuid [not null]
+  kind varchar [not null]
+  enabled boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, kind) [unique]
+  }
+
+  Note: 'Переключатели уведомлений по ключам, а не отдельными колонками.'
+}
+
+Table api_keys {
+  id uuid [pk]
+  user_id uuid [not null]
+  key_prefix varchar [not null]
+  key_hash varchar [not null, unique]
+  is_active boolean [not null, default: true]
+  last_used_at timestamptz
+  revoked_at timestamptz
+  created_at timestamptz [not null]
+
+  indexes {
+    user_id
+  }
+
+  Note: 'API-ключи пользователя с историей перевыпуска.'
+}
+
+Table export_requests {
+  id uuid [pk]
+  user_id uuid [not null]
+  status varchar [not null]
+  archive_asset_id uuid
+  requested_at timestamptz [not null]
+  finished_at timestamptz
+
+  indexes {
+    user_id
+    archive_asset_id
+  }
+}
+
+Table account_deletion_requests {
+  id uuid [pk]
+  user_id uuid [not null]
+  status varchar [not null]
+  requested_at timestamptz [not null]
+  scheduled_for timestamptz
+  finished_at timestamptz
+
+  indexes {
+    user_id
+  }
+}
+
+Table plans {
+  id uuid [pk]
+  code varchar [not null, unique]
+  name varchar [not null]
+  period varchar [not null, note: 'monthly или yearly']
+  cards_limit int [not null]
+  price_amount numeric(12,2) [not null]
+  price_currency varchar [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table subscriptions {
+  id uuid [pk]
+  user_id uuid [not null]
+  plan_id uuid [not null]
+  status varchar [not null]
+  provider varchar
+  provider_subscription_id varchar
+  started_at timestamptz [not null]
+  current_period_start timestamptz
+  current_period_end timestamptz
+  renews_at timestamptz
+  cancels_at timestamptz
+  ended_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    user_id
+    plan_id
+    provider_subscription_id [unique]
+  }
+
+  Note: 'История подписок пользователя. Активная подписка определяется по status.'
+}
+
+Table usage_quotas {
+  id uuid [pk]
+  user_id uuid [not null]
+  subscription_id uuid [not null]
+  period_start timestamptz [not null]
+  period_end timestamptz [not null]
+  cards_limit int [not null]
+  cards_used int [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    user_id
+    subscription_id
+    (user_id, period_start, period_end) [unique]
+  }
+
+  Note: 'Снимок лимитов и использования по периоду подписки.'
+}
+
+Table addon_products {
+  id uuid [pk]
+  code varchar [not null, unique]
+  name varchar [not null]
+  cards_count int [not null]
+  price_amount numeric(12,2) [not null]
+  price_currency varchar [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table payments {
+  id uuid [pk]
+  user_id uuid [not null]
+  subscription_id uuid
+  addon_product_id uuid
+  provider varchar [not null]
+  provider_payment_id varchar [unique]
+  kind varchar [not null, note: 'subscription или addon']
+  status varchar [not null]
+  amount numeric(12,2) [not null]
+  currency varchar [not null]
+  paid_at timestamptz
+  created_at timestamptz [not null]
+
+  indexes {
+    user_id
+    subscription_id
+    addon_product_id
+  }
+
+  Note: 'Единая таблица платежей по подпискам и разовым пакетам.'
+}
+
+Table projects {
+  id uuid [pk]
+  user_id uuid [not null]
+  title varchar [not null]
+  marketplace varchar
+  product_name varchar
+  product_description text
+  status varchar [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    user_id
+    updated_at
+  }
+
+  Note: 'Рабочая сущность пользователя для генерации карточек.'
+}
+
+Table assets {
+  id uuid [pk]
+  user_id uuid [not null]
+  project_id uuid
+  kind varchar [not null, note: 'source, generated, export']
+  storage_key text [not null, unique]
+  mime_type varchar
+  size_bytes bigint
+  original_filename varchar
+  created_at timestamptz [not null]
+
+  indexes {
+    user_id
+    project_id
+    kind
+  }
+
+  Note: 'Единая таблица для исходных и результирующих файлов.'
+}
+
+Table generation_jobs {
+  id uuid [pk]
+  user_id uuid [not null]
+  project_id uuid [not null]
+  source_asset_id uuid [not null]
+  status varchar [not null]
+  current_step varchar
+  progress_percent int
+  error_message text
+  archive_asset_id uuid
+  started_at timestamptz [not null]
+  finished_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    user_id
+    project_id
+    source_asset_id
+    archive_asset_id
+    created_at
+  }
+
+  Note: 'Запуск генерации и его служебный статус.'
+}
+
+Table generated_cards {
+  id uuid [pk]
+  generation_job_id uuid [not null]
+  asset_id uuid [not null]
+  card_type_id varchar [not null]
+  sort_order int [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    generation_job_id
+    asset_id
+    (generation_job_id, sort_order) [unique]
+  }
+
+  Note: 'Отдельные карточки, полученные в рамках одного запуска генерации.'
+}
+
+Table blog_posts {
+  id uuid [pk]
+  slug varchar [not null, unique]
+  title varchar [not null]
+  excerpt text
+  seo_title varchar
+  seo_description text
+  cover_asset_id uuid
+  status varchar [not null]
+  published_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    status
+    published_at
+  }
+
+  Note: 'Статьи блога для SEO-страниц.'
+}
+
+Table blog_post_sections {
+  id uuid [pk]
+  blog_post_id uuid [not null]
+  sort_order int [not null]
+  kind varchar [not null]
+  title varchar
+  level int
+  payload jsonb [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    blog_post_id
+    (blog_post_id, sort_order) [unique]
+  }
+
+  Note: 'Универсальные секции статьи. Детали блока лежат в JSON payload.'
+}
+
+Table blog_categories {
+  id uuid [pk]
+  slug varchar [not null, unique]
+  label varchar [not null]
+  created_at timestamptz [not null]
+}
+
+Table blog_post_categories {
+  id uuid [pk]
+  blog_post_id uuid [not null]
+  blog_category_id uuid [not null]
+
+  indexes {
+    (blog_post_id, blog_category_id) [unique]
+    blog_category_id
+  }
+}
+
+Table blog_tags {
+  id uuid [pk]
+  slug varchar [not null, unique]
+  label varchar [not null]
+  created_at timestamptz [not null]
+}
+
+Table blog_post_tags {
+  id uuid [pk]
+  blog_post_id uuid [not null]
+  blog_tag_id uuid [not null]
+
+  indexes {
+    (blog_post_id, blog_tag_id) [unique]
+    blog_tag_id
+  }
+}
+
+Table blog_post_metrics {
+  blog_post_id uuid [pk]
+  views_count bigint [not null, default: 0]
+  reading_time_minutes int
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Ref: sessions.user_id > users.id
+Ref: password_reset_tokens.user_id > users.id
+Ref: oauth_accounts.user_id > users.id
+Ref: user_settings.user_id - users.id
+Ref: notification_preferences.user_id > users.id
+Ref: api_keys.user_id > users.id
+Ref: export_requests.user_id > users.id
+Ref: export_requests.archive_asset_id > assets.id
+Ref: account_deletion_requests.user_id > users.id
+
+Ref: subscriptions.user_id > users.id
+Ref: subscriptions.plan_id > plans.id
+Ref: usage_quotas.user_id > users.id
+Ref: usage_quotas.subscription_id > subscriptions.id
+Ref: payments.user_id > users.id
+Ref: payments.subscription_id > subscriptions.id
+Ref: payments.addon_product_id > addon_products.id
+
+Ref: projects.user_id > users.id
+Ref: assets.user_id > users.id
+Ref: assets.project_id > projects.id
+Ref: generation_jobs.user_id > users.id
+Ref: generation_jobs.project_id > projects.id
+Ref: generation_jobs.source_asset_id > assets.id
+Ref: generation_jobs.archive_asset_id > assets.id
+Ref: generated_cards.generation_job_id > generation_jobs.id
+Ref: generated_cards.asset_id > assets.id
+
+Ref: blog_posts.cover_asset_id > assets.id
+Ref: blog_post_sections.blog_post_id > blog_posts.id
+Ref: blog_post_categories.blog_post_id > blog_posts.id
+Ref: blog_post_categories.blog_category_id > blog_categories.id
+Ref: blog_post_tags.blog_post_id > blog_posts.id
+Ref: blog_post_tags.blog_tag_id > blog_tags.id
+Ref: blog_post_metrics.blog_post_id - blog_posts.id
