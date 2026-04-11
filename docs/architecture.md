@@ -247,6 +247,10 @@ Responsibilities:
 - transport DTOs
 - request parsing and response mapping
 
+Transport DTOs may live in explicit subpackages when that keeps contracts readable, for example:
+
+- `internal/http/contracts`
+
 Do not put database access or cross-domain orchestration directly in handlers.
 
 ### `internal/platform`
