@@ -1,4 +1,4 @@
-// Package contracts содержит transport DTO для публичных HTTP-контрактов.
+// Package contracts-mermaid содержит transport DTO для публичных HTTP-контрактов.
 package contracts
 
 import "time"
