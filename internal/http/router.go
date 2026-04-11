@@ -1,18 +1,17 @@
 package http
 
 import (
-	"io/fs"
 	stdhttp "net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 
-	openapi "kartochki-online-backend/api/openapi"
 	"kartochki-online-backend/internal/config"
 	"kartochki-online-backend/internal/http/handlers"
 )
 
+// NewRouter собирает HTTP-маршруты и middleware для публичного API и служебных endpoint.
 func NewRouter(cfg config.HTTPConfig, logger zerolog.Logger, healthHandler handlers.HealthHandler) stdhttp.Handler {
 	router := chi.NewRouter()
 
@@ -25,10 +24,7 @@ func NewRouter(cfg config.HTTPConfig, logger zerolog.Logger, healthHandler handl
 	router.Get("/health/live", healthHandler.Live)
 	router.Get("/health/ready", healthHandler.Ready)
 
-	openapiFS, err := fs.Sub(openapi.Files, ".")
-	if err == nil {
-		router.Handle("/openapi/*", stdhttp.StripPrefix("/openapi/", stdhttp.FileServer(stdhttp.FS(openapiFS))))
-	}
+	registerDocsRoutes(router)
 
 	return router
 }
