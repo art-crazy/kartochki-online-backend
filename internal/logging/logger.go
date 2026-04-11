@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// New создаёт zerolog.Logger с форматом, подходящим для текущего окружения.
 func New(env string) zerolog.Logger {
 	if env == "local" {
 		return zerolog.New(zerolog.ConsoleWriter{
@@ -17,4 +18,3 @@ func New(env string) zerolog.Logger {
 
 	return zerolog.New(os.Stdout).With().Timestamp().Logger()
 }
-

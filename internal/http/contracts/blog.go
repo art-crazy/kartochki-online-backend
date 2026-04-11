@@ -1,4 +1,4 @@
-// Package contracts-mermaid содержит transport DTO для публичных HTTP-контрактов.
+// Package contracts содержит transport DTO для публичных HTTP-контрактов.
 package contracts
 
 import "time"
@@ -84,7 +84,8 @@ type BlogPostDetail struct {
 
 // BlogArticleSection описывает один смысловой блок статьи.
 //
-// Level нужен, чтобы фронтенд мог строить содержание без отдельного поля toc_items.
+// Level нужен, чтобы фронтенд мог строить содержание без отдельного поля
+// `toc_items`.
 type BlogArticleSection struct {
 	ID      string              `json:"id"`
 	Title   string              `json:"title"`
@@ -101,6 +102,7 @@ type BlogArticleSection struct {
 // BlogSectionKind помогает фронтенду понять, как рендерить блок статьи.
 type BlogSectionKind string
 
+// BlogSectionKind values задают допустимые типы смысловых блоков статьи.
 const (
 	// BlogSectionKindText описывает обычный текстовый блок.
 	BlogSectionKindText BlogSectionKind = "text"

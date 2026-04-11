@@ -1,6 +1,6 @@
 # kartochki-online-backend
 
-Пустой backend-скелет для `kartochki.online` на Go.
+Backend-сервис для `kartochki.online` на Go.
 
 ## Документация для AI-агентов
 
@@ -14,6 +14,7 @@
 - chi
 - PostgreSQL
 - pgx
+- sqlc
 - Redis
 - Asynq
 - zerolog
@@ -27,7 +28,7 @@
 - health endpoints
 - конфиг через env
 - заготовки под PostgreSQL, Redis и Asynq
-- OpenAPI-спека и endpoint для ее отдачи
+- OpenAPI-спека и endpoint для её отдачи
 - `docker-compose.yml` для локального Postgres и Redis
 
 ## Старт
@@ -51,7 +52,7 @@ go run ./cmd/api
 
 Спека лежит в `api/openapi/openapi.yaml`.
 
-Во время работы API она отдается по:
+Во время работы API она отдаётся по:
 
 - `GET /openapi/openapi.yaml`
 

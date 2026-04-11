@@ -32,7 +32,8 @@ type AuthUser struct {
 
 // ForgotPasswordResponse подтверждает, что запрос принят в обработку.
 //
-// Status стоит держать фиксированным, например `accepted`, чтобы не плодить лишние состояния.
+// Status стоит держать фиксированным, например `accepted`, чтобы не плодить
+// лишние состояния.
 type ForgotPasswordResponse struct {
 	Status string `json:"status"`
 }

@@ -60,6 +60,7 @@ type CreateCheckoutRequest struct {
 // BillingPlanPeriod описывает период оплаты тарифа.
 type BillingPlanPeriod string
 
+// BillingPlanPeriod values используются фронтендом и backend как общий набор периодов оплаты.
 const (
 	// BillingPlanPeriodMonthly описывает оплату тарифа на один месяц.
 	BillingPlanPeriodMonthly BillingPlanPeriod = "monthly"

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
@@ -16,6 +17,7 @@ import (
 	"kartochki-online-backend/internal/platform/redis"
 )
 
+// App хранит собранные runtime-зависимости приложения.
 type App struct {
 	Server *httpserver.Server
 	DB     *postgres.Client
@@ -23,16 +25,17 @@ type App struct {
 	Asynq  *jobs.Client
 }
 
+// New собирает приложение и проверяет доступность обязательной инфраструктуры.
 func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	db, err := postgres.New(cfg.Postgres.DSN)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init postgres: %w", err)
 	}
 
 	redisClient, err := redis.New(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
 	if err != nil {
 		db.Close()
-		return nil, err
+		return nil, fmt.Errorf("init redis: %w", err)
 	}
 
 	asynqClient := jobs.New(redisClient.AsynqOpt(), cfg.Asynq.Concurrency)
@@ -53,6 +56,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	}, nil
 }
 
+// Shutdown останавливает сервер и закрывает инфраструктурные клиенты.
 func (a *App) Shutdown(ctx context.Context) error {
 	var joined error
 

@@ -2,8 +2,7 @@ package openapi
 
 import "embed"
 
-// Files contains embedded OpenAPI assets served by the API.
+// Files содержит встроенные OpenAPI-ресурсы, которые API отдаёт как статические файлы.
 //
 //go:embed *.yaml
 var Files embed.FS
-
