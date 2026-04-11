@@ -57,4 +57,3 @@ func main() {
 
 	logger.Info().Msg("application stopped")
 }
-

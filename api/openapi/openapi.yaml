@@ -15,6 +15,11 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            X-Request-ID:
+              description: Request identifier for log correlation.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -28,12 +33,22 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            X-Request-ID:
+              description: Request identifier for log correlation.
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
         "503":
           description: Dependencies are unavailable
+          headers:
+            X-Request-ID:
+              description: Request identifier for log correlation.
+              schema:
+                type: string
           content:
             application/json:
               schema:
@@ -51,3 +66,33 @@ components:
             - ok
             - degraded
           example: ok
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: not_found
+        message:
+          type: string
+          example: resource not found
+        request_id:
+          type: string
+          example: 01HZY3GQK0M5YAWQ2N6R8T9P1S
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+    ErrorDetail:
+      type: object
+      required:
+        - message
+      properties:
+        field:
+          type: string
+          example: email
+        message:
+          type: string
+          example: field is required

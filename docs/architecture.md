@@ -251,6 +251,8 @@ Transport DTOs may live in explicit subpackages when that keeps contracts readab
 
 - `internal/http/contracts`
 
+Transport response helpers may live in a small dedicated package when that keeps handlers thin and preserves one error format for the whole API.
+
 Do not put database access or cross-domain orchestration directly in handlers.
 
 ### `internal/platform`
@@ -363,6 +365,15 @@ The project should eventually standardize fields similar to:
 
 This matters because generated frontend clients and UI flows become more predictable when error shapes are stable.
 
+At the transport level it is reasonable to converge on:
+
+- `code`
+- `message`
+- `request_id`
+- `details`
+
+`request_id` should also be returned in the `X-Request-ID` header so frontend logs, browser inspection, and backend logs refer to the same identifier.
+
 ### Health endpoints
 
 Keep simple infrastructure endpoints separate from business routes:
@@ -382,6 +393,8 @@ Prefer including:
 - user ID when available
 - job ID when available
 - domain identifiers such as workspace ID or project ID
+
+For HTTP, it is useful to build a request-scoped logger in middleware and pass it through context. This keeps handler logs and access logs aligned on the same request metadata without repeating field assembly in every handler.
 
 As the backend grows, add:
 

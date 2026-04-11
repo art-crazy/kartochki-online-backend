@@ -43,7 +43,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		health.NewChecker("postgres", db.Ping),
 		health.NewChecker("redis", redisClient.Ping),
 	)
-	healthHandler := handlers.NewHealthHandler(readiness)
+	healthHandler := handlers.NewHealthHandler(readiness, logger)
 
 	router := httptransport.NewRouter(cfg.HTTP, logger, healthHandler)
 	server := httpserver.New(cfg.HTTP, router)

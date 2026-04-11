@@ -2,9 +2,13 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/rs/zerolog"
+
+	"kartochki-online-backend/internal/http/requestctx"
+	"kartochki-online-backend/internal/http/response"
 )
 
 type healthResponse struct {
@@ -19,22 +23,26 @@ type ReadinessChecker interface {
 // HealthHandler обслуживает liveness и readiness endpoint приложения.
 type HealthHandler struct {
 	readiness ReadinessChecker
+	logger    zerolog.Logger
 }
 
 // NewHealthHandler создаёт обработчик health endpoint.
-func NewHealthHandler(readiness ReadinessChecker) HealthHandler {
-	return HealthHandler{readiness: readiness}
+func NewHealthHandler(readiness ReadinessChecker, logger zerolog.Logger) HealthHandler {
+	return HealthHandler{
+		readiness: readiness,
+		logger:    logger,
+	}
 }
 
 // Live отвечает, что HTTP-процесс запущен и может принимать запросы.
-func (h HealthHandler) Live(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, healthResponse{Status: "ok"})
+func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
+	response.WriteJSON(w, r, http.StatusOK, healthResponse{Status: "ok"})
 }
 
 // Ready проверяет доступность обязательных зависимостей приложения.
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	if h.readiness == nil {
-		writeJSON(w, http.StatusOK, healthResponse{Status: "ok"})
+		response.WriteJSON(w, r, http.StatusOK, healthResponse{Status: "ok"})
 		return
 	}
 
@@ -42,16 +50,13 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := h.readiness.Ready(ctx); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, healthResponse{Status: "degraded"})
+		requestLogger := requestctx.Logger(r.Context(), h.logger)
+		requestLogger.Warn().
+			Err(err).
+			Msg("readiness check failed")
+		response.WriteJSON(w, r, http.StatusServiceUnavailable, healthResponse{Status: "degraded"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, healthResponse{Status: "ok"})
-}
-
-// writeJSON пишет JSON-ответ без дополнительной бизнес-логики.
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	response.WriteJSON(w, r, http.StatusOK, healthResponse{Status: "ok"})
 }

@@ -37,16 +37,3 @@ type AuthUser struct {
 type ForgotPasswordResponse struct {
 	Status string `json:"status"`
 }
-
-// ErrorResponse описывает единый формат ошибки для auth-форм.
-type ErrorResponse struct {
-	Code        string       `json:"code"`
-	Message     string       `json:"message"`
-	FieldErrors []FieldError `json:"field_errors,omitempty"`
-}
-
-// FieldError описывает ошибку конкретного поля формы.
-type FieldError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
-}
