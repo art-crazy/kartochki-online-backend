@@ -23,6 +23,7 @@ import (
 	"kartochki-online-backend/internal/platform/postgres"
 	"kartochki-online-backend/internal/platform/redis"
 	"kartochki-online-backend/internal/platform/storage"
+	"kartochki-online-backend/internal/platform/yookassa"
 	"kartochki-online-backend/internal/projects"
 	"kartochki-online-backend/internal/settings"
 )
@@ -30,6 +31,37 @@ import (
 // Статические проверки соответствия адаптеров своим интерфейсам.
 // Компилятор сообщит об ошибке, если сигнатура метода разойдётся с интерфейсом.
 var _ jobs.SendPasswordResetEmailHandler = authEmailWorker{}
+var _ billing.CheckoutProvider = yookassaCheckoutAdapter{}
+var _ handlers.WebhookSignatureVerifier = (*yookassa.Client)(nil)
+
+// yookassaCheckoutAdapter оборачивает yookassa.Client и реализует billing.CheckoutProvider.
+// Живёт в app-пакете, чтобы ни billing, ни yookassa не зависели друг от друга.
+type yookassaCheckoutAdapter struct {
+	client *yookassa.Client
+}
+
+// CreateSubscriptionCheckout реализует billing.CheckoutProvider для подписки.
+func (a yookassaCheckoutAdapter) CreateSubscriptionCheckout(ctx context.Context, input billing.SubscriptionCheckoutInput) (string, error) {
+	return a.client.CreateSubscriptionCheckout(ctx, yookassa.SubscriptionCheckoutInput{
+		UserID:         input.UserID,
+		PlanCode:       input.PlanCode,
+		Period:         string(input.Period),
+		Amount:         input.Amount,
+		Currency:       input.Currency,
+		IdempotencyKey: input.IdempotencyKey,
+	})
+}
+
+// CreateAddonCheckout реализует billing.CheckoutProvider для разового пакета.
+func (a yookassaCheckoutAdapter) CreateAddonCheckout(ctx context.Context, input billing.AddonCheckoutInput) (string, error) {
+	return a.client.CreateAddonCheckout(ctx, yookassa.AddonCheckoutInput{
+		UserID:         input.UserID,
+		AddonCode:      input.AddonCode,
+		Amount:         input.Amount,
+		Currency:       input.Currency,
+		IdempotencyKey: input.IdempotencyKey,
+	})
+}
 
 // authEmailWorker адаптирует auth.EmailSender к интерфейсу jobs.SendPasswordResetEmailHandler.
 // Обёртка живёт в app-пакете, чтобы ни auth, ни jobs не зависели друг от друга.
@@ -138,7 +170,20 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 
 	projectService := projects.NewService(queries)
 	blogService := blog.NewService(queries)
-	billingService := billing.NewService(queries)
+
+	// Если YOOKASSA_SHOP_ID задан — используем реальный клиент ЮКасса.
+	// Иначе noopCheckoutProvider: checkout вернёт ошибку, но остальной billing работает,
+	// а проверка подписи webhook пропускается (NoopWebhookVerifier).
+	var (
+		billingProvider billing.CheckoutProvider
+		webhookVerifier handlers.WebhookSignatureVerifier = handlers.NoopWebhookVerifier{}
+	)
+	if cfg.YooKassa.ShopID != "" {
+		yk := yookassa.New(cfg.YooKassa)
+		billingProvider = yookassaCheckoutAdapter{client: yk}
+		webhookVerifier = yk
+	}
+	billingService := billing.NewService(db.Pool, queries, billingProvider)
 	generationService := generation.NewService(
 		db.Pool,
 		queries,
@@ -152,6 +197,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	projectsHandler := handlers.NewProjectsHandler(projectService, logger)
 	generationHandler := handlers.NewGenerationHandler(generationService, logger)
 	billingHandler := handlers.NewBillingHandler(billingService, logger)
+	billingWebhookHandler := handlers.NewBillingWebhookHandler(billingService, webhookVerifier, logger)
 	settingsHandler := handlers.NewSettingsHandler(settingsService, logger)
 	worker := jobs.NewServer(redisClient.AsynqOpt(), cfg.Asynq.Concurrency, logger, generationService, authEmailWorker{
 		sender:      emailSender,
@@ -169,6 +215,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		projectsHandler,
 		generationHandler,
 		billingHandler,
+		billingWebhookHandler,
 		settingsHandler,
 		authService,
 		cfg.Storage.PublicPath,

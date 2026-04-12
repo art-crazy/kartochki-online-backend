@@ -12,6 +12,37 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addAddonCardsToQuota = `-- name: AddAddonCardsToQuota :execrows
+update usage_quotas uq
+set cards_limit = uq.cards_limit + $1,
+    updated_at  = now()
+where uq.id = (
+    select sub.id
+    from usage_quotas sub
+    where sub.user_id = $2
+      and sub.period_start <= $3
+      and sub.period_end > $3
+    order by sub.period_start desc
+    limit 1
+)
+`
+
+type AddAddonCardsToQuotaParams struct {
+	ExtraCards int32
+	UserID     uuid.UUID
+	NowAt      pgtype.Timestamptz
+}
+
+// Увеличивает лимит карточек в текущей квоте пользователя после покупки addon.
+// Подзапрос нужен, потому что PostgreSQL не поддерживает ORDER BY/LIMIT в UPDATE напрямую.
+func (q *Queries) AddAddonCardsToQuota(ctx context.Context, arg AddAddonCardsToQuotaParams) (int64, error) {
+	result, err := q.db.Exec(ctx, addAddonCardsToQuota, arg.ExtraCards, arg.UserID, arg.NowAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countGeneratedCardsForUserInPeriod = `-- name: CountGeneratedCardsForUserInPeriod :one
 select count(*)
 from generated_cards gc
@@ -34,6 +65,79 @@ func (q *Queries) CountGeneratedCardsForUserInPeriod(ctx context.Context, arg Co
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createPayment = `-- name: CreatePayment :one
+insert into payments (
+    user_id,
+    subscription_id,
+    addon_product_id,
+    provider,
+    provider_payment_id,
+    kind,
+    status,
+    amount,
+    currency,
+    checkout_url
+) values (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10
+)
+returning id, user_id, subscription_id, addon_product_id, provider, provider_payment_id, kind, status, amount, currency, checkout_url, paid_at, created_at
+`
+
+type CreatePaymentParams struct {
+	UserID            uuid.UUID
+	SubscriptionID    pgtype.UUID
+	AddonProductID    pgtype.UUID
+	Provider          string
+	ProviderPaymentID pgtype.Text
+	Kind              string
+	Status            string
+	Amount            int32
+	Currency          string
+	CheckoutUrl       pgtype.Text
+}
+
+// Создаём запись платежа после получения checkout от провайдера.
+func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, createPayment,
+		arg.UserID,
+		arg.SubscriptionID,
+		arg.AddonProductID,
+		arg.Provider,
+		arg.ProviderPaymentID,
+		arg.Kind,
+		arg.Status,
+		arg.Amount,
+		arg.Currency,
+		arg.CheckoutUrl,
+	)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SubscriptionID,
+		&i.AddonProductID,
+		&i.Provider,
+		&i.ProviderPaymentID,
+		&i.Kind,
+		&i.Status,
+		&i.Amount,
+		&i.Currency,
+		&i.CheckoutUrl,
+		&i.PaidAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const createSubscription = `-- name: CreateSubscription :one
@@ -348,6 +452,92 @@ func (q *Queries) GetCurrentUsageQuotaBySubscriptionID(ctx context.Context, arg 
 	return i, err
 }
 
+const getPaymentByProviderID = `-- name: GetPaymentByProviderID :one
+select
+    id,
+    user_id,
+    subscription_id,
+    addon_product_id,
+    provider,
+    provider_payment_id,
+    kind,
+    status,
+    amount,
+    currency,
+    checkout_url,
+    paid_at,
+    created_at
+from payments
+where provider_payment_id = $1
+limit 1
+`
+
+// Ищем платёж по внешнему ID провайдера для идемпотентной обработки webhook.
+func (q *Queries) GetPaymentByProviderID(ctx context.Context, providerPaymentID pgtype.Text) (Payment, error) {
+	row := q.db.QueryRow(ctx, getPaymentByProviderID, providerPaymentID)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SubscriptionID,
+		&i.AddonProductID,
+		&i.Provider,
+		&i.ProviderPaymentID,
+		&i.Kind,
+		&i.Status,
+		&i.Amount,
+		&i.Currency,
+		&i.CheckoutUrl,
+		&i.PaidAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getSubscriptionByID = `-- name: GetSubscriptionByID :one
+select
+    id,
+    user_id,
+    plan_id,
+    status,
+    provider,
+    provider_subscription_id,
+    has_payment_method,
+    started_at,
+    current_period_start,
+    current_period_end,
+    renews_at,
+    cancels_at,
+    ended_at,
+    created_at,
+    updated_at
+from subscriptions
+where id = $1
+`
+
+func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error) {
+	row := q.db.QueryRow(ctx, getSubscriptionByID, id)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PlanID,
+		&i.Status,
+		&i.Provider,
+		&i.ProviderSubscriptionID,
+		&i.HasPaymentMethod,
+		&i.StartedAt,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.RenewsAt,
+		&i.CancelsAt,
+		&i.EndedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listActiveAddonProducts = `-- name: ListActiveAddonProducts :many
 select
     id,
@@ -442,6 +632,44 @@ func (q *Queries) ListActiveBillingPlans(ctx context.Context) ([]Plan, error) {
 	return items, nil
 }
 
+const markPaymentCanceled = `-- name: MarkPaymentCanceled :execrows
+update payments
+set status = 'canceled'
+where provider_payment_id = $1
+  and status = 'pending'
+`
+
+// Помечаем платёж отменённым после webhook payment.canceled.
+func (q *Queries) MarkPaymentCanceled(ctx context.Context, providerPaymentID pgtype.Text) (int64, error) {
+	result, err := q.db.Exec(ctx, markPaymentCanceled, providerPaymentID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markPaymentPaid = `-- name: MarkPaymentPaid :execrows
+update payments
+set status  = 'paid',
+    paid_at = $1
+where provider_payment_id = $2
+  and status = 'pending'
+`
+
+type MarkPaymentPaidParams struct {
+	PaidAt            pgtype.Timestamptz
+	ProviderPaymentID pgtype.Text
+}
+
+// Фиксируем успешное завершение платежа после webhook payment.succeeded.
+func (q *Queries) MarkPaymentPaid(ctx context.Context, arg MarkPaymentPaidParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markPaymentPaid, arg.PaidAt, arg.ProviderPaymentID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const markSubscriptionScheduledCancel = `-- name: MarkSubscriptionScheduledCancel :execrows
 update subscriptions
 set status = 'scheduled_cancel',
@@ -488,4 +716,147 @@ func (q *Queries) SumReservedGenerationCardsForUserInPeriod(ctx context.Context,
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const upsertActiveSubscription = `-- name: UpsertActiveSubscription :one
+insert into subscriptions (
+    user_id,
+    plan_id,
+    status,
+    provider,
+    provider_subscription_id,
+    has_payment_method,
+    started_at,
+    current_period_start,
+    current_period_end,
+    renews_at,
+    cancels_at
+) values (
+    $1,
+    $2,
+    'active',
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    null
+)
+on conflict (user_id) where status in ('active', 'scheduled_cancel')
+do update set
+    plan_id                  = excluded.plan_id,
+    status                   = 'active',
+    provider                 = excluded.provider,
+    provider_subscription_id = excluded.provider_subscription_id,
+    has_payment_method       = excluded.has_payment_method,
+    current_period_start     = excluded.current_period_start,
+    current_period_end       = excluded.current_period_end,
+    renews_at                = excluded.renews_at,
+    cancels_at               = null,
+    updated_at               = now()
+returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at
+`
+
+type UpsertActiveSubscriptionParams struct {
+	UserID                 uuid.UUID
+	PlanID                 uuid.UUID
+	Provider               string
+	ProviderSubscriptionID pgtype.Text
+	HasPaymentMethod       bool
+	StartedAt              pgtype.Timestamptz
+	CurrentPeriodStart     pgtype.Timestamptz
+	CurrentPeriodEnd       pgtype.Timestamptz
+	RenewsAt               pgtype.Timestamptz
+}
+
+// Создаёт или обновляет активную подписку после успешного платежа.
+// ON CONFLICT по user_id гарантирует, что у пользователя всегда одна активная запись.
+func (q *Queries) UpsertActiveSubscription(ctx context.Context, arg UpsertActiveSubscriptionParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, upsertActiveSubscription,
+		arg.UserID,
+		arg.PlanID,
+		arg.Provider,
+		arg.ProviderSubscriptionID,
+		arg.HasPaymentMethod,
+		arg.StartedAt,
+		arg.CurrentPeriodStart,
+		arg.CurrentPeriodEnd,
+		arg.RenewsAt,
+	)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PlanID,
+		&i.Status,
+		&i.Provider,
+		&i.ProviderSubscriptionID,
+		&i.HasPaymentMethod,
+		&i.StartedAt,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.RenewsAt,
+		&i.CancelsAt,
+		&i.EndedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertUsageQuotaForSubscription = `-- name: UpsertUsageQuotaForSubscription :one
+insert into usage_quotas (
+    user_id,
+    subscription_id,
+    period_start,
+    period_end,
+    cards_limit,
+    cards_used
+) values (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    0
+)
+on conflict (subscription_id, period_start, period_end)
+do update set
+    cards_limit = excluded.cards_limit,
+    updated_at  = now()
+returning id, user_id, subscription_id, period_start, period_end, cards_limit, cards_used, created_at, updated_at
+`
+
+type UpsertUsageQuotaForSubscriptionParams struct {
+	UserID         uuid.UUID
+	SubscriptionID uuid.UUID
+	PeriodStart    pgtype.Timestamptz
+	PeriodEnd      pgtype.Timestamptz
+	CardsLimit     int32
+}
+
+// Создаёт или сбрасывает usage_quota при начале нового billing-периода.
+func (q *Queries) UpsertUsageQuotaForSubscription(ctx context.Context, arg UpsertUsageQuotaForSubscriptionParams) (UsageQuota, error) {
+	row := q.db.QueryRow(ctx, upsertUsageQuotaForSubscription,
+		arg.UserID,
+		arg.SubscriptionID,
+		arg.PeriodStart,
+		arg.PeriodEnd,
+		arg.CardsLimit,
+	)
+	var i UsageQuota
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SubscriptionID,
+		&i.PeriodStart,
+		&i.PeriodEnd,
+		&i.CardsLimit,
+		&i.CardsUsed,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

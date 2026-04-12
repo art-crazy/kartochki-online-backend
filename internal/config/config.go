@@ -20,6 +20,16 @@ type Config struct {
 	Auth     AuthConfig
 	Storage  StorageConfig
 	Email    EmailConfig
+	YooKassa YooKassaConfig
+}
+
+// YooKassaConfig хранит параметры для интеграции с платёжной системой ЮКасса.
+// При пустом ShopID и SecretKey приложение использует noopCheckoutProvider (без реальных платежей).
+type YooKassaConfig struct {
+	ShopID        string
+	SecretKey     string
+	WebhookSecret string
+	ReturnURL     string
 }
 
 // AppConfig хранит общие параметры приложения.
@@ -227,6 +237,12 @@ func loadFromEnv() (Config, error) {
 			Password:    getEnv("SMTP_PASSWORD", ""),
 			FromAddress: getEnv("EMAIL_FROM", ""),
 			FromName:    getEnv("EMAIL_FROM_NAME", "kartochki.online"),
+		},
+		YooKassa: YooKassaConfig{
+			ShopID:        getEnv("YOOKASSA_SHOP_ID", ""),
+			SecretKey:     getEnv("YOOKASSA_SECRET_KEY", ""),
+			WebhookSecret: getEnv("YOOKASSA_WEBHOOK_SECRET", ""),
+			ReturnURL:     getEnv("YOOKASSA_RETURN_URL", "http://localhost:3000/app/billing"),
 		},
 		Auth: AuthConfig{
 			SessionTTL:            sessionTTL,

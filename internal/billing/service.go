@@ -2,6 +2,8 @@ package billing
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"kartochki-online-backend/internal/dbgen"
 )
@@ -17,6 +19,17 @@ import (
 const (
 	freePlanCode        = "free"
 	checkoutCurrencyRUB = "RUB"
+
+	// ProviderYooKassa идентифицирует ЮКасса в колонке provider таблицы subscriptions.
+	ProviderYooKassa = "yookassa"
+	// providerManual используется для виртуальных подписок (бесплатный план без внешнего провайдера).
+	providerManual = "manual"
+
+	subscriptionStatusActive          = "active"
+	subscriptionStatusScheduledCancel = "scheduled_cancel"
+
+	paymentTypeSubscription = "subscription"
+	paymentTypeAddon        = "addon"
 )
 
 var planFeaturesByCode = map[string][]PlanFeature{
@@ -121,37 +134,61 @@ type PurchaseAddonResult struct {
 
 // Service управляет billing-сценариями поверх sqlc-запросов и checkout-провайдера.
 type Service struct {
+	pool     *pgxpool.Pool
 	queries  *dbgen.Queries
-	provider checkoutProvider
+	provider CheckoutProvider
 }
 
-type checkoutProvider interface {
-	CreateSubscriptionCheckout(ctx context.Context, input subscriptionCheckoutInput) (string, error)
-	CreateAddonCheckout(ctx context.Context, input addonCheckoutInput) (string, error)
+// CheckoutProvider описывает внешний платёжный провайдер, который создаёт checkout-сессии.
+// Реализация живёт в internal/platform/yookassa и подключается через app-адаптер.
+type CheckoutProvider interface {
+	CreateSubscriptionCheckout(ctx context.Context, input SubscriptionCheckoutInput) (string, error)
+	CreateAddonCheckout(ctx context.Context, input AddonCheckoutInput) (string, error)
 }
 
-type subscriptionCheckoutInput struct {
+// SubscriptionCheckoutInput описывает параметры checkout для покупки тарифа.
+type SubscriptionCheckoutInput struct {
 	UserID   string
 	PlanCode string
 	Period   PlanPeriod
 	Amount   int
 	Currency string
+	// IdempotencyKey — стабильный ключ для дедупликации запроса на стороне платёжного провайдера.
+	// Вычисляется в billing-сервисе, чтобы провайдер не создавал дублирующий платёж при повторных попытках.
+	IdempotencyKey string
 }
 
-type addonCheckoutInput struct {
+// AddonCheckoutInput описывает параметры checkout для покупки разового пакета.
+type AddonCheckoutInput struct {
 	UserID    string
 	AddonCode string
 	Amount    int
 	Currency  string
+	// IdempotencyKey — стабильный ключ для дедупликации запроса на стороне платёжного провайдера.
+	IdempotencyKey string
 }
 
 type noopCheckoutProvider struct{}
 
+var _ CheckoutProvider = noopCheckoutProvider{}
+
 // NewService создаёт billing-сервис.
-func NewService(queries *dbgen.Queries) *Service {
+// Если provider равен nil — используется noopCheckoutProvider (checkout недоступен, но остальные операции работают).
+// pool и queries обязательны: nil вызовет панику при первом обращении к БД.
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, provider CheckoutProvider) *Service {
+	if pool == nil {
+		panic("billing.NewService: pool is nil")
+	}
+	if queries == nil {
+		panic("billing.NewService: queries is nil")
+	}
+	if provider == nil {
+		provider = noopCheckoutProvider{}
+	}
 	return &Service{
+		pool:     pool,
 		queries:  queries,
-		provider: noopCheckoutProvider{},
+		provider: provider,
 	}
 }
 
@@ -245,12 +282,16 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 		return CheckoutResult{}, err
 	}
 
-	checkoutURL, err := s.provider.CreateSubscriptionCheckout(ctx, subscriptionCheckoutInput{
-		UserID:   uid.String(),
-		PlanCode: targetPlan.Code,
-		Period:   period,
-		Amount:   amount,
-		Currency: checkoutCurrencyRUB,
+	// Ключ включает год-месяц: стабилен при повторных попытках в одном месяце,
+	// уникален при покупке того же плана в следующем периоде.
+	billingMonth := time.Now().UTC().Format("2006-01")
+	checkoutURL, err := s.provider.CreateSubscriptionCheckout(ctx, SubscriptionCheckoutInput{
+		UserID:         uid.String(),
+		PlanCode:       targetPlan.Code,
+		Period:         period,
+		Amount:         amount,
+		Currency:       checkoutCurrencyRUB,
+		IdempotencyKey: checkoutIdempotencyKey(uid.String(), targetPlan.Code, string(period), billingMonth),
 	})
 	if err != nil {
 		return CheckoutResult{}, err
@@ -278,11 +319,13 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 		return PurchaseAddonResult{}, fmt.Errorf("get billing addon by code: %w", err)
 	}
 
-	checkoutURL, err := s.provider.CreateAddonCheckout(ctx, addonCheckoutInput{
-		UserID:    uid.String(),
-		AddonCode: addon.Code,
-		Amount:    int(addon.Price),
-		Currency:  checkoutCurrencyRUB,
+	billingMonth := time.Now().UTC().Format("2006-01")
+	checkoutURL, err := s.provider.CreateAddonCheckout(ctx, AddonCheckoutInput{
+		UserID:         uid.String(),
+		AddonCode:      addon.Code,
+		Amount:         int(addon.Price),
+		Currency:       checkoutCurrencyRUB,
+		IdempotencyKey: checkoutIdempotencyKey(uid.String(), addon.Code, billingMonth),
 	})
 	if err != nil {
 		return PurchaseAddonResult{}, err
@@ -309,7 +352,7 @@ func (s *Service) CancelSubscription(ctx context.Context, userID string) error {
 	if strings.TrimSpace(row.PlanCode) == freePlanCode {
 		return ErrSubscriptionNotCancelable
 	}
-	if row.Status == "scheduled_cancel" {
+	if row.Status == subscriptionStatusScheduledCancel {
 		return nil
 	}
 
@@ -430,8 +473,8 @@ func (s *Service) buildFreeBillingSnapshot(ctx context.Context, userID uuid.UUID
 	return dbgen.GetCurrentSubscriptionByUserIDRow{
 			UserID:             userID,
 			PlanID:             plan.ID,
-			Status:             "active",
-			Provider:           "manual",
+			Status:             subscriptionStatusActive,
+			Provider:           providerManual,
 			HasPaymentMethod:   false,
 			StartedAt:          toTimestamp(periodStart),
 			CurrentPeriodStart: toTimestamp(periodStart),
@@ -502,6 +545,14 @@ func clonePlanFeatures(features []PlanFeature) []PlanFeature {
 	return result
 }
 
+// checkoutIdempotencyKey возвращает детерминированный ключ для дедупликации checkout-запроса.
+// Ключ строится из бизнес-параметров и периода, поэтому стабилен при повторных попытках
+// в пределах одного периода и уникален для каждого нового периода.
+func checkoutIdempotencyKey(parts ...string) string {
+	h := sha256.Sum256([]byte(strings.Join(parts, ":")))
+	return hex.EncodeToString(h[:])
+}
+
 func amountForPeriod(plan dbgen.Plan, period PlanPeriod) (int, error) {
 	switch period {
 	case PlanPeriodMonthly:
@@ -516,40 +567,10 @@ func amountForPeriod(plan dbgen.Plan, period PlanPeriod) (int, error) {
 	}
 }
 
-func parseUserID(userID string) (uuid.UUID, error) {
-	return uuid.Parse(strings.TrimSpace(userID))
-}
-
-func currentMonthPeriod(now time.Time) (time.Time, time.Time) {
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	return start, start.AddDate(0, 1, 0)
-}
-
-func toTimestamp(value time.Time) pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: value, Valid: true}
-}
-
-func nullableTime(value pgtype.Timestamptz) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-
-	result := value.Time
-	return &result
-}
-
-func int32Value(value pgtype.Int4) int {
-	if !value.Valid {
-		return 0
-	}
-
-	return int(value.Int32)
-}
-
-func (noopCheckoutProvider) CreateSubscriptionCheckout(context.Context, subscriptionCheckoutInput) (string, error) {
+func (noopCheckoutProvider) CreateSubscriptionCheckout(context.Context, SubscriptionCheckoutInput) (string, error) {
 	return "", ErrCheckoutProviderNotConfigured
 }
 
-func (noopCheckoutProvider) CreateAddonCheckout(context.Context, addonCheckoutInput) (string, error) {
+func (noopCheckoutProvider) CreateAddonCheckout(context.Context, AddonCheckoutInput) (string, error) {
 	return "", ErrCheckoutProviderNotConfigured
 }

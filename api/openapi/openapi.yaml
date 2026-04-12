@@ -2041,6 +2041,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/billing/webhook:
+    post:
+      summary: Webhook-уведомление от ЮКасса
+      description: |
+        Принимает события payment.succeeded и payment.canceled от ЮКасса.
+        Подпись проверяется через заголовок YooKassa-Signature (HMAC-SHA256).
+        Endpoint не требует авторизации пользователя — он публичный, но защищён подписью.
+        ЮКасса повторяет уведомление при ответах, отличных от 2xx, поэтому обработка идемпотентна.
+      operationId: billingWebhook
+      tags:
+        - Billing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/YooKassaWebhookEvent"
+      responses:
+        "200":
+          description: Событие принято и обработано
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Невалидное тело запроса или неизвестный тип события
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Неверная подпись YooKassa-Signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при обработке события
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   securitySchemes:
     BearerAuth:
@@ -3365,3 +3408,68 @@ components:
           type: string
           example: /blog/infografika-dlya-ozon-conversion
 
+    YooKassaWebhookEvent:
+      type: object
+      required:
+        - type
+        - object
+      properties:
+        type:
+          type: string
+          enum:
+            - payment.succeeded
+            - payment.canceled
+          example: payment.succeeded
+        object:
+          $ref: "#/components/schemas/YooKassaPaymentObject"
+    YooKassaPaymentObject:
+      type: object
+      required:
+        - id
+        - status
+        - amount
+        - metadata
+      properties:
+        id:
+          type: string
+          example: 2a4e4c49-000f-5000-a000-1e1ce5e3b4c4
+        status:
+          type: string
+          enum:
+            - succeeded
+            - canceled
+          example: succeeded
+        amount:
+          type: object
+          properties:
+            value:
+              type: string
+              example: "1490.00"
+            currency:
+              type: string
+              example: RUB
+        captured_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          properties:
+            user_id:
+              type: string
+              example: 550e8400-e29b-41d4-a716-446655440000
+            plan_code:
+              type: string
+              example: pro
+            addon_code:
+              type: string
+              example: cards_100
+            period:
+              type: string
+              enum:
+                - monthly
+                - yearly
+            type:
+              type: string
+              enum:
+                - subscription
+                - addon

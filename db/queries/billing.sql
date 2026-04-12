@@ -179,3 +179,166 @@ where user_id = @user_id
   and status in ('queued', 'processing', 'completed')
   and created_at >= @period_start
   and created_at < @period_end;
+
+-- name: GetPaymentByProviderID :one
+-- Ищем платёж по внешнему ID провайдера для идемпотентной обработки webhook.
+select
+    id,
+    user_id,
+    subscription_id,
+    addon_product_id,
+    provider,
+    provider_payment_id,
+    kind,
+    status,
+    amount,
+    currency,
+    checkout_url,
+    paid_at,
+    created_at
+from payments
+where provider_payment_id = @provider_payment_id
+limit 1;
+
+-- name: CreatePayment :one
+-- Создаём запись платежа после получения checkout от провайдера.
+insert into payments (
+    user_id,
+    subscription_id,
+    addon_product_id,
+    provider,
+    provider_payment_id,
+    kind,
+    status,
+    amount,
+    currency,
+    checkout_url
+) values (
+    @user_id,
+    @subscription_id,
+    @addon_product_id,
+    @provider,
+    @provider_payment_id,
+    @kind,
+    @status,
+    @amount,
+    @currency,
+    @checkout_url
+)
+returning *;
+
+-- name: MarkPaymentPaid :execrows
+-- Фиксируем успешное завершение платежа после webhook payment.succeeded.
+update payments
+set status  = 'paid',
+    paid_at = @paid_at
+where provider_payment_id = @provider_payment_id
+  and status = 'pending';
+
+-- name: MarkPaymentCanceled :execrows
+-- Помечаем платёж отменённым после webhook payment.canceled.
+update payments
+set status = 'canceled'
+where provider_payment_id = @provider_payment_id
+  and status = 'pending';
+
+-- name: UpsertActiveSubscription :one
+-- Создаёт или обновляет активную подписку после успешного платежа.
+-- ON CONFLICT по user_id гарантирует, что у пользователя всегда одна активная запись.
+insert into subscriptions (
+    user_id,
+    plan_id,
+    status,
+    provider,
+    provider_subscription_id,
+    has_payment_method,
+    started_at,
+    current_period_start,
+    current_period_end,
+    renews_at,
+    cancels_at
+) values (
+    @user_id,
+    @plan_id,
+    'active',
+    @provider,
+    @provider_subscription_id,
+    @has_payment_method,
+    @started_at,
+    @current_period_start,
+    @current_period_end,
+    @renews_at,
+    null
+)
+on conflict (user_id) where status in ('active', 'scheduled_cancel')
+do update set
+    plan_id                  = excluded.plan_id,
+    status                   = 'active',
+    provider                 = excluded.provider,
+    provider_subscription_id = excluded.provider_subscription_id,
+    has_payment_method       = excluded.has_payment_method,
+    current_period_start     = excluded.current_period_start,
+    current_period_end       = excluded.current_period_end,
+    renews_at                = excluded.renews_at,
+    cancels_at               = null,
+    updated_at               = now()
+returning *;
+
+-- name: UpsertUsageQuotaForSubscription :one
+-- Создаёт или сбрасывает usage_quota при начале нового billing-периода.
+insert into usage_quotas (
+    user_id,
+    subscription_id,
+    period_start,
+    period_end,
+    cards_limit,
+    cards_used
+) values (
+    @user_id,
+    @subscription_id,
+    @period_start,
+    @period_end,
+    @cards_limit,
+    0
+)
+on conflict (subscription_id, period_start, period_end)
+do update set
+    cards_limit = excluded.cards_limit,
+    updated_at  = now()
+returning *;
+
+-- name: AddAddonCardsToQuota :execrows
+-- Увеличивает лимит карточек в текущей квоте пользователя после покупки addon.
+-- Подзапрос нужен, потому что PostgreSQL не поддерживает ORDER BY/LIMIT в UPDATE напрямую.
+update usage_quotas uq
+set cards_limit = uq.cards_limit + sqlc.arg(extra_cards),
+    updated_at  = now()
+where uq.id = (
+    select sub.id
+    from usage_quotas sub
+    where sub.user_id = sqlc.arg(user_id)
+      and sub.period_start <= sqlc.arg(now_at)
+      and sub.period_end > sqlc.arg(now_at)
+    order by sub.period_start desc
+    limit 1
+);
+
+-- name: GetSubscriptionByID :one
+select
+    id,
+    user_id,
+    plan_id,
+    status,
+    provider,
+    provider_subscription_id,
+    has_payment_method,
+    started_at,
+    current_period_start,
+    current_period_end,
+    renews_at,
+    cancels_at,
+    ended_at,
+    created_at,
+    updated_at
+from subscriptions
+where id = @id;

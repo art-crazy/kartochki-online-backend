@@ -26,6 +26,7 @@ func NewRouter(
 	projectsHandler handlers.ProjectsHandler,
 	generationHandler handlers.GenerationHandler,
 	billingHandler handlers.BillingHandler,
+	billingWebhookHandler handlers.BillingWebhookHandler,
 	settingsHandler handlers.SettingsHandler,
 	authService *auth.Service,
 	storagePublicPath string,
@@ -89,6 +90,8 @@ func NewRouter(
 		api.With(authMiddleware.RequireUser).Post("/billing/checkout", billingHandler.CreateCheckout)
 		api.With(authMiddleware.RequireUser).Post("/billing/addons", billingHandler.PurchaseAddon)
 		api.With(authMiddleware.RequireUser).Post("/billing/cancel", billingHandler.CancelSubscription)
+		// Webhook не требует авторизации пользователя — подпись проверяется внутри handler.
+		api.Post("/billing/webhook", billingWebhookHandler.Handle)
 		api.With(authMiddleware.RequireUser).Get("/settings", settingsHandler.Get)
 		api.With(authMiddleware.RequireUser).Patch("/settings/profile", settingsHandler.PatchProfile)
 		api.With(authMiddleware.RequireUser).Patch("/settings/defaults", settingsHandler.PatchDefaults)

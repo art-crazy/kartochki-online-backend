@@ -351,6 +351,35 @@ It owns:
 - mapping typed article sections from JSON payloads
 - related posts, tags, categories, and sidebar data for blog pages
 
+`internal/billing` is now used for the `/api/v1/billing/*` surface.
+
+It owns:
+
+- subscription and usage quota state
+- checkout session creation (delegated to a `CheckoutProvider` interface)
+- webhook event handling (idempotent, transactional)
+- generation quota enforcement via `EnsureGenerationAllowed`
+
+The `CheckoutProvider` interface is defined in `internal/billing` and implemented in `internal/platform/yookassa`. Wiring lives in `internal/app` via `yookassaCheckoutAdapter` to keep the domain and platform packages decoupled (same adapter pattern as `authEmailWorker`).
+
+`internal/platform/yookassa` implements the ЮКасса HTTP API:
+
+- payment creation for subscriptions and addons
+- HMAC-SHA256 webhook signature verification
+- deterministic idempotency keys (SHA256 of input params + year-month) to prevent duplicate payments on retry while allowing new payments in subsequent periods
+
+### Webhook handler pattern
+
+Incoming payment provider webhooks follow this flow:
+
+1. `BillingWebhookHandler` (transport) reads and signature-verifies the raw body
+2. `yookassaEventToBilling` converts the provider-specific event to a domain `billing.WebhookEvent` (strings normalized at this boundary)
+3. `billing.Service.HandleWebhookEvent` handles the event in a single DB transaction
+4. Idempotency is enforced by `MarkPaymentPaid WHERE status = 'pending'` — `affected == 0` means the webhook was already processed, no activation occurs
+5. On any error, the handler returns 500 so the provider retries
+
+The webhook endpoint does not require user authentication; it is protected by signature verification only.
+
 ## Data and Persistence Conventions
 
 ### Migrations
