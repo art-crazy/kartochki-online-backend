@@ -599,6 +599,309 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/projects:
+    get:
+      summary: Получить список проектов текущего пользователя
+      description: Возвращает все проекты текущего пользователя, отсортированные по дате обновления.
+      operationId: listProjects
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Список проектов пользователя
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectListResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке списка проектов
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать новый проект
+      description: Создаёт новый проект текущего пользователя со статусом `draft`.
+      operationId: createProject
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Проект успешно создан
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          description: Ошибка валидации входных данных
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при создании проекта
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/projects/{id}:
+    get:
+      summary: Получить проект по идентификатору
+      description: Возвращает проект текущего пользователя по его идентификатору.
+      operationId: getProjectById
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: Идентификатор проекта.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Проект найден
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Проект не найден или не принадлежит текущему пользователю
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке проекта
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      summary: Частично обновить проект
+      description: Обновляет только те поля проекта, которые были переданы в запросе.
+      operationId: patchProject
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: Идентификатор проекта.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchProjectRequest"
+      responses:
+        "200":
+          description: Проект успешно обновлён
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "400":
+          description: Ошибка валидации входных данных
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Проект не найден или не принадлежит текущему пользователю
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при обновлении проекта
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Удалить проект
+      description: Удаляет проект текущего пользователя.
+      operationId: deleteProject
+      tags:
+        - Projects
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: Идентификатор проекта.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Проект успешно удалён
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Проект не найден или не принадлежит текущему пользователю
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при удалении проекта
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/dashboard:
     get:
       summary: Данные для главной страницы приложения
@@ -697,7 +1000,97 @@ components:
             - accepted
             - password_changed
             - logged_out
+            - deleted
           example: accepted
+    CreateProjectRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          example: Кроссовки Nike Air Max
+        marketplace:
+          type: string
+          example: wildberries
+        product_name:
+          type: string
+          example: Nike Air Max 90
+        product_description:
+          type: string
+          example: Белые кроссовки для повседневной носки
+    PatchProjectRequest:
+      type: object
+      description: Достаточно передать только те поля, которые нужно изменить.
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          example: Обновлённое название проекта
+        marketplace:
+          type: string
+          example: ozon
+        product_name:
+          type: string
+          example: Nike Air Max 90 Premium
+        product_description:
+          type: string
+          example: Новое описание товара для карточки
+    Project:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Кроссовки Nike Air Max
+        marketplace:
+          type: string
+          example: wildberries
+        product_name:
+          type: string
+          example: Nike Air Max 90
+        product_description:
+          type: string
+          example: Белые кроссовки для повседневной носки
+        status:
+          type: string
+          enum:
+            - draft
+            - active
+            - archived
+          example: draft
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProjectResponse:
+      type: object
+      required:
+        - project
+      properties:
+        project:
+          $ref: "#/components/schemas/Project"
+    ProjectListResponse:
+      type: object
+      required:
+        - projects
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
     RegisterRequest:
       type: object
       required:

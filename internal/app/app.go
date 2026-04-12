@@ -57,8 +57,17 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 
 	projectService := projects.NewService(queries)
 	dashboardHandler := handlers.NewDashboardHandler(projectService, logger)
+	projectsHandler := handlers.NewProjectsHandler(projectService, logger)
 
-	router := httptransport.NewRouter(cfg.HTTP, logger, healthHandler, authHandler, dashboardHandler, authService)
+	router := httptransport.NewRouter(
+		cfg.HTTP,
+		logger,
+		healthHandler,
+		authHandler,
+		dashboardHandler,
+		projectsHandler,
+		authService,
+	)
 	server := httpserver.New(cfg.HTTP, router)
 
 	return &App{

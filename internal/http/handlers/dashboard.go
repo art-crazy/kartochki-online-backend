@@ -1,26 +1,33 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/rs/zerolog"
 
 	"kartochki-online-backend/internal/http/authctx"
 	"kartochki-online-backend/internal/http/contracts"
+	"kartochki-online-backend/internal/http/requestctx"
 	"kartochki-online-backend/internal/http/response"
 	"kartochki-online-backend/internal/projects"
 )
 
 const dashboardQuickStartPath = "/app/generate"
 
+// dashboardProjectService описывает минимальный контракт получения данных дашборда.
+type dashboardProjectService interface {
+	GetDashboard(ctx context.Context, userID string) (projects.Dashboard, error)
+}
+
 // DashboardHandler обслуживает GET /api/v1/dashboard.
 type DashboardHandler struct {
-	projectService *projects.Service
+	projectService dashboardProjectService
 	logger         zerolog.Logger
 }
 
 // NewDashboardHandler создаёт обработчик дашборда.
-func NewDashboardHandler(projectService *projects.Service, logger zerolog.Logger) DashboardHandler {
+func NewDashboardHandler(projectService dashboardProjectService, logger zerolog.Logger) DashboardHandler {
 	return DashboardHandler{projectService: projectService, logger: logger}
 }
 
@@ -34,7 +41,8 @@ func (h DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	dashboard, err := h.projectService.GetDashboard(r.Context(), user.ID)
 	if err != nil {
-		h.logger.Error().Err(err).Str("user_id", user.ID).Msg("не удалось загрузить проекты для дашборда")
+		logger := requestctx.Logger(r.Context(), h.logger)
+		logger.Error().Err(err).Str("user_id", user.ID).Msg("не удалось загрузить проекты для дашборда")
 		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to load dashboard")
 		return
 	}

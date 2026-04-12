@@ -68,8 +68,8 @@ type CurrentUserResponse struct {
 }
 
 // StatusResponse — универсальный ответ для операций, которые подтверждают результат
-// без возврата данных. Используется для logout, forgot-password, reset-password.
+// без возврата данных. Используется для logout, forgot-password, reset-password и delete.
 type StatusResponse struct {
-	// Status — результат операции: "accepted", "password_changed" или "logged_out".
+	// Status — результат операции: "accepted", "password_changed", "logged_out" или "deleted".
 	Status string `json:"status"`
 }

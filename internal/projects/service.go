@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,6 +86,15 @@ type UpdateInput struct {
 	ProductDescription string
 }
 
+// PatchInput содержит только те поля проекта, которые клиент действительно хочет изменить.
+// nil означает, что поле нужно оставить без изменений.
+type PatchInput struct {
+	Title              *string
+	Marketplace        *string
+	ProductName        *string
+	ProductDescription *string
+}
+
 // Service управляет сценариями работы с проектами и не знает о деталях HTTP.
 type Service struct {
 	queries *dbgen.Queries
@@ -120,6 +130,11 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (Dashboard, e
 
 // Create создаёт проект и возвращает его.
 func (s *Service) Create(ctx context.Context, input CreateInput) (Project, error) {
+	input = normalizeCreateInput(input)
+	if input.Title == "" {
+		return Project{}, ErrTitleRequired
+	}
+
 	userID, err := uuid.Parse(input.UserID)
 	if err != nil {
 		return Project{}, fmt.Errorf("parse user id: %w", err)
@@ -183,6 +198,11 @@ func (s *Service) ListByUser(ctx context.Context, userID string) ([]Project, err
 
 // Update обновляет поля проекта. user_id проверяется на уровне SQL — один запрос к БД.
 func (s *Service) Update(ctx context.Context, id string, ownerUserID string, input UpdateInput) (Project, error) {
+	input = normalizeUpdateInput(input)
+	if input.Title == "" {
+		return Project{}, ErrTitleRequired
+	}
+
 	projectID, err := uuid.Parse(id)
 	if err != nil {
 		return Project{}, ErrNotFound
@@ -210,6 +230,38 @@ func (s *Service) Update(ctx context.Context, id string, ownerUserID string, inp
 	}
 
 	return toProject(row), nil
+}
+
+// Patch частично обновляет проект.
+// Сначала сервис читает текущую версию проекта владельца, чтобы не затирать поля,
+// которые не пришли в PATCH-запросе.
+func (s *Service) Patch(ctx context.Context, id string, ownerUserID string, input PatchInput) (Project, error) {
+	current, err := s.GetByID(ctx, id, ownerUserID)
+	if err != nil {
+		return Project{}, err
+	}
+
+	update := UpdateInput{
+		Title:              current.Title,
+		Marketplace:        current.Marketplace,
+		ProductName:        current.ProductName,
+		ProductDescription: current.ProductDescription,
+	}
+
+	if input.Title != nil {
+		update.Title = *input.Title
+	}
+	if input.Marketplace != nil {
+		update.Marketplace = *input.Marketplace
+	}
+	if input.ProductName != nil {
+		update.ProductName = *input.ProductName
+	}
+	if input.ProductDescription != nil {
+		update.ProductDescription = *input.ProductDescription
+	}
+
+	return s.Update(ctx, id, ownerUserID, update)
 }
 
 // Delete удаляет проект пользователя. Возвращает ErrNotFound, если проект не найден или чужой.
@@ -301,4 +353,21 @@ func buildQuickStart(totalProjects int) DashboardQuickStart {
 		Title:       "Сгенерировать новые карточки",
 		Description: "Загрузите новое фото и получите готовые карточки",
 	}
+}
+
+func normalizeCreateInput(input CreateInput) CreateInput {
+	input.UserID = strings.TrimSpace(input.UserID)
+	input.Title = strings.TrimSpace(input.Title)
+	input.Marketplace = strings.TrimSpace(input.Marketplace)
+	input.ProductName = strings.TrimSpace(input.ProductName)
+	input.ProductDescription = strings.TrimSpace(input.ProductDescription)
+	return input
+}
+
+func normalizeUpdateInput(input UpdateInput) UpdateInput {
+	input.Title = strings.TrimSpace(input.Title)
+	input.Marketplace = strings.TrimSpace(input.Marketplace)
+	input.ProductName = strings.TrimSpace(input.ProductName)
+	input.ProductDescription = strings.TrimSpace(input.ProductDescription)
+	return input
 }

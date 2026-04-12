@@ -21,6 +21,7 @@ func NewRouter(
 	healthHandler handlers.HealthHandler,
 	authHandler handlers.AuthHandler,
 	dashboardHandler handlers.DashboardHandler,
+	projectsHandler handlers.ProjectsHandler,
 	authService *auth.Service,
 ) stdhttp.Handler {
 	router := chi.NewRouter()
@@ -67,6 +68,11 @@ func NewRouter(
 
 		api.With(authMiddleware.RequireUser).Get("/me", authHandler.Me)
 		api.With(authMiddleware.RequireUser).Get("/dashboard", dashboardHandler.Get)
+		api.With(authMiddleware.RequireUser).Get("/projects", projectsHandler.List)
+		api.With(authMiddleware.RequireUser).Post("/projects", projectsHandler.Create)
+		api.With(authMiddleware.RequireUser).Get("/projects/{id}", projectsHandler.Get)
+		api.With(authMiddleware.RequireUser).Patch("/projects/{id}", projectsHandler.Patch)
+		api.With(authMiddleware.RequireUser).Delete("/projects/{id}", projectsHandler.Delete)
 	})
 
 	registerDocsRoutes(router)
