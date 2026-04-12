@@ -13,6 +13,11 @@ import (
 	"kartochki-online-backend/internal/logging"
 )
 
+type runtimeResult struct {
+	component string
+	err       error
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -29,20 +34,39 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	errCh := make(chan error, 1)
+	errCh := make(chan runtimeResult, 2)
 
 	go func() {
 		logger.Info().
 			Str("addr", application.Server.Address()).
 			Msg("starting http server")
 
-		errCh <- application.Server.Start()
+		errCh <- runtimeResult{
+			component: "http_server",
+			err:       application.Server.Start(),
+		}
 	}()
 
+	if application.Worker != nil {
+		go func() {
+			errCh <- runtimeResult{
+				component: "asynq_worker",
+				err:       application.Worker.Run(),
+			}
+		}()
+	}
+
 	select {
-	case err := <-errCh:
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal().Err(err).Msg("http server stopped with error")
+	case result := <-errCh:
+		if result.err != nil {
+			if result.component == "http_server" && errors.Is(result.err, http.ErrServerClosed) {
+				break
+			}
+
+			logger.Fatal().
+				Err(result.err).
+				Str("component", result.component).
+				Msg("runtime component stopped with error")
 		}
 	case <-ctx.Done():
 		logger.Info().Msg("shutdown signal received")

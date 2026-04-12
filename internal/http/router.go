@@ -2,6 +2,7 @@ package http
 
 import (
 	stdhttp "net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,8 +23,11 @@ func NewRouter(
 	authHandler handlers.AuthHandler,
 	dashboardHandler handlers.DashboardHandler,
 	projectsHandler handlers.ProjectsHandler,
+	generationHandler handlers.GenerationHandler,
 	settingsHandler handlers.SettingsHandler,
 	authService *auth.Service,
+	storagePublicPath string,
+	storageRootDir string,
 ) stdhttp.Handler {
 	router := chi.NewRouter()
 	authMiddleware := newAuthMiddleware(authService)
@@ -52,6 +56,7 @@ func NewRouter(
 
 	router.Get("/health/live", healthHandler.Live)
 	router.Get("/health/ready", healthHandler.Ready)
+	router.Handle(storagePublicPath+"/*", stdhttp.StripPrefix(storagePublicPath+"/", stdhttp.FileServer(stdhttp.FS(os.DirFS(storageRootDir)))))
 
 	router.Route("/api/v1", func(api chi.Router) {
 		api.Route("/auth", func(authRouter chi.Router) {
@@ -74,6 +79,10 @@ func NewRouter(
 		api.With(authMiddleware.RequireUser).Get("/projects/{id}", projectsHandler.Get)
 		api.With(authMiddleware.RequireUser).Patch("/projects/{id}", projectsHandler.Patch)
 		api.With(authMiddleware.RequireUser).Delete("/projects/{id}", projectsHandler.Delete)
+		api.With(authMiddleware.RequireUser).Get("/generate/config", generationHandler.GetConfig)
+		api.With(authMiddleware.RequireUser).Post("/uploads/images", generationHandler.UploadImage)
+		api.With(authMiddleware.RequireUser).Post("/generations", generationHandler.CreateGeneration)
+		api.With(authMiddleware.RequireUser).Get("/generations/{id}", generationHandler.GetGenerationStatus)
 		api.With(authMiddleware.RequireUser).Get("/settings", settingsHandler.Get)
 		api.With(authMiddleware.RequireUser).Patch("/settings/profile", settingsHandler.PatchProfile)
 		api.With(authMiddleware.RequireUser).Patch("/settings/defaults", settingsHandler.PatchDefaults)

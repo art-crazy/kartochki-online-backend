@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -17,6 +18,7 @@ type Config struct {
 	Redis    RedisConfig
 	Asynq    AsynqConfig
 	Auth     AuthConfig
+	Storage  StorageConfig
 }
 
 // AppConfig хранит общие параметры приложения.
@@ -51,6 +53,12 @@ type RedisConfig struct {
 // AsynqConfig хранит настройки клиента очередей Asynq.
 type AsynqConfig struct {
 	Concurrency int
+}
+
+// StorageConfig хранит настройки локального файлового хранилища generation-артефактов.
+type StorageConfig struct {
+	RootDir    string
+	PublicPath string
 }
 
 // AuthConfig хранит параметры локальной авторизации и OAuth-провайдеров.
@@ -189,6 +197,10 @@ func loadFromEnv() (Config, error) {
 		Asynq: AsynqConfig{
 			Concurrency: asynqConcurrency,
 		},
+		Storage: StorageConfig{
+			RootDir:    getEnv("STORAGE_ROOT_DIR", "./storage"),
+			PublicPath: normalizePublicPath(getEnv("STORAGE_PUBLIC_PATH", "/media")),
+		},
 		Auth: AuthConfig{
 			SessionTTL:            sessionTTL,
 			PasswordMinLength:     passwordMinLength,
@@ -256,6 +268,20 @@ func getDuration(key string, fallback time.Duration) (time.Duration, error) {
 	return parsed, nil
 }
 
+func normalizePublicPath(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "/media"
+	}
+	if !strings.HasPrefix(value, "/") {
+		value = "/" + value
+	}
+	if value != "/" {
+		value = strings.TrimRight(value, "/")
+	}
+	return value
+}
+
 func validate(cfg Config) error {
 	if cfg.HTTP.Host == "" {
 		return fmt.Errorf("HTTP_HOST must not be empty")
@@ -295,6 +321,18 @@ func validate(cfg Config) error {
 
 	if cfg.Asynq.Concurrency <= 0 {
 		return fmt.Errorf("ASYNQ_CONCURRENCY must be greater than zero")
+	}
+
+	if cfg.Storage.RootDir == "" {
+		return fmt.Errorf("STORAGE_ROOT_DIR must not be empty")
+	}
+
+	if cfg.Storage.PublicPath == "" {
+		return fmt.Errorf("STORAGE_PUBLIC_PATH must not be empty")
+	}
+
+	if cfg.Storage.PublicPath == "/" {
+		return fmt.Errorf("STORAGE_PUBLIC_PATH must not be /")
 	}
 
 	if cfg.Redis.DB < 0 {

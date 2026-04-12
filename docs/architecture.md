@@ -264,6 +264,7 @@ Examples:
 - PostgreSQL connection setup (`internal/platform/postgres`)
 - Redis setup (`internal/platform/redis`)
 - Email adapters — реализации интерфейса `auth.EmailSender` (`internal/platform/email`)
+- Local file storage for uploaded source images and generated artifacts (`internal/platform/storage`)
 - S3 adapter
 - payment provider clients
 
@@ -316,6 +317,17 @@ It owns:
 - account deletion orchestration
 
 Security-sensitive primitives such as password hashing and bearer-session authentication still remain in `internal/auth`.
+
+`internal/generation` is now used for the `/api/v1/generate/*`, `/api/v1/uploads/images`,
+and `/api/v1/generations/*` surface.
+
+It owns:
+
+- generation page config
+- source image upload orchestration
+- creation of generation jobs and linked projects
+- polling-ready generation status reads
+- coordination with Asynq worker and local artifact storage
 
 ## Data and Persistence Conventions
 

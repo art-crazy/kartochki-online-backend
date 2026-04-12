@@ -945,6 +945,236 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/generate/config:
+    get:
+      summary: Справочные данные для страницы генерации
+      description: Возвращает каталог маркетплейсов, визуальных стилей, типов карточек и допустимых количеств.
+      operationId: getGenerateConfig
+      tags:
+        - Generation
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Данные для формы запуска генерации
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateConfigResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/uploads/images:
+    post:
+      summary: Загрузить исходное изображение для генерации
+      description: Принимает один image-файл в multipart поле `file` и возвращает `asset_id` для следующего шага.
+      operationId: uploadGenerationImage
+      tags:
+        - Generation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Исходное изображение успешно загружено
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadImageResponse"
+        "400":
+          description: multipart-запрос некорректен или тип изображения не поддерживается
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при сохранении файла
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/generations:
+    post:
+      summary: Запустить генерацию карточек
+      description: Создаёт проект, записывает параметры запуска и ставит фоновую задачу генерации в очередь.
+      operationId: createGeneration
+      tags:
+        - Generation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGenerationRequest"
+      responses:
+        "202":
+          description: Генерация поставлена в очередь
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateGenerationResponse"
+        "400":
+          description: Ошибка валидации параметров генерации
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Исходное изображение не найдено
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при создании generation job
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/generations/{id}:
+    get:
+      summary: Получить статус генерации
+      description: Возвращает текущий progress generation job, а после завершения — список готовых карточек и ссылку на архив.
+      operationId: getGenerationById
+      tags:
+        - Generation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Текущее состояние генерации
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerationStatusResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Генерация не найдена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке статуса генерации
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/settings:
     get:
       summary: Данные страницы настроек
@@ -1842,6 +2072,182 @@ components:
             $ref: "#/components/schemas/DashboardProject"
         quick_start:
           $ref: "#/components/schemas/DashboardQuickStart"
+    GenerateConfigResponse:
+      type: object
+      required:
+        - marketplaces
+        - styles
+        - card_types
+        - card_count_options
+      properties:
+        marketplaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenerateMarketplace"
+        styles:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenerateStyle"
+        card_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/GenerateCardType"
+        card_count_options:
+          type: array
+          items:
+            type: integer
+    GenerateMarketplace:
+      type: object
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+          example: wildberries
+        label:
+          type: string
+          example: Wildberries
+    GenerateStyle:
+      type: object
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+          example: clean_catalog
+        label:
+          type: string
+          example: Чистый каталог
+    GenerateCardType:
+      type: object
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+          example: cover
+        label:
+          type: string
+          example: Обложка
+        default_selected:
+          type: boolean
+          example: true
+    UploadImageResponse:
+      type: object
+      required:
+        - asset_id
+        - preview_url
+      properties:
+        asset_id:
+          type: string
+          format: uuid
+        preview_url:
+          type: string
+          format: uri
+          example: http://localhost:8080/media/uploads/user-id/source.png
+    CreateGenerationRequest:
+      type: object
+      required:
+        - marketplace_id
+        - style_id
+        - card_type_ids
+        - card_count
+        - source_asset_id
+      properties:
+        project_name:
+          type: string
+          maxLength: 200
+          example: Карточки для летней коллекции
+        marketplace_id:
+          type: string
+          example: wildberries
+        style_id:
+          type: string
+          example: clean_catalog
+        card_type_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          example: [cover, benefits, details]
+        card_count:
+          type: integer
+          example: 5
+        source_asset_id:
+          type: string
+          format: uuid
+    CreateGenerationResponse:
+      type: object
+      required:
+        - generation_id
+        - status
+      properties:
+        generation_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+          example: queued
+    GenerationStatusResponse:
+      type: object
+      required:
+        - generation_id
+        - status
+      properties:
+        generation_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - queued
+            - processing
+            - completed
+            - failed
+          example: processing
+        current_step:
+          type: string
+          example: rendering_cards
+        progress_percent:
+          type: integer
+          example: 60
+        error_message:
+          type: string
+          example: failed to create archive
+        archive_download_url:
+          type: string
+          format: uri
+          example: http://localhost:8080/media/archives/generation-id/cards.zip
+        result_cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedCard"
+    GeneratedCard:
+      type: object
+      required:
+        - id
+        - card_type_id
+        - asset_id
+        - preview_url
+      properties:
+        id:
+          type: string
+          format: uuid
+        card_type_id:
+          type: string
+          example: cover
+        asset_id:
+          type: string
+          format: uuid
+        preview_url:
+          type: string
+          format: uri
+          example: http://localhost:8080/media/generated/generation-id/01-cover.png
     SettingsResponse:
       type: object
       required:

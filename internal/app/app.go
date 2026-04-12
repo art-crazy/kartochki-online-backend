@@ -10,6 +10,7 @@ import (
 	"kartochki-online-backend/internal/auth"
 	"kartochki-online-backend/internal/config"
 	"kartochki-online-backend/internal/dbgen"
+	"kartochki-online-backend/internal/generation"
 	"kartochki-online-backend/internal/health"
 	httptransport "kartochki-online-backend/internal/http"
 	"kartochki-online-backend/internal/http/handlers"
@@ -18,6 +19,7 @@ import (
 	"kartochki-online-backend/internal/platform/email"
 	"kartochki-online-backend/internal/platform/postgres"
 	"kartochki-online-backend/internal/platform/redis"
+	"kartochki-online-backend/internal/platform/storage"
 	"kartochki-online-backend/internal/projects"
 	"kartochki-online-backend/internal/settings"
 )
@@ -28,6 +30,7 @@ type App struct {
 	DB     *postgres.Client
 	Redis  *redis.Client
 	Asynq  *jobs.Client
+	Worker *jobs.Server
 }
 
 // New собирает приложение и проверяет доступность обязательной инфраструктуры.
@@ -44,6 +47,13 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	}
 
 	asynqClient := jobs.New(redisClient.AsynqOpt(), cfg.Asynq.Concurrency)
+	storageClient, err := storage.New(cfg.Storage.RootDir, cfg.Storage.PublicPath)
+	if err != nil {
+		db.Close()
+		_ = redisClient.Close()
+		_ = asynqClient.Close()
+		return nil, fmt.Errorf("init storage: %w", err)
+	}
 	readiness := health.NewService(
 		health.NewChecker("postgres", db.Ping),
 		health.NewChecker("redis", redisClient.Ping),
@@ -57,10 +67,13 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	authHandler := handlers.NewAuthHandler(authService)
 
 	projectService := projects.NewService(queries)
+	generationService := generation.NewService(db.Pool, queries, asynqClient, storageClient)
 	settingsService := settings.NewService(db.Pool, queries, asynqClient, authService.PasswordMinLength())
 	dashboardHandler := handlers.NewDashboardHandler(projectService, logger)
 	projectsHandler := handlers.NewProjectsHandler(projectService, logger)
+	generationHandler := handlers.NewGenerationHandler(generationService, logger)
 	settingsHandler := handlers.NewSettingsHandler(settingsService, logger)
+	worker := jobs.NewServer(redisClient.AsynqOpt(), cfg.Asynq.Concurrency, logger, generationService)
 
 	router := httptransport.NewRouter(
 		cfg.HTTP,
@@ -69,8 +82,11 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		authHandler,
 		dashboardHandler,
 		projectsHandler,
+		generationHandler,
 		settingsHandler,
 		authService,
+		cfg.Storage.PublicPath,
+		storageClient.RootDir(),
 	)
 	server := httpserver.New(cfg.HTTP, router)
 
@@ -79,6 +95,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		DB:     db,
 		Redis:  redisClient,
 		Asynq:  asynqClient,
+		Worker: worker,
 	}, nil
 }
 
@@ -90,6 +107,11 @@ func (a *App) Shutdown(ctx context.Context) error {
 		if err := a.Server.Shutdown(ctx); err != nil {
 			joined = errors.Join(joined, err)
 		}
+	}
+
+	// Worker останавливаем раньше Redis, чтобы фоновые задачи успели корректно завершить текущие операции.
+	if a.Worker != nil {
+		a.Worker.Shutdown()
 	}
 
 	if a.Asynq != nil {

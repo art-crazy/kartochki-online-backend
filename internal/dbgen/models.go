@@ -20,6 +20,55 @@ type ApiKey struct {
 	RevokedAt   pgtype.Timestamptz
 }
 
+// Файлы пользователя и артефакты генерации.
+type Asset struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	Kind             string
+	StorageKey       string
+	OriginalFilename string
+	MimeType         string
+	SizeBytes        int64
+	CreatedAt        pgtype.Timestamptz
+}
+
+// Готовые карточки, полученные после завершения генерации.
+type GeneratedCard struct {
+	ID           uuid.UUID
+	GenerationID uuid.UUID
+	AssetID      uuid.UUID
+	CardTypeID   string
+	Position     int32
+	CreatedAt    pgtype.Timestamptz
+}
+
+// История запусков генерации карточек и прогресс фоновой задачи.
+type Generation struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	ProjectID       uuid.UUID
+	SourceAssetID   uuid.UUID
+	MarketplaceID   string
+	StyleID         string
+	CardCount       int32
+	Status          string
+	CurrentStep     string
+	ProgressPercent int32
+	ErrorMessage    string
+	ArchiveAssetID  pgtype.UUID
+	StartedAt       pgtype.Timestamptz
+	FinishedAt      pgtype.Timestamptz
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+// Выбранные типы карточек внутри конкретного запуска генерации.
+type GenerationCardType struct {
+	GenerationID uuid.UUID
+	Position     int32
+	CardTypeID   string
+}
+
 // Пользовательские переключатели уведомлений.
 type NotificationPreference struct {
 	UserID        uuid.UUID
