@@ -12,3 +12,12 @@ type EmailSender interface {
 	// token — сырой токен, который нужно встроить в URL на frontend.
 	SendPasswordResetEmail(ctx context.Context, toEmail string, token string) error
 }
+
+// PasswordResetEmailEnqueuer ставит задачу отправки письма сброса пароля в фоновую очередь.
+//
+// Через этот интерфейс auth-сервис не зависит от конкретного брокера задач.
+type PasswordResetEmailEnqueuer interface {
+	// EnqueuePasswordResetEmail ставит письмо в очередь и не ждёт отправки.
+	// userID нужен для структурированного логирования в worker-е.
+	EnqueuePasswordResetEmail(ctx context.Context, userID, email, rawToken string) error
+}

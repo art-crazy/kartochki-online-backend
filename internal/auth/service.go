@@ -84,29 +84,27 @@ type Service struct {
 	queries               *dbgen.Queries
 	pool                  *pgxpool.Pool
 	stateStore            OAuthStateStore
-	emailSender           EmailSender
+	emailEnqueuer         PasswordResetEmailEnqueuer
 	logger                zerolog.Logger
 	sessionTTL            time.Duration
 	passwordMinLength     int
 	passwordResetTokenTTL time.Duration
-	emailSendTimeout      time.Duration
 	vkOAuth               OAuthProviderConfig
 	yandexOAuth           OAuthProviderConfig
 	telegramAuth          TelegramAuthConfig
 }
 
 // NewService создаёт auth-сервис с настройками локальных сессий и OAuth-провайдеров.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, stateStore OAuthStateStore, emailSender EmailSender, logger zerolog.Logger, cfg config.AuthConfig) *Service {
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, stateStore OAuthStateStore, emailEnqueuer PasswordResetEmailEnqueuer, logger zerolog.Logger, cfg config.AuthConfig) *Service {
 	return &Service{
 		queries:               queries,
 		pool:                  pool,
 		stateStore:            stateStore,
-		emailSender:           emailSender,
+		emailEnqueuer:         emailEnqueuer,
 		logger:                logger,
 		sessionTTL:            cfg.SessionTTL,
 		passwordMinLength:     cfg.PasswordMinLength,
 		passwordResetTokenTTL: cfg.PasswordResetTokenTTL,
-		emailSendTimeout:      cfg.EmailSendTimeout,
 		vkOAuth: OAuthProviderConfig{
 			Name:         providerVK,
 			ClientID:     cfg.VKOAuth.ClientID,
@@ -397,22 +395,17 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 	}
 
 	// Отправка письма — side effect после коммита транзакции.
-	// Используем отдельный контекст с таймаутом, а не ctx запроса: отправка не должна
-	// прерваться из-за закрытия HTTP-соединения клиентом, но и не должна висеть вечно
-	// при зависшем SMTP-сервере.
-	// Если письмо не ушло — логируем ошибку, но возвращаем nil: пользователь видит
-	// одинаковый ответ независимо от результата, чтобы не раскрывать внутреннее состояние.
-	// Повторный запрос создаст новый токен и инвалидирует текущий.
-	//
-	// TODO: перенести отправку письма в Asynq-джоб, чтобы не занимать HTTP-запрос
-	// ожиданием SMTP и корректно обрабатывать ретраи при сбоях провайдера.
-	emailCtx, emailCancel := context.WithTimeout(context.Background(), s.emailSendTimeout)
-	defer emailCancel()
-	if err := s.emailSender.SendPasswordResetEmail(emailCtx, email, rawToken); err != nil {
+	// Ставим задачу в очередь Asynq: это освобождает HTTP-запрос немедленно
+	// и даёт worker-у несколько попыток при временном сбое SMTP.
+	// Используем context.Background(), а не ctx запроса: клиент может закрыть соединение
+	// сразу после ответа, и тогда ctx будет отменён раньше, чем задача встанет в очередь.
+	// Ошибка постановки в очередь логируется, но не возвращается клиенту:
+	// ответ одинаков независимо от результата, чтобы не раскрывать внутреннее состояние.
+	if err := s.emailEnqueuer.EnqueuePasswordResetEmail(context.Background(), user.ID.String(), email, rawToken); err != nil {
 		s.logger.Error().Err(err).
 			Str("user_id", user.ID.String()).
 			Str("email", email).
-			Msg("не удалось отправить письмо для сброса пароля")
+			Msg("не удалось поставить письмо сброса пароля в очередь")
 	}
 
 	return nil
@@ -672,3 +665,5 @@ func isUniqueViolation(err error) bool {
 
 	return pgErr.Code == "23505"
 }
+
+

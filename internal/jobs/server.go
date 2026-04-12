@@ -14,6 +14,11 @@ type GenerationHandler interface {
 	HandleGeneration(ctx context.Context, payload GenerationPayload) error
 }
 
+// SendPasswordResetEmailHandler описывает минимальный контракт worker-обработчика отправки письма сброса пароля.
+type SendPasswordResetEmailHandler interface {
+	HandleSendPasswordResetEmail(ctx context.Context, payload SendPasswordResetEmailPayload) error
+}
+
 // Server запускает Asynq worker в том же процессе, что и HTTP API.
 type Server struct {
 	server      *asynq.Server
@@ -23,7 +28,7 @@ type Server struct {
 }
 
 // NewServer создаёт worker и регистрирует известные task handlers.
-func NewServer(redisOpts asynq.RedisConnOpt, concurrency int, logger zerolog.Logger, generationHandler GenerationHandler) *Server {
+func NewServer(redisOpts asynq.RedisConnOpt, concurrency int, logger zerolog.Logger, generationHandler GenerationHandler, emailHandler SendPasswordResetEmailHandler) *Server {
 	mux := asynq.NewServeMux()
 	if generationHandler != nil {
 		mux.HandleFunc(taskTypeGeneration, func(ctx context.Context, task *asynq.Task) error {
@@ -33,6 +38,17 @@ func NewServer(redisOpts asynq.RedisConnOpt, concurrency int, logger zerolog.Log
 			}
 
 			return generationHandler.HandleGeneration(ctx, payload)
+		})
+	}
+
+	if emailHandler != nil {
+		mux.HandleFunc(taskTypeSendPasswordResetEmail, func(ctx context.Context, task *asynq.Task) error {
+			var payload SendPasswordResetEmailPayload
+			if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+				return fmt.Errorf("decode send-password-reset-email task payload: %w", err)
+			}
+
+			return emailHandler.HandleSendPasswordResetEmail(ctx, payload)
 		})
 	}
 

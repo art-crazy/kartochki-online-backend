@@ -281,6 +281,18 @@ Responsibilities:
 - workers and handlers
 - job middleware if needed later
 
+### Adapter pattern for domain-to-jobs wiring
+
+Domain packages (`internal/auth`, `internal/generation`, etc.) must not import `internal/jobs` directly to avoid circular dependencies.
+
+Instead, use one of two approaches:
+
+1. **Domain implements a jobs interface** — when the domain service needs to be called *by* a worker. The domain method signature matches the `jobs.*Handler` interface, and `internal/app` passes the domain service directly (see `generation.Service` implementing `jobs.GenerationHandler`).
+
+2. **App-level adapter** — when wiring would create a cycle. `internal/app` defines a small adapter struct that holds only what the worker needs (e.g. `auth.EmailSender` + timeout), implements the `jobs.*Handler` interface, and is passed to `jobs.NewServer`. The domain package never sees `jobs`. (see `authEmailWorker` in `internal/app/app.go`).
+
+A `var _ jobs.XHandler = adapterType{}` compile-time check must accompany every adapter.
+
 ### Future domain packages
 
 As business logic appears, add explicit domain-owned packages such as:

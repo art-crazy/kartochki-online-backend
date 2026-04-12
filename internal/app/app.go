@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -25,6 +26,40 @@ import (
 	"kartochki-online-backend/internal/projects"
 	"kartochki-online-backend/internal/settings"
 )
+
+// Статические проверки соответствия адаптеров своим интерфейсам.
+// Компилятор сообщит об ошибке, если сигнатура метода разойдётся с интерфейсом.
+var _ jobs.SendPasswordResetEmailHandler = authEmailWorker{}
+
+// authEmailWorker адаптирует auth.EmailSender к интерфейсу jobs.SendPasswordResetEmailHandler.
+// Обёртка живёт в app-пакете, чтобы ни auth, ни jobs не зависели друг от друга.
+type authEmailWorker struct {
+	sender      auth.EmailSender
+	sendTimeout time.Duration
+	logger      zerolog.Logger
+}
+
+// HandleSendPasswordResetEmail вызывается Asynq worker-ом при обработке задачи отправки письма.
+// При ошибке возвращает её явно: Asynq повторит задачу согласно MaxRetry.
+func (w authEmailWorker) HandleSendPasswordResetEmail(ctx context.Context, payload jobs.SendPasswordResetEmailPayload) error {
+	sendCtx, cancel := context.WithTimeout(ctx, w.sendTimeout)
+	defer cancel()
+
+	if err := w.sender.SendPasswordResetEmail(sendCtx, payload.Email, payload.RawToken); err != nil {
+		w.logger.Error().Err(err).
+			Str("user_id", payload.UserID).
+			Str("email", payload.Email).
+			Msg("worker: не удалось отправить письмо для сброса пароля")
+		return err
+	}
+
+	w.logger.Info().
+		Str("user_id", payload.UserID).
+		Str("email", payload.Email).
+		Msg("worker: письмо для сброса пароля отправлено")
+
+	return nil
+}
 
 // generationBillingLimits адаптирует billing-сервис к минимальному контракту generation.
 // Так generation не знает о деталях billing-домена и зависит только от проверяемого правила.
@@ -93,7 +128,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	} else {
 		emailSender = email.NewNoopSender(logger)
 	}
-	authService := auth.NewService(db.Pool, queries, redisClient, emailSender, logger, cfg.Auth)
+	authService := auth.NewService(db.Pool, queries, redisClient, asynqClient, logger, cfg.Auth)
 	authHandler := handlers.NewAuthHandler(authService)
 
 	projectService := projects.NewService(queries)
@@ -113,7 +148,11 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	generationHandler := handlers.NewGenerationHandler(generationService, logger)
 	billingHandler := handlers.NewBillingHandler(billingService, logger)
 	settingsHandler := handlers.NewSettingsHandler(settingsService, logger)
-	worker := jobs.NewServer(redisClient.AsynqOpt(), cfg.Asynq.Concurrency, logger, generationService)
+	worker := jobs.NewServer(redisClient.AsynqOpt(), cfg.Asynq.Concurrency, logger, generationService, authEmailWorker{
+		sender:      emailSender,
+		sendTimeout: cfg.Auth.EmailSendTimeout,
+		logger:      logger,
+	})
 
 	router := httptransport.NewRouter(
 		cfg.HTTP,
