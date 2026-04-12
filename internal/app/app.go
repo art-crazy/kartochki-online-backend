@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"kartochki-online-backend/internal/auth"
+	"kartochki-online-backend/internal/billing"
 	"kartochki-online-backend/internal/config"
 	"kartochki-online-backend/internal/dbgen"
 	"kartochki-online-backend/internal/generation"
@@ -23,6 +24,29 @@ import (
 	"kartochki-online-backend/internal/projects"
 	"kartochki-online-backend/internal/settings"
 )
+
+// generationBillingLimits адаптирует billing-сервис к минимальному контракту generation.
+// Так generation не знает о деталях billing-домена и зависит только от проверяемого правила.
+type generationBillingLimits struct {
+	billing *billing.Service
+}
+
+// EnsureGenerationAllowed проверяет квоту и переводит billing-ошибку в доменную ошибку generation.
+func (a generationBillingLimits) EnsureGenerationAllowed(ctx context.Context, userID string, requestedCards int) error {
+	if a.billing == nil {
+		return nil
+	}
+
+	err := a.billing.EnsureGenerationAllowed(ctx, userID, requestedCards)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, billing.ErrGenerationLimitExceeded) {
+		return generation.ErrQuotaExceeded
+	}
+
+	return err
+}
 
 // App хранит собранные runtime-зависимости приложения.
 type App struct {
@@ -67,11 +91,19 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	authHandler := handlers.NewAuthHandler(authService)
 
 	projectService := projects.NewService(queries)
-	generationService := generation.NewService(db.Pool, queries, asynqClient, storageClient)
+	billingService := billing.NewService(queries)
+	generationService := generation.NewService(
+		db.Pool,
+		queries,
+		asynqClient,
+		storageClient,
+		generationBillingLimits{billing: billingService},
+	)
 	settingsService := settings.NewService(db.Pool, queries, asynqClient, authService.PasswordMinLength())
 	dashboardHandler := handlers.NewDashboardHandler(projectService, logger)
 	projectsHandler := handlers.NewProjectsHandler(projectService, logger)
 	generationHandler := handlers.NewGenerationHandler(generationService, logger)
+	billingHandler := handlers.NewBillingHandler(billingService, logger)
 	settingsHandler := handlers.NewSettingsHandler(settingsService, logger)
 	worker := jobs.NewServer(redisClient.AsynqOpt(), cfg.Asynq.Concurrency, logger, generationService)
 
@@ -83,6 +115,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		dashboardHandler,
 		projectsHandler,
 		generationHandler,
+		billingHandler,
 		settingsHandler,
 		authService,
 		cfg.Storage.PublicPath,

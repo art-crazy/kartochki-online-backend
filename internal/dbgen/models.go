@@ -9,6 +9,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// Разовые пакеты карточек для покупки сверх месячного лимита.
+type AddonProduct struct {
+	ID          uuid.UUID
+	Code        string
+	Title       string
+	Description string
+	Price       int32
+	CardsCount  int32
+	IsActive    bool
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
 // API-ключи пользовательских интеграций. Секрет хранится только в виде хэша.
 type ApiKey struct {
 	ID          uuid.UUID
@@ -98,6 +111,37 @@ type PasswordResetToken struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+// Платежи и checkout-сессии. Реальная интеграция провайдера сможет безопасно использовать эту таблицу позже.
+type Payment struct {
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	SubscriptionID    pgtype.UUID
+	AddonProductID    pgtype.UUID
+	Provider          string
+	ProviderPaymentID pgtype.Text
+	Kind              string
+	Status            string
+	Amount            int32
+	Currency          string
+	CheckoutUrl       pgtype.Text
+	PaidAt            pgtype.Timestamptz
+	CreatedAt         pgtype.Timestamptz
+}
+
+// Тарифные планы, которые backend показывает на странице billing.
+type Plan struct {
+	ID                 uuid.UUID
+	Code               string
+	Name               string
+	MonthlyPrice       int32
+	YearlyMonthlyPrice pgtype.Int4
+	CardsPerMonth      int32
+	IsPopular          bool
+	IsActive           bool
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
 // Рабочий проект пользователя для генерации карточек маркетплейса.
 type Project struct {
 	ID                 uuid.UUID
@@ -123,6 +167,38 @@ type Session struct {
 	CreatedAt pgtype.Timestamptz
 	UserAgent string
 	IpAddress string
+}
+
+// Текущее и прошлые состояния подписки пользователя по тарифу.
+type Subscription struct {
+	ID                     uuid.UUID
+	UserID                 uuid.UUID
+	PlanID                 uuid.UUID
+	Status                 string
+	Provider               string
+	ProviderSubscriptionID pgtype.Text
+	HasPaymentMethod       bool
+	StartedAt              pgtype.Timestamptz
+	CurrentPeriodStart     pgtype.Timestamptz
+	CurrentPeriodEnd       pgtype.Timestamptz
+	RenewsAt               pgtype.Timestamptz
+	CancelsAt              pgtype.Timestamptz
+	EndedAt                pgtype.Timestamptz
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
+// Снимок лимита на период подписки. cards_used пока хранится для будущей синхронизации.
+type UsageQuota struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	SubscriptionID uuid.UUID
+	PeriodStart    pgtype.Timestamptz
+	PeriodEnd      pgtype.Timestamptz
+	CardsLimit     int32
+	CardsUsed      int32
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
 }
 
 // Основной аккаунт пользователя. Не зависит от способа входа.

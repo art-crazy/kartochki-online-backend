@@ -24,6 +24,7 @@ func NewRouter(
 	dashboardHandler handlers.DashboardHandler,
 	projectsHandler handlers.ProjectsHandler,
 	generationHandler handlers.GenerationHandler,
+	billingHandler handlers.BillingHandler,
 	settingsHandler handlers.SettingsHandler,
 	authService *auth.Service,
 	storagePublicPath string,
@@ -83,6 +84,10 @@ func NewRouter(
 		api.With(authMiddleware.RequireUser).Post("/uploads/images", generationHandler.UploadImage)
 		api.With(authMiddleware.RequireUser).Post("/generations", generationHandler.CreateGeneration)
 		api.With(authMiddleware.RequireUser).Get("/generations/{id}", generationHandler.GetGenerationStatus)
+		api.With(authMiddleware.RequireUser).Get("/billing", billingHandler.Get)
+		api.With(authMiddleware.RequireUser).Post("/billing/checkout", billingHandler.CreateCheckout)
+		api.With(authMiddleware.RequireUser).Post("/billing/addons", billingHandler.PurchaseAddon)
+		api.With(authMiddleware.RequireUser).Post("/billing/cancel", billingHandler.CancelSubscription)
 		api.With(authMiddleware.RequireUser).Get("/settings", settingsHandler.Get)
 		api.With(authMiddleware.RequireUser).Patch("/settings/profile", settingsHandler.PatchProfile)
 		api.With(authMiddleware.RequireUser).Patch("/settings/defaults", settingsHandler.PatchDefaults)

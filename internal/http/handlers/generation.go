@@ -165,6 +165,8 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 				Field:   "project_name",
 				Message: "must be at most 200 characters",
 			})
+		case errors.Is(err, generation.ErrQuotaExceeded):
+			response.WriteError(w, r, http.StatusConflict, "generation_quota_exceeded", "generation quota is exceeded")
 		default:
 			logger := h.requestLogger(r)
 			logger.Error().Err(err).Str("user_id", user.ID).Msg("не удалось запустить генерацию")

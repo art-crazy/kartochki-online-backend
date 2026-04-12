@@ -120,6 +120,7 @@ type Service struct {
 	queries    *dbgen.Queries
 	jobsClient *jobs.Client
 	storage    generationStorage
+	limits     generationLimits
 }
 
 type generationStorage interface {
@@ -130,13 +131,18 @@ type generationStorage interface {
 	PublicURL(storageKey string) string
 }
 
+type generationLimits interface {
+	EnsureGenerationAllowed(ctx context.Context, userID string, requestedCards int) error
+}
+
 // NewService создаёт сервис generation и связывает БД с локальным storage и очередью.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, jobsClient *jobs.Client, storage generationStorage) *Service {
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, jobsClient *jobs.Client, storage generationStorage, limits generationLimits) *Service {
 	return &Service{
 		pool:       pool,
 		queries:    queries,
 		jobsClient: jobsClient,
 		storage:    storage,
+		limits:     limits,
 	}
 }
 
@@ -199,6 +205,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreatedGenerat
 	uid, sourceAssetID, normalized, err := s.validateCreateInput(ctx, input)
 	if err != nil {
 		return CreatedGeneration{}, err
+	}
+	if s.limits != nil {
+		if err := s.limits.EnsureGenerationAllowed(ctx, uid.String(), normalized.CardCount); err != nil {
+			return CreatedGeneration{}, err
+		}
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})

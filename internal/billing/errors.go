@@ -1,0 +1,22 @@
+package billing
+
+import "errors"
+
+var (
+	// ErrUserNotFound возвращается, когда billing-сценарий запрошен для несуществующего пользователя.
+	ErrUserNotFound = errors.New("billing user not found")
+	// ErrPlanNotFound возвращается, когда frontend передал неизвестный план.
+	ErrPlanNotFound = errors.New("billing plan not found")
+	// ErrAddonNotFound возвращается, когда frontend передал неизвестный addon-пакет.
+	ErrAddonNotFound = errors.New("billing addon not found")
+	// ErrInvalidPlanPeriod возвращается, когда checkout запрашивает неподдерживаемый период оплаты.
+	ErrInvalidPlanPeriod = errors.New("billing plan period is invalid")
+	// ErrPlanAlreadyActive возвращается, когда пользователь пытается купить уже активный тариф.
+	ErrPlanAlreadyActive = errors.New("billing plan is already active")
+	// ErrCheckoutProviderNotConfigured возвращается, когда backend ещё не подключён к платёжному провайдеру.
+	ErrCheckoutProviderNotConfigured = errors.New("billing checkout provider is not configured")
+	// ErrSubscriptionNotCancelable возвращается, когда у пользователя нет платной подписки для отмены.
+	ErrSubscriptionNotCancelable = errors.New("billing subscription is not cancelable")
+	// ErrGenerationLimitExceeded возвращается, когда новый запуск генерации превысит доступный лимит карточек.
+	ErrGenerationLimitExceeded = errors.New("billing generation limit exceeded")
+)
