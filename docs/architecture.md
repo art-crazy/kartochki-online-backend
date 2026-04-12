@@ -261,10 +261,10 @@ Infrastructure adapters.
 
 Examples:
 
-- PostgreSQL connection setup
-- Redis setup
+- PostgreSQL connection setup (`internal/platform/postgres`)
+- Redis setup (`internal/platform/redis`)
+- Email adapters — реализации интерфейса `auth.EmailSender` (`internal/platform/email`)
 - S3 adapter
-- email provider clients
 - payment provider clients
 
 Keep these packages focused on external systems and low-level integration details.

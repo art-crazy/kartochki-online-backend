@@ -9,6 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// Одноразовые токены сброса пароля. Хранится только хэш, сырой токен уходит по email.
+type PasswordResetToken struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	TokenHash string
+	ExpiresAt pgtype.Timestamptz
+	UsedAt    pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 // Связь локального пользователя с внешним OAuth-провайдером.
 type OauthAccount struct {
 	ID             uuid.UUID

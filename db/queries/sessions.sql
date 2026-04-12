@@ -29,3 +29,11 @@ update sessions
 set revoked_at = now()
 where token_hash = $1
   and revoked_at is null;
+
+-- name: RevokeAllUserSessions :exec
+-- Отзываем все активные сессии пользователя. Вызывается при смене пароля,
+-- чтобы злоумышленник потерял доступ к аккаунту даже с ранее выданным токеном.
+update sessions
+set revoked_at = now()
+where user_id = $1
+  and revoked_at is null;

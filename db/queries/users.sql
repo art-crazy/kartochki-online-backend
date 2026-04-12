@@ -37,3 +37,11 @@ select
 from users
 where email = $1
 limit 1;
+
+-- name: UpdateUserPassword :execrows
+-- Обновляем хэш пароля пользователя. Возвращает количество затронутых строк —
+-- 0 означает, что пользователь не найден.
+update users
+set password_hash = $2,
+    updated_at = now()
+where id = $1;

@@ -127,3 +127,23 @@ func (q *Queries) GetLoginUserByEmail(ctx context.Context, email pgtype.Text) (G
 	)
 	return i, err
 }
+
+const updateUserPassword = `-- name: UpdateUserPassword :execrows
+update users
+set password_hash = $2,
+    updated_at = now()
+where id = $1
+`
+
+type UpdateUserPasswordParams struct {
+	ID           uuid.UUID
+	PasswordHash pgtype.Text
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

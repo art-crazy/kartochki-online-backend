@@ -235,7 +235,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LogoutResponse"
+                $ref: "#/components/schemas/StatusResponse"
         "401":
           description: Токен отсутствует, истёк или недействителен
           headers:
@@ -270,6 +270,89 @@ paths:
                 $ref: "#/components/schemas/CurrentUserResponse"
         "401":
           description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/auth/forgot-password:
+    post:
+      summary: Запросить сброс пароля
+      description: |
+        Отправляет письмо со ссылкой для сброса пароля на указанный email.
+
+        Ответ всегда `200` независимо от того, найден пользователь или нет.
+        Это сделано намеренно, чтобы не раскрывать факт существования аккаунта по email.
+
+        Все предыдущие активные токены сброса для этого пользователя инвалидируются —
+        в каждый момент времени действует только один токен.
+      operationId: forgotPassword
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Запрос принят. Если аккаунт найден — письмо будет отправлено.
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Ошибка валидации входных данных
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/auth/reset-password:
+    post:
+      summary: Установить новый пароль по токену из письма
+      description: |
+        Проверяет одноразовый токен из письма и устанавливает новый пароль.
+
+        Токен действителен однократно и только в течение срока жизни, заданного на backend.
+        После использования токен помечается и повторный запрос с тем же токеном вернёт ошибку.
+      operationId: resetPassword
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Пароль успешно изменён
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Токен недействителен, истёк или уже был использован; либо пароль не прошёл валидацию
           headers:
             X-Request-ID:
               description: Идентификатор запроса для поиска в логах.
@@ -535,6 +618,43 @@ components:
             - ok
             - degraded
           example: ok
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - password
+      properties:
+        token:
+          type: string
+          description: Одноразовый токен из письма для сброса пароля.
+          example: xK9mQ2rTv8nYpL3wZd5jF1cB6oE4sA7h
+        password:
+          type: string
+          format: password
+          description: Новый пароль пользователя.
+          example: novyy-nadezhnyy-parol-456
+    StatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Результат операции.
+          enum:
+            - accepted
+            - password_changed
+            - logged_out
+          example: accepted
     RegisterRequest:
       type: object
       required:
@@ -646,14 +766,6 @@ components:
       properties:
         user:
           $ref: "#/components/schemas/AuthUser"
-    LogoutResponse:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          example: logged_out
     ErrorResponse:
       type: object
       required:

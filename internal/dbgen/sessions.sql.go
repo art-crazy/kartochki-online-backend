@@ -100,3 +100,15 @@ func (q *Queries) RevokeSessionByTokenHash(ctx context.Context, tokenHash string
 	}
 	return result.RowsAffected(), nil
 }
+
+const revokeAllUserSessions = `-- name: RevokeAllUserSessions :exec
+update sessions
+set revoked_at = now()
+where user_id = $1
+  and revoked_at is null
+`
+
+func (q *Queries) RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, revokeAllUserSessions, userID)
+	return err
+}

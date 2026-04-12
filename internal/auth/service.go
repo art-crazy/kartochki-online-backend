@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 	"golang.org/x/oauth2"
 
 	"kartochki-online-backend/internal/config"
@@ -73,24 +74,32 @@ type TelegramAuthConfig struct {
 
 // Service хранит auth-логику и общее место расширения под OAuth.
 type Service struct {
-	queries           *dbgen.Queries
-	pool              *pgxpool.Pool
-	stateStore        OAuthStateStore
-	sessionTTL        time.Duration
-	passwordMinLength int
-	vkOAuth           OAuthProviderConfig
-	yandexOAuth       OAuthProviderConfig
-	telegramAuth      TelegramAuthConfig
+	queries               *dbgen.Queries
+	pool                  *pgxpool.Pool
+	stateStore            OAuthStateStore
+	emailSender           EmailSender
+	logger                zerolog.Logger
+	sessionTTL            time.Duration
+	passwordMinLength     int
+	passwordResetTokenTTL time.Duration
+	emailSendTimeout      time.Duration
+	vkOAuth               OAuthProviderConfig
+	yandexOAuth           OAuthProviderConfig
+	telegramAuth          TelegramAuthConfig
 }
 
 // NewService создаёт auth-сервис с настройками локальных сессий и OAuth-провайдеров.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, stateStore OAuthStateStore, cfg config.AuthConfig) *Service {
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, stateStore OAuthStateStore, emailSender EmailSender, logger zerolog.Logger, cfg config.AuthConfig) *Service {
 	return &Service{
-		queries:           queries,
-		pool:              pool,
-		stateStore:        stateStore,
-		sessionTTL:        cfg.SessionTTL,
-		passwordMinLength: cfg.PasswordMinLength,
+		queries:               queries,
+		pool:                  pool,
+		stateStore:            stateStore,
+		emailSender:           emailSender,
+		logger:                logger,
+		sessionTTL:            cfg.SessionTTL,
+		passwordMinLength:     cfg.PasswordMinLength,
+		passwordResetTokenTTL: cfg.PasswordResetTokenTTL,
+		emailSendTimeout:      cfg.EmailSendTimeout,
 		vkOAuth: OAuthProviderConfig{
 			Name:         providerVK,
 			ClientID:     cfg.VKOAuth.ClientID,
@@ -326,6 +335,152 @@ func (s *Service) LoginWithTelegram(ctx context.Context, data TelegramLoginData)
 	}
 
 	return s.loginOrCreateOAuthUser(ctx, providerTelegram, fmt.Sprintf("%d", data.ID), "", BuildTelegramDisplayName(data))
+}
+
+// ForgotPassword создаёт токен сброса пароля и запрашивает его отправку на email.
+//
+// Если пользователь с таким email не найден, метод всё равно возвращает nil,
+// чтобы не раскрывать факт существования аккаунта (timing-safe ответ).
+// Все предыдущие активные токены пользователя инвалидируются в той же транзакции,
+// чтобы в каждый момент существовал только один рабочий токен.
+func (s *Service) ForgotPassword(ctx context.Context, email string) error {
+	email = normalizeEmail(email)
+
+	user, err := s.queries.GetAuthUserByEmail(ctx, nullableText(email))
+	if err != nil {
+		// Пользователь не найден — тихо выходим, не раскрываем факт существования.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+
+		return fmt.Errorf("get user by email for password reset: %w", err)
+	}
+
+	// Генерируем сырой токен — он уйдёт по email и больше не появится в системе.
+	rawToken, err := GenerateSessionToken()
+	if err != nil {
+		return fmt.Errorf("generate password reset token: %w", err)
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin forgot password tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txQueries := s.queries.WithTx(tx)
+
+	// Инвалидируем старые токены до создания нового, чтобы не накапливать рабочие ссылки.
+	if err := txQueries.InvalidatePreviousPasswordResetTokens(ctx, user.ID); err != nil {
+		return fmt.Errorf("invalidate previous reset tokens: %w", err)
+	}
+
+	expiresAt := time.Now().UTC().Add(s.passwordResetTokenTTL)
+	_, err = txQueries.CreatePasswordResetToken(ctx, dbgen.CreatePasswordResetTokenParams{
+		UserID:    user.ID,
+		TokenHash: HashSessionToken(rawToken),
+		ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("create password reset token: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit forgot password tx: %w", err)
+	}
+
+	// Отправка письма — side effect после коммита транзакции.
+	// Используем отдельный контекст с таймаутом, а не ctx запроса: отправка не должна
+	// прерваться из-за закрытия HTTP-соединения клиентом, но и не должна висеть вечно
+	// при зависшем SMTP-сервере.
+	// Если письмо не ушло — логируем ошибку, но возвращаем nil: пользователь видит
+	// одинаковый ответ независимо от результата, чтобы не раскрывать внутреннее состояние.
+	// Повторный запрос создаст новый токен и инвалидирует текущий.
+	//
+	// TODO: перенести отправку письма в Asynq-джоб, чтобы не занимать HTTP-запрос
+	// ожиданием SMTP и корректно обрабатывать ретраи при сбоях провайдера.
+	emailCtx, emailCancel := context.WithTimeout(context.Background(), s.emailSendTimeout)
+	defer emailCancel()
+	if err := s.emailSender.SendPasswordResetEmail(emailCtx, email, rawToken); err != nil {
+		s.logger.Error().Err(err).
+			Str("user_id", user.ID.String()).
+			Str("email", email).
+			Msg("не удалось отправить письмо для сброса пароля")
+	}
+
+	return nil
+}
+
+// ResetPassword проверяет токен сброса, обновляет пароль и отзывает токен.
+func (s *Service) ResetPassword(ctx context.Context, rawToken string, newPassword string) error {
+	if len(newPassword) < s.passwordMinLength {
+		return ErrPasswordTooShort
+	}
+
+	tokenHash := HashSessionToken(rawToken)
+
+	// Транзакция нужна для атомарного обновления пароля и пометки токена.
+	// GetValidPasswordResetToken использует FOR UPDATE — это блокирует строку токена
+	// на уровне строки и не даёт параллельному запросу прочитать тот же токен
+	// как активный до завершения нашей транзакции.
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin reset password tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txQueries := s.queries.WithTx(tx)
+
+	tokenRow, err := txQueries.GetValidPasswordResetToken(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrPasswordResetTokenInvalid
+		}
+
+		return fmt.Errorf("get password reset token: %w", err)
+	}
+
+	newHash, err := HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hash new password: %w", err)
+	}
+
+	// Обновляем пароль пользователя напрямую через SQL.
+	rows, err := txQueries.UpdateUserPassword(ctx, dbgen.UpdateUserPasswordParams{
+		ID:           tokenRow.UserID,
+		PasswordHash: pgtype.Text{String: newHash, Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("update user password: %w", err)
+	}
+
+	if rows == 0 {
+		// Теоретически невозможно: токен ссылается на user_id с ON DELETE CASCADE.
+		return ErrUserNotFound
+	}
+
+	// Отзываем все активные сессии пользователя: после смены пароля старые токены
+	// не должны давать доступ — это стандартная мера при компрометации аккаунта.
+	if err := txQueries.RevokeAllUserSessions(ctx, tokenRow.UserID); err != nil {
+		return fmt.Errorf("revoke user sessions after password reset: %w", err)
+	}
+
+	// Помечаем токен использованным атомарно внутри транзакции.
+	// Если параллельный запрос успел пометить токен первым — получим 0 строк,
+	// что означает гонку на одном токене: возвращаем ошибку невалидного токена.
+	markedRows, err := txQueries.MarkPasswordResetTokenUsed(ctx, tokenHash)
+	if err != nil {
+		return fmt.Errorf("mark password reset token used: %w", err)
+	}
+	if markedRows == 0 {
+		return ErrPasswordResetTokenInvalid
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit reset password tx: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) createSessionForUser(ctx context.Context, queries *dbgen.Queries, user User) (AuthResult, error) {

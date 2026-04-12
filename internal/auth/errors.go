@@ -36,4 +36,10 @@ var (
 
 	// ErrTelegramAuthExpired возвращается, когда Telegram прислал слишком старые данные входа.
 	ErrTelegramAuthExpired = errors.New("telegram auth data is expired")
+
+	// ErrPasswordResetTokenInvalid возвращается, когда токен сброса не найден, истёк или уже использован.
+	ErrPasswordResetTokenInvalid = errors.New("password reset token is invalid or expired")
+
+	// ErrUserNotFound возвращается во внутренней логике, когда пользователь внезапно исчез из БД.
+	ErrUserNotFound = errors.New("user not found")
 )

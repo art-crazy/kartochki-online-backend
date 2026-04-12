@@ -154,7 +154,7 @@ func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.LogoutResponse{Status: "logged_out"})
+	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "logged_out"})
 }
 
 // Me возвращает текущего пользователя, который уже был загружен middleware.
@@ -172,6 +172,56 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			Email: user.Email,
 		},
 	})
+}
+
+// ForgotPassword принимает email и инициирует отправку письма со ссылкой для сброса пароля.
+//
+// Ответ всегда 200 независимо от того, найден пользователь или нет — чтобы не раскрывать
+// факт существования аккаунта по email.
+func (h AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req contracts.ForgotPasswordRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		return
+	}
+
+	if details := validateForgotPasswordRequest(req); len(details) > 0 {
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		return
+	}
+
+	if err := h.authService.ForgotPassword(r.Context(), req.Email); err != nil {
+		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to process password reset request")
+		return
+	}
+
+	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "accepted"})
+}
+
+// ResetPassword принимает токен из письма и новый пароль, затем обновляет пароль пользователя.
+func (h AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req contracts.ResetPasswordRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		return
+	}
+
+	if details := validateResetPasswordRequest(req, h.authService.PasswordMinLength()); len(details) > 0 {
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		return
+	}
+
+	if err := h.authService.ResetPassword(r.Context(), req.Token, req.Password); err != nil {
+		switch {
+		case errors.Is(err, auth.ErrPasswordResetTokenInvalid):
+			response.WriteError(w, r, http.StatusBadRequest, "invalid_reset_token", "password reset token is invalid or expired")
+		default:
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to reset password")
+		}
+		return
+	}
+
+	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "password_changed"})
 }
 
 // VKStart начинает внешний OAuth-flow и перенаправляет пользователя на страницу VK ID.
@@ -307,6 +357,37 @@ func validateLoginRequest(req contracts.LoginRequest) []contracts.ErrorDetail {
 
 	if strings.TrimSpace(req.Password) == "" {
 		details = append(details, contracts.ErrorDetail{Field: "password", Message: "field is required"})
+	}
+
+	return details
+}
+
+func validateForgotPasswordRequest(req contracts.ForgotPasswordRequest) []contracts.ErrorDetail {
+	var details []contracts.ErrorDetail
+
+	if strings.TrimSpace(req.Email) == "" {
+		details = append(details, contracts.ErrorDetail{Field: "email", Message: "field is required"})
+	} else if !isLikelyEmail(req.Email) {
+		details = append(details, contracts.ErrorDetail{Field: "email", Message: "must be a valid email"})
+	}
+
+	return details
+}
+
+func validateResetPasswordRequest(req contracts.ResetPasswordRequest, passwordMinLength int) []contracts.ErrorDetail {
+	var details []contracts.ErrorDetail
+
+	if strings.TrimSpace(req.Token) == "" {
+		details = append(details, contracts.ErrorDetail{Field: "token", Message: "field is required"})
+	}
+
+	if strings.TrimSpace(req.Password) == "" {
+		details = append(details, contracts.ErrorDetail{Field: "password", Message: "field is required"})
+	} else if len(req.Password) < passwordMinLength {
+		details = append(details, contracts.ErrorDetail{
+			Field:   "password",
+			Message: fmt.Sprintf("must be at least %d characters", passwordMinLength),
+		})
 	}
 
 	return details

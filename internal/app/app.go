@@ -15,6 +15,7 @@ import (
 	"kartochki-online-backend/internal/http/handlers"
 	"kartochki-online-backend/internal/httpserver"
 	"kartochki-online-backend/internal/jobs"
+	"kartochki-online-backend/internal/platform/email"
 	"kartochki-online-backend/internal/platform/postgres"
 	"kartochki-online-backend/internal/platform/redis"
 )
@@ -47,7 +48,10 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	)
 	healthHandler := handlers.NewHealthHandler(readiness, logger)
 	queries := dbgen.New(db.Pool)
-	authService := auth.NewService(db.Pool, queries, redisClient, cfg.Auth)
+	// Используем NoopSender, пока отправка письма не вынесена в Asynq-джоб.
+	// До миграции на джоб токен сброса выводится только в лог.
+	emailSender := email.NewNoopSender(logger)
+	authService := auth.NewService(db.Pool, queries, redisClient, emailSender, logger, cfg.Auth)
 	authHandler := handlers.NewAuthHandler(authService)
 
 	router := httptransport.NewRouter(cfg.HTTP, logger, healthHandler, authHandler, authService)

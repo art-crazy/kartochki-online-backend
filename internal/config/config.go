@@ -55,11 +55,13 @@ type AsynqConfig struct {
 
 // AuthConfig хранит параметры локальной авторизации и OAuth-провайдеров.
 type AuthConfig struct {
-	SessionTTL        time.Duration
-	PasswordMinLength int
-	VKOAuth           VKOAuthConfig
-	YandexOAuth       YandexOAuthConfig
-	TelegramAuth      TelegramAuthConfig
+	SessionTTL            time.Duration
+	PasswordMinLength     int
+	PasswordResetTokenTTL time.Duration
+	EmailSendTimeout      time.Duration
+	VKOAuth               VKOAuthConfig
+	YandexOAuth           YandexOAuthConfig
+	TelegramAuth          TelegramAuthConfig
 }
 
 // VKOAuthConfig хранит env-параметры для входа через VK ID.
@@ -152,6 +154,16 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	passwordResetTokenTTL, err := getDuration("AUTH_PASSWORD_RESET_TOKEN_TTL", 1*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+
+	emailSendTimeout, err := getDuration("AUTH_EMAIL_SEND_TIMEOUT", 30*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		App: AppConfig{
 			Name: getEnv("APP_NAME", "kartochki-online-backend"),
@@ -178,8 +190,10 @@ func loadFromEnv() (Config, error) {
 			Concurrency: asynqConcurrency,
 		},
 		Auth: AuthConfig{
-			SessionTTL:        sessionTTL,
-			PasswordMinLength: passwordMinLength,
+			SessionTTL:            sessionTTL,
+			PasswordMinLength:     passwordMinLength,
+			PasswordResetTokenTTL: passwordResetTokenTTL,
+			EmailSendTimeout:      emailSendTimeout,
 			VKOAuth: VKOAuthConfig{
 				ClientID:     getEnv("AUTH_VK_CLIENT_ID", ""),
 				ClientSecret: getEnv("AUTH_VK_CLIENT_SECRET", ""),
@@ -293,6 +307,14 @@ func validate(cfg Config) error {
 
 	if cfg.Auth.PasswordMinLength <= 0 {
 		return fmt.Errorf("AUTH_PASSWORD_MIN_LENGTH must be greater than zero")
+	}
+
+	if cfg.Auth.PasswordResetTokenTTL <= 0 {
+		return fmt.Errorf("AUTH_PASSWORD_RESET_TOKEN_TTL must be greater than zero")
+	}
+
+	if cfg.Auth.EmailSendTimeout <= 0 {
+		return fmt.Errorf("AUTH_EMAIL_SEND_TIMEOUT must be greater than zero")
 	}
 
 	if cfg.Auth.VKOAuth.StateTTL <= 0 {

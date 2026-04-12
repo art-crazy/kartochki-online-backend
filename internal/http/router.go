@@ -56,6 +56,8 @@ func NewRouter(
 			authRouter.Post("/login", authHandler.Login)
 			authRouter.Post("/telegram/login", authHandler.TelegramLogin)
 			authRouter.With(authMiddleware.RequireUser).Post("/logout", authHandler.Logout)
+			authRouter.Post("/forgot-password", authHandler.ForgotPassword)
+			authRouter.Post("/reset-password", authHandler.ResetPassword)
 			authRouter.Get("/vk/start", authHandler.VKStart)
 			authRouter.Get("/vk/callback", authHandler.VKCallback)
 			authRouter.Get("/yandex/start", authHandler.YandexStart)

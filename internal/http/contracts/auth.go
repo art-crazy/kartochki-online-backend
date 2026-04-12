@@ -34,6 +34,12 @@ type ForgotPasswordRequest struct {
 	Email string `json:"email"`
 }
 
+// ResetPasswordRequest описывает запрос на установку нового пароля по токену из письма.
+type ResetPasswordRequest struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
 // AuthResponse возвращается после успешной авторизации или регистрации.
 type AuthResponse struct {
 	User    AuthUser    `json:"user"`
@@ -61,15 +67,9 @@ type CurrentUserResponse struct {
 	User AuthUser `json:"user"`
 }
 
-// LogoutResponse подтверждает, что текущая сессия завершена.
-type LogoutResponse struct {
-	Status string `json:"status"`
-}
-
-// ForgotPasswordResponse подтверждает, что запрос принят в обработку.
-//
-// Status стоит держать фиксированным, например `accepted`, чтобы не плодить
-// лишние состояния.
-type ForgotPasswordResponse struct {
+// StatusResponse — универсальный ответ для операций, которые подтверждают результат
+// без возврата данных. Используется для logout, forgot-password, reset-password.
+type StatusResponse struct {
+	// Status — результат операции: "accepted", "password_changed" или "logged_out".
 	Status string `json:"status"`
 }
