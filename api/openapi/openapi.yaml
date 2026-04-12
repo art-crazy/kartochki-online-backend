@@ -599,6 +599,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/dashboard:
+    get:
+      summary: Данные для главной страницы приложения
+      description: Возвращает статистику, последние и все проекты пользователя, а также CTA-блок быстрого старта.
+      operationId: getDashboard
+      tags:
+        - Dashboard
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Данные дашборда
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при сборке дашборда
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     BearerAuth:
@@ -796,3 +839,101 @@ components:
         message:
           type: string
           example: поле обязательно
+    DashboardProject:
+      type: object
+      required:
+        - id
+        - title
+        - updated_at
+        - canonical_path
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Кроссовки Nike Air Max
+        card_count:
+          type: integer
+          example: 6
+        marketplace_id:
+          type: string
+          example: wildberries
+        updated_at:
+          type: string
+          format: date-time
+        preview_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+        canonical_path:
+          type: string
+          example: /app/projects/7f3e1a2b-...
+    DashboardStat:
+      type: object
+      required:
+        - key
+        - label
+        - value
+        - description
+      properties:
+        key:
+          type: string
+          example: total_projects
+        label:
+          type: string
+          example: Всего проектов
+        value:
+          type: string
+          example: "12"
+        description:
+          type: string
+          example: проектов создано
+        accent_text:
+          type: string
+        progress:
+          type: object
+          properties:
+            value:
+              type: integer
+            max:
+              type: integer
+    DashboardQuickStart:
+      type: object
+      required:
+        - title
+        - description
+        - canonical_path
+      properties:
+        title:
+          type: string
+          example: Создайте первый проект
+        description:
+          type: string
+          example: Загрузите фото товара — мы сгенерируем карточки для маркетплейса
+        canonical_path:
+          type: string
+          example: /app/generate
+    DashboardResponse:
+      type: object
+      required:
+        - stats
+        - recent_projects
+        - all_projects
+        - quick_start
+      properties:
+        stats:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardStat"
+        recent_projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardProject"
+        all_projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardProject"
+        quick_start:
+          $ref: "#/components/schemas/DashboardQuickStart"

@@ -20,6 +20,7 @@ func NewRouter(
 	logger zerolog.Logger,
 	healthHandler handlers.HealthHandler,
 	authHandler handlers.AuthHandler,
+	dashboardHandler handlers.DashboardHandler,
 	authService *auth.Service,
 ) stdhttp.Handler {
 	router := chi.NewRouter()
@@ -65,6 +66,7 @@ func NewRouter(
 		})
 
 		api.With(authMiddleware.RequireUser).Get("/me", authHandler.Me)
+		api.With(authMiddleware.RequireUser).Get("/dashboard", dashboardHandler.Get)
 	})
 
 	registerDocsRoutes(router)

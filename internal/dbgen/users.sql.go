@@ -25,12 +25,14 @@ insert into users (
 returning id, coalesce(email, '') as email, name, created_at, updated_at
 `
 
+// CreateUserParams содержит поля для создания пользователя.
 type CreateUserParams struct {
 	Email        pgtype.Text
 	PasswordHash pgtype.Text
 	Name         string
 }
 
+// CreateUserRow содержит пользователя сразу после создания.
 type CreateUserRow struct {
 	ID        uuid.UUID
 	Email     string
@@ -39,6 +41,7 @@ type CreateUserRow struct {
 	UpdatedAt pgtype.Timestamptz
 }
 
+// CreateUser создаёт пользователя и возвращает базовые поля для дальнейшей работы сервиса.
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.PasswordHash, arg.Name)
 	var i CreateUserRow
@@ -62,12 +65,14 @@ where email = $1
 limit 1
 `
 
+// GetAuthUserByEmailRow содержит базовые данные пользователя для auth-сценариев.
 type GetAuthUserByEmailRow struct {
 	ID    uuid.UUID
 	Email string
 	Name  string
 }
 
+// GetAuthUserByEmail ищет пользователя по email для сценариев, где пароль не нужен.
 func (q *Queries) GetAuthUserByEmail(ctx context.Context, email pgtype.Text) (GetAuthUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getAuthUserByEmail, email)
 	var i GetAuthUserByEmailRow
@@ -85,12 +90,14 @@ where id = $1
 limit 1
 `
 
+// GetAuthUserByIDRow содержит базовые данные пользователя для auth-сценариев.
 type GetAuthUserByIDRow struct {
 	ID    uuid.UUID
 	Email string
 	Name  string
 }
 
+// GetAuthUserByID ищет пользователя по id для auth-сценариев.
 func (q *Queries) GetAuthUserByID(ctx context.Context, id uuid.UUID) (GetAuthUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, getAuthUserByID, id)
 	var i GetAuthUserByIDRow
@@ -109,6 +116,7 @@ where email = $1
 limit 1
 `
 
+// GetLoginUserByEmailRow содержит данные пользователя, нужные для логина по паролю.
 type GetLoginUserByEmailRow struct {
 	ID           uuid.UUID
 	Email        pgtype.Text
@@ -116,6 +124,7 @@ type GetLoginUserByEmailRow struct {
 	PasswordHash string
 }
 
+// GetLoginUserByEmail ищет пользователя по email вместе с хэшем пароля.
 func (q *Queries) GetLoginUserByEmail(ctx context.Context, email pgtype.Text) (GetLoginUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getLoginUserByEmail, email)
 	var i GetLoginUserByEmailRow
@@ -135,11 +144,14 @@ set password_hash = $2,
 where id = $1
 `
 
+// UpdateUserPasswordParams содержит пользователя и новый хэш пароля.
 type UpdateUserPasswordParams struct {
 	ID           uuid.UUID
 	PasswordHash pgtype.Text
 }
 
+// Обновляем хэш пароля пользователя. Возвращает количество затронутых строк —
+// 0 означает, что пользователь не найден.
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
 	if err != nil {

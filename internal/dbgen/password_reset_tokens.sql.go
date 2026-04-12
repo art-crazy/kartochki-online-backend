@@ -12,19 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const invalidatePreviousPasswordResetTokens = `-- name: InvalidatePreviousPasswordResetTokens :exec
-update password_reset_tokens
-set used_at = now()
-where user_id = $1
-  and used_at is null
-  and expires_at > now()
-`
-
-func (q *Queries) InvalidatePreviousPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, invalidatePreviousPasswordResetTokens, userID)
-	return err
-}
-
 const createPasswordResetToken = `-- name: CreatePasswordResetToken :one
 insert into password_reset_tokens (
     user_id,
@@ -38,12 +25,14 @@ insert into password_reset_tokens (
 returning id, user_id, expires_at, created_at
 `
 
+// CreatePasswordResetTokenParams содержит поля для записи нового токена сброса.
 type CreatePasswordResetTokenParams struct {
 	UserID    uuid.UUID
 	TokenHash string
 	ExpiresAt pgtype.Timestamptz
 }
 
+// CreatePasswordResetTokenRow содержит данные созданного токена, которые нужны сервису.
 type CreatePasswordResetTokenRow struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -51,6 +40,8 @@ type CreatePasswordResetTokenRow struct {
 	CreatedAt pgtype.Timestamptz
 }
 
+// Создаём новый токен сброса. Предыдущие токены должны быть инвалидированы заранее
+// через InvalidatePreviousPasswordResetTokens в той же транзакции.
 func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (CreatePasswordResetTokenRow, error) {
 	row := q.db.QueryRow(ctx, createPasswordResetToken, arg.UserID, arg.TokenHash, arg.ExpiresAt)
 	var i CreatePasswordResetTokenRow
@@ -75,19 +66,36 @@ limit 1
 for update
 `
 
+// GetValidPasswordResetTokenRow содержит активный токен и пользователя, которому он принадлежит.
 type GetValidPasswordResetTokenRow struct {
 	ID     uuid.UUID
 	UserID uuid.UUID
 }
 
+// Ищем токен по хэшу только среди активных: не истёкших и не использованных.
+// FOR UPDATE блокирует строку на уровне транзакции, чтобы предотвратить
+// одновременное использование одного токена двумя параллельными запросами.
 func (q *Queries) GetValidPasswordResetToken(ctx context.Context, tokenHash string) (GetValidPasswordResetTokenRow, error) {
 	row := q.db.QueryRow(ctx, getValidPasswordResetToken, tokenHash)
 	var i GetValidPasswordResetTokenRow
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-	)
+	err := row.Scan(&i.ID, &i.UserID)
 	return i, err
+}
+
+const invalidatePreviousPasswordResetTokens = `-- name: InvalidatePreviousPasswordResetTokens :exec
+update password_reset_tokens
+set used_at = now()
+where user_id = $1
+  and used_at is null
+  and expires_at > now()
+`
+
+// Инвалидируем все предыдущие активные токены пользователя перед созданием нового.
+// Это гарантирует, что в каждый момент у пользователя есть только один рабочий токен,
+// и предотвращает накопление активных ссылок в базе.
+func (q *Queries) InvalidatePreviousPasswordResetTokens(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, invalidatePreviousPasswordResetTokens, userID)
+	return err
 }
 
 const markPasswordResetTokenUsed = `-- name: MarkPasswordResetTokenUsed :execrows
@@ -97,6 +105,7 @@ where token_hash = $1
   and used_at is null
 `
 
+// Помечаем токен использованным. Повторный вызов с тем же хэшем вернёт 0 строк.
 func (q *Queries) MarkPasswordResetTokenUsed(ctx context.Context, tokenHash string) (int64, error) {
 	result, err := q.db.Exec(ctx, markPasswordResetTokenUsed, tokenHash)
 	if err != nil {

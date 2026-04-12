@@ -9,6 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// Связь локального пользователя с внешним OAuth-провайдером.
+type OauthAccount struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	Provider       string
+	ProviderUserID string
+	Email          pgtype.Text
+	CreatedAt      pgtype.Timestamptz
+}
+
 // Одноразовые токены сброса пароля. Хранится только хэш, сырой токен уходит по email.
 type PasswordResetToken struct {
 	ID        uuid.UUID
@@ -19,14 +29,17 @@ type PasswordResetToken struct {
 	CreatedAt pgtype.Timestamptz
 }
 
-// Связь локального пользователя с внешним OAuth-провайдером.
-type OauthAccount struct {
-	ID             uuid.UUID
-	UserID         uuid.UUID
-	Provider       string
-	ProviderUserID string
-	Email          pgtype.Text
-	CreatedAt      pgtype.Timestamptz
+// Рабочий проект пользователя для генерации карточек маркетплейса.
+type Project struct {
+	ID                 uuid.UUID
+	UserID             uuid.UUID
+	Title              string
+	Marketplace        string
+	ProductName        string
+	ProductDescription string
+	Status             string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
 }
 
 // Сессии входа. В базе хранится только хэш токена.
