@@ -35,3 +35,13 @@ join users u on u.id = oa.user_id
 where oa.provider = $1
   and oa.provider_user_id = $2
 limit 1;
+
+-- name: ListOAuthAccountsByUserID :many
+select
+    id,
+    provider,
+    coalesce(email, '') as email,
+    created_at
+from oauth_accounts
+where user_id = $1
+order by created_at asc;

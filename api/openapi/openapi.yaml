@@ -945,6 +945,510 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings:
+    get:
+      summary: Данные страницы настроек
+      description: Возвращает профиль, дефолтные настройки, уведомления, активные сессии, интеграции и API-ключ.
+      operationId: getSettings
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Данные настроек
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке настроек
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/profile:
+    patch:
+      summary: Обновить профиль пользователя
+      operationId: patchSettingsProfile
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Профиль успешно обновлён
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsProfile"
+        "400":
+          description: Ошибка валидации
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email уже занят
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при сохранении профиля
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/defaults:
+    patch:
+      summary: Обновить дефолтные настройки генерации
+      operationId: patchSettingsDefaults
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDefaultsRequest"
+      responses:
+        "200":
+          description: Настройки по умолчанию успешно обновлены
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsDefaults"
+        "400":
+          description: Ошибка валидации
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при сохранении настроек
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/change-password:
+    post:
+      summary: Сменить пароль
+      operationId: changeSettingsPassword
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Пароль изменён, остальные сессии отозваны
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Ошибка валидации или неверный текущий пароль
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при смене пароля
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/notifications:
+    patch:
+      summary: Обновить настройки уведомлений
+      operationId: patchSettingsNotifications
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationsRequest"
+      responses:
+        "200":
+          description: Настройки уведомлений успешно обновлены
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsNotifications"
+        "400":
+          description: Ошибка валидации
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при сохранении уведомлений
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/sessions/{id}:
+    delete:
+      summary: Отозвать одну сессию
+      operationId: deleteSettingsSession
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Сессия успешно отозвана
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Нельзя отозвать текущую сессию или запрос некорректен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Сессия не найдена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при отзыве сессии
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/api-key/rotate:
+    post:
+      summary: Перевыпустить API-ключ
+      operationId: rotateSettingsApiKey
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Новый API-ключ успешно создан
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateAPIKeyResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при перевыпуске API-ключа
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/export:
+    post:
+      summary: Поставить экспорт данных аккаунта в очередь
+      operationId: postSettingsExport
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Задача экспорта принята
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportDataResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при постановке экспорта в очередь
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/settings/account:
+    delete:
+      summary: Удалить аккаунт
+      operationId: deleteSettingsAccount
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteAccountRequest"
+      responses:
+        "200":
+          description: Аккаунт успешно удалён
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Неверное подтверждающее слово
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при удалении аккаунта
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   securitySchemes:
     BearerAuth:
@@ -1330,3 +1834,236 @@ components:
             $ref: "#/components/schemas/DashboardProject"
         quick_start:
           $ref: "#/components/schemas/DashboardQuickStart"
+    SettingsResponse:
+      type: object
+      required:
+        - profile
+        - defaults
+        - notifications
+        - sessions
+        - integrations
+        - api_key
+      properties:
+        profile:
+          $ref: "#/components/schemas/SettingsProfile"
+        defaults:
+          $ref: "#/components/schemas/SettingsDefaults"
+        notifications:
+          $ref: "#/components/schemas/SettingsNotifications"
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettingsSession"
+        integrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/SettingsIntegration"
+        api_key:
+          $ref: "#/components/schemas/SettingsAPIKey"
+    SettingsProfile:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: Ivan
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+        phone:
+          type: string
+          example: "+7 999 123-45-67"
+        company:
+          type: string
+          example: Kartochki LLC
+    SettingsDefaults:
+      type: object
+      required:
+        - marketplace_id
+        - cards_per_generation
+        - format
+      properties:
+        marketplace_id:
+          type: string
+          example: wildberries
+        cards_per_generation:
+          type: integer
+          minimum: 1
+          maximum: 50
+          example: 10
+        format:
+          type: string
+          enum:
+            - png
+            - jpg
+            - webp
+          example: png
+    SettingsNotifications:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateNotificationItem"
+    SettingsSession:
+      type: object
+      required:
+        - id
+        - device
+        - platform
+        - is_current
+        - can_revoke
+      properties:
+        id:
+          type: string
+          format: uuid
+        device:
+          type: string
+          example: Chrome browser
+        platform:
+          type: string
+          example: macOS
+        location:
+          type: string
+          example: 203.0.113.20
+        is_current:
+          type: boolean
+        can_revoke:
+          type: boolean
+    SettingsIntegration:
+      type: object
+      required:
+        - provider
+        - connected
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          example: yandex
+        account_email:
+          type: string
+          format: email
+        connected:
+          type: boolean
+    SettingsAPIKey:
+      type: object
+      required:
+        - can_rotate
+      properties:
+        masked_value:
+          type: string
+          example: ko_l********************************P0Q2
+        can_rotate:
+          type: boolean
+          example: true
+    UpdateProfileRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: Ivan
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+        phone:
+          type: string
+          example: "+7 999 123-45-67"
+        company:
+          type: string
+          example: Kartochki LLC
+    UpdateDefaultsRequest:
+      type: object
+      required:
+        - marketplace_id
+        - cards_per_generation
+        - format
+      properties:
+        marketplace_id:
+          type: string
+          example: wildberries
+        cards_per_generation:
+          type: integer
+          minimum: 1
+          maximum: 50
+          example: 10
+        format:
+          type: string
+          enum:
+            - png
+            - jpg
+            - webp
+          example: png
+    ChangePasswordRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+    UpdateNotificationsRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/UpdateNotificationItem"
+    UpdateNotificationItem:
+      type: object
+      required:
+        - key
+        - enabled
+      properties:
+        key:
+          type: string
+          example: generation_ready
+        enabled:
+          type: boolean
+    RotateAPIKeyResponse:
+      type: object
+      required:
+        - masked_value
+        - plain_value
+      properties:
+        masked_value:
+          type: string
+          example: ko_l********************************P0Q2
+        plain_value:
+          type: string
+          example: ko_live_7fD2D1Xnq6C7xBskjPq6WQ6OHvOjQJE9P0Q
+    ExportDataResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - accepted
+          example: accepted
+    DeleteAccountRequest:
+      type: object
+      required:
+        - confirm_word
+      properties:
+        confirm_word:
+          type: string
+          example: DELETE

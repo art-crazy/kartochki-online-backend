@@ -38,10 +38,32 @@ from users
 where email = $1
 limit 1;
 
+-- name: GetUserCredentialsByID :one
+select
+    id,
+    coalesce(email, '') as email,
+    name,
+    coalesce(password_hash, '') as password_hash
+from users
+where id = $1
+limit 1;
+
+-- name: UpdateUserProfile :one
+update users
+set name = $2,
+    email = $3,
+    updated_at = now()
+where id = $1
+returning id, coalesce(email, '') as email, name, created_at, updated_at;
+
 -- name: UpdateUserPassword :execrows
 -- Обновляем хэш пароля пользователя. Возвращает количество затронутых строк —
 -- 0 означает, что пользователь не найден.
 update users
 set password_hash = $2,
     updated_at = now()
+where id = $1;
+
+-- name: DeleteUserByID :execrows
+delete from users
 where id = $1;

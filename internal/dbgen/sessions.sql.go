@@ -16,39 +16,52 @@ const createSession = `-- name: CreateSession :one
 insert into sessions (
     user_id,
     token_hash,
-    expires_at
+    expires_at,
+    user_agent,
+    ip_address
 ) values (
     $1,
     $2,
-    $3
+    $3,
+    $4,
+    $5
 )
-returning id, user_id, expires_at, created_at
+returning id, user_id, expires_at, created_at, user_agent, ip_address
 `
 
-// CreateSessionParams содержит данные новой сессии пользователя.
 type CreateSessionParams struct {
 	UserID    uuid.UUID
 	TokenHash string
 	ExpiresAt pgtype.Timestamptz
+	UserAgent string
+	IpAddress string
 }
 
-// CreateSessionRow содержит сохранённую сессию и её сроки действия.
 type CreateSessionRow struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
 	ExpiresAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+	UserAgent string
+	IpAddress string
 }
 
-// CreateSession создаёт новую сессию входа и возвращает её служебные поля.
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (CreateSessionRow, error) {
-	row := q.db.QueryRow(ctx, createSession, arg.UserID, arg.TokenHash, arg.ExpiresAt)
+	row := q.db.QueryRow(ctx, createSession,
+		arg.UserID,
+		arg.TokenHash,
+		arg.ExpiresAt,
+		arg.UserAgent,
+		arg.IpAddress,
+	)
 	var i CreateSessionRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.UserAgent,
+		&i.IpAddress,
 	)
 	return i, err
 }
@@ -68,7 +81,6 @@ where s.token_hash = $1
 limit 1
 `
 
-// GetAuthIdentityByTokenHashRow содержит пользователя и сессию, найденные по токену.
 type GetAuthIdentityByTokenHashRow struct {
 	ID        uuid.UUID
 	Email     string
@@ -77,7 +89,6 @@ type GetAuthIdentityByTokenHashRow struct {
 	ExpiresAt pgtype.Timestamptz
 }
 
-// GetAuthIdentityByTokenHash ищет активную сессию и её владельца по хэшу токена.
 func (q *Queries) GetAuthIdentityByTokenHash(ctx context.Context, tokenHash string) (GetAuthIdentityByTokenHashRow, error) {
 	row := q.db.QueryRow(ctx, getAuthIdentityByTokenHash, tokenHash)
 	var i GetAuthIdentityByTokenHashRow
@@ -89,6 +100,62 @@ func (q *Queries) GetAuthIdentityByTokenHash(ctx context.Context, tokenHash stri
 		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const listActiveUserSessions = `-- name: ListActiveUserSessions :many
+select
+    id,
+    user_agent,
+    ip_address,
+    created_at,
+    expires_at,
+    token_hash = $2 as is_current
+from sessions
+where user_id = $1
+  and revoked_at is null
+  and expires_at > now()
+order by created_at desc
+`
+
+type ListActiveUserSessionsParams struct {
+	UserID    uuid.UUID
+	TokenHash string
+}
+
+type ListActiveUserSessionsRow struct {
+	ID        uuid.UUID
+	UserAgent string
+	IpAddress string
+	CreatedAt pgtype.Timestamptz
+	ExpiresAt pgtype.Timestamptz
+	IsCurrent bool
+}
+
+func (q *Queries) ListActiveUserSessions(ctx context.Context, arg ListActiveUserSessionsParams) ([]ListActiveUserSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveUserSessions, arg.UserID, arg.TokenHash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveUserSessionsRow
+	for rows.Next() {
+		var i ListActiveUserSessionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserAgent,
+			&i.IpAddress,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.IsCurrent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const revokeAllUserSessions = `-- name: RevokeAllUserSessions :exec
@@ -105,6 +172,26 @@ func (q *Queries) RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) e
 	return err
 }
 
+const revokeOtherUserSessions = `-- name: RevokeOtherUserSessions :exec
+update sessions
+set revoked_at = now()
+where user_id = $1
+  and token_hash <> $2
+  and revoked_at is null
+`
+
+type RevokeOtherUserSessionsParams struct {
+	UserID    uuid.UUID
+	TokenHash string
+}
+
+// После смены пароля в настройках оставляем текущую сессию живой,
+// чтобы пользователь не вылетал из интерфейса сразу после успешного подтверждения пароля.
+func (q *Queries) RevokeOtherUserSessions(ctx context.Context, arg RevokeOtherUserSessionsParams) error {
+	_, err := q.db.Exec(ctx, revokeOtherUserSessions, arg.UserID, arg.TokenHash)
+	return err
+}
+
 const revokeSessionByTokenHash = `-- name: RevokeSessionByTokenHash :execrows
 update sessions
 set revoked_at = now()
@@ -112,10 +199,30 @@ where token_hash = $1
   and revoked_at is null
 `
 
-// RevokeSessionByTokenHash отзывает одну сессию по хэшу токена.
-// Возвращаемое число строк помогает понять, был ли токен ещё активен.
 func (q *Queries) RevokeSessionByTokenHash(ctx context.Context, tokenHash string) (int64, error) {
 	result, err := q.db.Exec(ctx, revokeSessionByTokenHash, tokenHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revokeUserSessionByID = `-- name: RevokeUserSessionByID :execrows
+update sessions
+set revoked_at = now()
+where id = $1
+  and user_id = $2
+  and revoked_at is null
+  and expires_at > now()
+`
+
+type RevokeUserSessionByIDParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) RevokeUserSessionByID(ctx context.Context, arg RevokeUserSessionByIDParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeUserSessionByID, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}

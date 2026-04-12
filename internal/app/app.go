@@ -19,6 +19,7 @@ import (
 	"kartochki-online-backend/internal/platform/postgres"
 	"kartochki-online-backend/internal/platform/redis"
 	"kartochki-online-backend/internal/projects"
+	"kartochki-online-backend/internal/settings"
 )
 
 // App хранит собранные runtime-зависимости приложения.
@@ -56,8 +57,10 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	authHandler := handlers.NewAuthHandler(authService)
 
 	projectService := projects.NewService(queries)
+	settingsService := settings.NewService(db.Pool, queries, asynqClient, authService.PasswordMinLength())
 	dashboardHandler := handlers.NewDashboardHandler(projectService, logger)
 	projectsHandler := handlers.NewProjectsHandler(projectService, logger)
+	settingsHandler := handlers.NewSettingsHandler(settingsService, logger)
 
 	router := httptransport.NewRouter(
 		cfg.HTTP,
@@ -66,6 +69,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		authHandler,
 		dashboardHandler,
 		projectsHandler,
+		settingsHandler,
 		authService,
 	)
 	server := httpserver.New(cfg.HTTP, router)

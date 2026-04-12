@@ -9,6 +9,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// API-ключи пользовательских интеграций. Секрет хранится только в виде хэша.
+type ApiKey struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	KeyHash     string
+	MaskedValue string
+	CreatedAt   pgtype.Timestamptz
+	LastUsedAt  pgtype.Timestamptz
+	RevokedAt   pgtype.Timestamptz
+}
+
+// Пользовательские переключатели уведомлений.
+type NotificationPreference struct {
+	UserID        uuid.UUID
+	PreferenceKey string
+	Enabled       bool
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
 // Связь локального пользователя с внешним OAuth-провайдером.
 type OauthAccount struct {
 	ID             uuid.UUID
@@ -50,6 +70,8 @@ type Session struct {
 	ExpiresAt pgtype.Timestamptz
 	RevokedAt pgtype.Timestamptz
 	CreatedAt pgtype.Timestamptz
+	UserAgent string
+	IpAddress string
 }
 
 // Основной аккаунт пользователя. Не зависит от способа входа.
@@ -61,4 +83,16 @@ type User struct {
 	EmailVerifiedAt pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+}
+
+// Расширенный профиль пользователя и дефолтные параметры генерации.
+type UserSetting struct {
+	UserID             uuid.UUID
+	Phone              string
+	Company            string
+	DefaultMarketplace string
+	CardsPerGeneration int32
+	ImageFormat        string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
 }

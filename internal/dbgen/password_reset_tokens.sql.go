@@ -25,14 +25,12 @@ insert into password_reset_tokens (
 returning id, user_id, expires_at, created_at
 `
 
-// CreatePasswordResetTokenParams содержит поля для записи нового токена сброса.
 type CreatePasswordResetTokenParams struct {
 	UserID    uuid.UUID
 	TokenHash string
 	ExpiresAt pgtype.Timestamptz
 }
 
-// CreatePasswordResetTokenRow содержит данные созданного токена, которые нужны сервису.
 type CreatePasswordResetTokenRow struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -66,7 +64,6 @@ limit 1
 for update
 `
 
-// GetValidPasswordResetTokenRow содержит активный токен и пользователя, которому он принадлежит.
 type GetValidPasswordResetTokenRow struct {
 	ID     uuid.UUID
 	UserID uuid.UUID

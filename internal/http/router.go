@@ -22,6 +22,7 @@ func NewRouter(
 	authHandler handlers.AuthHandler,
 	dashboardHandler handlers.DashboardHandler,
 	projectsHandler handlers.ProjectsHandler,
+	settingsHandler handlers.SettingsHandler,
 	authService *auth.Service,
 ) stdhttp.Handler {
 	router := chi.NewRouter()
@@ -73,6 +74,15 @@ func NewRouter(
 		api.With(authMiddleware.RequireUser).Get("/projects/{id}", projectsHandler.Get)
 		api.With(authMiddleware.RequireUser).Patch("/projects/{id}", projectsHandler.Patch)
 		api.With(authMiddleware.RequireUser).Delete("/projects/{id}", projectsHandler.Delete)
+		api.With(authMiddleware.RequireUser).Get("/settings", settingsHandler.Get)
+		api.With(authMiddleware.RequireUser).Patch("/settings/profile", settingsHandler.PatchProfile)
+		api.With(authMiddleware.RequireUser).Patch("/settings/defaults", settingsHandler.PatchDefaults)
+		api.With(authMiddleware.RequireUser).Post("/settings/change-password", settingsHandler.ChangePassword)
+		api.With(authMiddleware.RequireUser).Patch("/settings/notifications", settingsHandler.PatchNotifications)
+		api.With(authMiddleware.RequireUser).Delete("/settings/sessions/{id}", settingsHandler.DeleteSession)
+		api.With(authMiddleware.RequireUser).Post("/settings/api-key/rotate", settingsHandler.RotateAPIKey)
+		api.With(authMiddleware.RequireUser).Post("/settings/export", settingsHandler.ExportData)
+		api.With(authMiddleware.RequireUser).Delete("/settings/account", settingsHandler.DeleteAccount)
 	})
 
 	registerDocsRoutes(router)

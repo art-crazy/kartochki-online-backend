@@ -17,7 +17,6 @@ values ($1, $2, $3, $4, $5, 'draft')
 returning id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at
 `
 
-// CreateProjectParams содержит поля для создания проекта.
 type CreateProjectParams struct {
 	UserID             uuid.UUID
 	Title              string
@@ -54,7 +53,6 @@ const deleteProject = `-- name: DeleteProject :execrows
 delete from projects where id = $1 and user_id = $2
 `
 
-// DeleteProjectParams содержит идентификаторы проекта и владельца для безопасного удаления.
 type DeleteProjectParams struct {
 	ID     uuid.UUID
 	UserID uuid.UUID
@@ -75,7 +73,6 @@ where id = $1
   and user_id = $2
 `
 
-// GetProjectByIDParams содержит идентификаторы проекта и владельца для безопасного чтения.
 type GetProjectByIDParams struct {
 	ID     uuid.UUID
 	UserID uuid.UUID
@@ -147,7 +144,6 @@ where id = $5 and user_id = $6
 returning id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at
 `
 
-// UpdateProjectParams содержит новые значения проекта и идентификатор владельца.
 type UpdateProjectParams struct {
 	Title              string
 	Marketplace        string

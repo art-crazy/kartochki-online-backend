@@ -89,6 +89,7 @@ type UpdateNotificationItem struct {
 // RotateAPIKeyResponse возвращается после перевыпуска API-ключа.
 type RotateAPIKeyResponse struct {
 	MaskedValue string `json:"masked_value"`
+	PlainValue  string `json:"plain_value"`
 }
 
 // ExportDataResponse подтверждает, что экспорт данных поставлен в очередь.

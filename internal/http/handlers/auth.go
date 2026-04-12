@@ -41,7 +41,7 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
-	})
+	}, sessionMetadataFromRequest(r))
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrEmailAlreadyExists):
@@ -83,7 +83,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	result, err := h.authService.Login(r.Context(), auth.LoginInput{
 		Email:    req.Email,
 		Password: req.Password,
-	})
+	}, sessionMetadataFromRequest(r))
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrInvalidCredentials):
@@ -118,7 +118,7 @@ func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 		PhotoURL:  req.PhotoURL,
 		AuthDate:  req.AuthDate,
 		Hash:      req.Hash,
-	})
+	}, sessionMetadataFromRequest(r))
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrTelegramAuthNotConfigured):
@@ -249,7 +249,7 @@ func (h AuthHandler) VKCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.authService.FinishVKOAuth(r.Context(), code, state)
+	result, err := h.authService.FinishVKOAuth(r.Context(), code, state, sessionMetadataFromRequest(r))
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrOAuthNotConfigured):
@@ -292,7 +292,7 @@ func (h AuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.authService.FinishYandexOAuth(r.Context(), code, state)
+	result, err := h.authService.FinishYandexOAuth(r.Context(), code, state, sessionMetadataFromRequest(r))
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrOAuthNotConfigured):

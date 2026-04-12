@@ -285,6 +285,7 @@ Responsibilities:
 As business logic appears, add explicit domain-owned packages such as:
 
 - `internal/auth`
+- `internal/settings`
 - `internal/users`
 - `internal/workspaces`
 - `internal/projects`
@@ -301,6 +302,20 @@ Each domain can contain its own:
 - transport mapping helpers if truly domain-specific
 
 Keep ownership explicit. Avoid giant cross-domain utility packages.
+
+`internal/settings` is now used for the `/api/v1/settings` surface.
+
+It owns:
+
+- profile editing beyond core auth fields
+- generation defaults
+- notification preferences
+- active session management
+- API key rotation
+- account export enqueueing
+- account deletion orchestration
+
+Security-sensitive primitives such as password hashing and bearer-session authentication still remain in `internal/auth`.
 
 ## Data and Persistence Conventions
 

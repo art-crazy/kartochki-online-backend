@@ -115,3 +115,46 @@ func (q *Queries) GetOAuthIdentityByProviderUserID(ctx context.Context, arg GetO
 	err := row.Scan(&i.ID, &i.Email, &i.Name)
 	return i, err
 }
+
+const listOAuthAccountsByUserID = `-- name: ListOAuthAccountsByUserID :many
+select
+    id,
+    provider,
+    coalesce(email, '') as email,
+    created_at
+from oauth_accounts
+where user_id = $1
+order by created_at asc
+`
+
+type ListOAuthAccountsByUserIDRow struct {
+	ID        uuid.UUID
+	Provider  string
+	Email     string
+	CreatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListOAuthAccountsByUserID(ctx context.Context, userID uuid.UUID) ([]ListOAuthAccountsByUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listOAuthAccountsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOAuthAccountsByUserIDRow
+	for rows.Next() {
+		var i ListOAuthAccountsByUserIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Provider,
+			&i.Email,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

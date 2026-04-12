@@ -38,6 +38,13 @@ type Session struct {
 	ExpiresAt   time.Time
 }
 
+// SessionMetadata содержит служебные данные клиентской сессии.
+// Эти поля не участвуют в авторизации, но нужны для страницы настроек и аудита устройств.
+type SessionMetadata struct {
+	UserAgent string
+	IPAddress string
+}
+
 // AuthResult объединяет пользователя и сессию после логина или регистрации.
 type AuthResult struct {
 	User    User
@@ -127,7 +134,7 @@ func (s *Service) PasswordMinLength() int {
 }
 
 // Register создаёт пользователя, а затем сразу выдаёт ему первую сессию.
-func (s *Service) Register(ctx context.Context, input RegisterInput) (AuthResult, error) {
+func (s *Service) Register(ctx context.Context, input RegisterInput, metadata SessionMetadata) (AuthResult, error) {
 	email := normalizeEmail(input.Email)
 	if len(input.Password) < s.passwordMinLength {
 		return AuthResult{}, ErrPasswordTooShort
@@ -162,7 +169,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (AuthResult
 		ID:    user.ID.String(),
 		Name:  strings.TrimSpace(user.Name),
 		Email: user.Email,
-	})
+	}, metadata)
 	if err != nil {
 		return AuthResult{}, err
 	}
@@ -175,7 +182,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (AuthResult
 }
 
 // Login проверяет пароль и создаёт новую сессию.
-func (s *Service) Login(ctx context.Context, input LoginInput) (AuthResult, error) {
+func (s *Service) Login(ctx context.Context, input LoginInput, metadata SessionMetadata) (AuthResult, error) {
 	user, err := s.queries.GetLoginUserByEmail(ctx, nullableText(normalizeEmail(input.Email)))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -197,7 +204,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (AuthResult, erro
 		ID:    user.ID.String(),
 		Name:  strings.TrimSpace(user.Name),
 		Email: nullableTextValue(user.Email),
-	})
+	}, metadata)
 }
 
 // Authenticate находит активную сессию по Bearer-токену и возвращает её владельца.
@@ -252,7 +259,7 @@ func (s *Service) StartVKOAuth(ctx context.Context) (string, error) {
 }
 
 // FinishVKOAuth завершает внешний вход через VK ID и создаёт обычную локальную сессию backend.
-func (s *Service) FinishVKOAuth(ctx context.Context, code string, state string) (AuthResult, error) {
+func (s *Service) FinishVKOAuth(ctx context.Context, code string, state string, metadata SessionMetadata) (AuthResult, error) {
 	if !s.vkOAuthConfigured() {
 		return AuthResult{}, ErrOAuthNotConfigured
 	}
@@ -275,7 +282,7 @@ func (s *Service) FinishVKOAuth(ctx context.Context, code string, state string) 
 		return AuthResult{}, ErrOAuthEmailMissing
 	}
 
-	return s.loginOrCreateVKOAuthUser(ctx, profile)
+	return s.loginOrCreateVKOAuthUser(ctx, profile, metadata)
 }
 
 // StartYandexOAuth подготавливает redirect URL на Яндекс ID и сохраняет одноразовый state в Redis.
@@ -298,7 +305,7 @@ func (s *Service) StartYandexOAuth(ctx context.Context) (string, error) {
 }
 
 // FinishYandexOAuth завершает внешний вход через Яндекс ID и создаёт обычную локальную сессию backend.
-func (s *Service) FinishYandexOAuth(ctx context.Context, code string, state string) (AuthResult, error) {
+func (s *Service) FinishYandexOAuth(ctx context.Context, code string, state string, metadata SessionMetadata) (AuthResult, error) {
 	if !s.providerConfigured(s.yandexOAuth) {
 		return AuthResult{}, ErrOAuthNotConfigured
 	}
@@ -321,11 +328,11 @@ func (s *Service) FinishYandexOAuth(ctx context.Context, code string, state stri
 		return AuthResult{}, ErrOAuthEmailMissing
 	}
 
-	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName)
+	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName, metadata)
 }
 
 // LoginWithTelegram проверяет подпись Telegram Login Widget и открывает локальную сессию.
-func (s *Service) LoginWithTelegram(ctx context.Context, data TelegramLoginData) (AuthResult, error) {
+func (s *Service) LoginWithTelegram(ctx context.Context, data TelegramLoginData, metadata SessionMetadata) (AuthResult, error) {
 	if !s.telegramAuthConfigured() {
 		return AuthResult{}, ErrTelegramAuthNotConfigured
 	}
@@ -334,7 +341,7 @@ func (s *Service) LoginWithTelegram(ctx context.Context, data TelegramLoginData)
 		return AuthResult{}, err
 	}
 
-	return s.loginOrCreateOAuthUser(ctx, providerTelegram, fmt.Sprintf("%d", data.ID), "", BuildTelegramDisplayName(data))
+	return s.loginOrCreateOAuthUser(ctx, providerTelegram, fmt.Sprintf("%d", data.ID), "", BuildTelegramDisplayName(data), metadata)
 }
 
 // ForgotPassword создаёт токен сброса пароля и запрашивает его отправку на email.
@@ -483,7 +490,7 @@ func (s *Service) ResetPassword(ctx context.Context, rawToken string, newPasswor
 	return nil
 }
 
-func (s *Service) createSessionForUser(ctx context.Context, queries *dbgen.Queries, user User) (AuthResult, error) {
+func (s *Service) createSessionForUser(ctx context.Context, queries *dbgen.Queries, user User, metadata SessionMetadata) (AuthResult, error) {
 	accessToken, err := GenerateSessionToken()
 	if err != nil {
 		return AuthResult{}, fmt.Errorf("generate session token: %w", err)
@@ -499,6 +506,8 @@ func (s *Service) createSessionForUser(ctx context.Context, queries *dbgen.Queri
 		UserID:    userID,
 		TokenHash: HashSessionToken(accessToken),
 		ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
+		UserAgent: strings.TrimSpace(metadata.UserAgent),
+		IpAddress: strings.TrimSpace(metadata.IPAddress),
 	})
 	if err != nil {
 		return AuthResult{}, fmt.Errorf("create session: %w", err)
@@ -521,8 +530,8 @@ func (s *Service) vkOAuthConfigured() bool {
 	return s.providerConfigured(s.vkOAuth)
 }
 
-func (s *Service) loginOrCreateVKOAuthUser(ctx context.Context, profile VKOAuthProfile) (AuthResult, error) {
-	return s.loginOrCreateOAuthUser(ctx, s.vkOAuth.Name, profile.Subject, profile.Email, profile.Name)
+func (s *Service) loginOrCreateVKOAuthUser(ctx context.Context, profile VKOAuthProfile, metadata SessionMetadata) (AuthResult, error) {
+	return s.loginOrCreateOAuthUser(ctx, s.vkOAuth.Name, profile.Subject, profile.Email, profile.Name, metadata)
 }
 
 func (s *Service) providerConfigured(provider OAuthProviderConfig) bool {
@@ -536,7 +545,7 @@ func (s *Service) telegramAuthConfigured() bool {
 	return strings.TrimSpace(s.telegramAuth.BotToken) != ""
 }
 
-func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName string, providerUserID string, email string, name string) (AuthResult, error) {
+func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName string, providerUserID string, email string, name string, metadata SessionMetadata) (AuthResult, error) {
 	email = normalizeEmail(email)
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -556,7 +565,7 @@ func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName strin
 			ID:    existingIdentity.ID.String(),
 			Name:  strings.TrimSpace(existingIdentity.Name),
 			Email: existingIdentity.Email,
-		})
+		}, metadata)
 		if sessionErr != nil {
 			return AuthResult{}, sessionErr
 		}
@@ -589,7 +598,7 @@ func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName strin
 				ID:    user.ID.String(),
 				Name:  strings.TrimSpace(user.Name),
 				Email: user.Email,
-			})
+			}, metadata)
 			if sessionErr != nil {
 				return AuthResult{}, sessionErr
 			}
@@ -626,7 +635,7 @@ func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName strin
 		ID:    createdUser.ID.String(),
 		Name:  strings.TrimSpace(createdUser.Name),
 		Email: createdUser.Email,
-	})
+	}, metadata)
 	if err != nil {
 		return AuthResult{}, err
 	}

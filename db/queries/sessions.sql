@@ -2,13 +2,17 @@
 insert into sessions (
     user_id,
     token_hash,
-    expires_at
+    expires_at,
+    user_agent,
+    ip_address
 ) values (
     $1,
     $2,
-    $3
+    $3,
+    $4,
+    $5
 )
-returning id, user_id, expires_at, created_at;
+returning id, user_id, expires_at, created_at, user_agent, ip_address;
 
 -- name: GetAuthIdentityByTokenHash :one
 select
@@ -37,3 +41,34 @@ update sessions
 set revoked_at = now()
 where user_id = $1
   and revoked_at is null;
+
+-- name: RevokeOtherUserSessions :exec
+-- После смены пароля в настройках оставляем текущую сессию живой,
+-- чтобы пользователь не вылетал из интерфейса сразу после успешного подтверждения пароля.
+update sessions
+set revoked_at = now()
+where user_id = $1
+  and token_hash <> $2
+  and revoked_at is null;
+
+-- name: ListActiveUserSessions :many
+select
+    id,
+    user_agent,
+    ip_address,
+    created_at,
+    expires_at,
+    token_hash = $2 as is_current
+from sessions
+where user_id = $1
+  and revoked_at is null
+  and expires_at > now()
+order by created_at desc;
+
+-- name: RevokeUserSessionByID :execrows
+update sessions
+set revoked_at = now()
+where id = $1
+  and user_id = $2
+  and revoked_at is null
+  and expires_at > now();
