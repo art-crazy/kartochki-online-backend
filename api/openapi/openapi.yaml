@@ -602,7 +602,7 @@ paths:
   /api/v1/projects:
     get:
       summary: Получить список проектов текущего пользователя
-      description: Возвращает все проекты текущего пользователя, отсортированные по дате обновления.
+      description: Возвращает только активные проекты текущего пользователя, отсортированные по дате обновления.
       operationId: listProjects
       tags:
         - Projects
@@ -704,7 +704,7 @@ paths:
   /api/v1/projects/{id}:
     get:
       summary: Получить проект по идентификатору
-      description: Возвращает проект текущего пользователя по его идентификатору.
+      description: Возвращает активный проект текущего пользователя по его идентификатору.
       operationId: getProjectById
       tags:
         - Projects
@@ -843,7 +843,7 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
     delete:
       summary: Удалить проект
-      description: Удаляет проект текущего пользователя.
+      description: Мягко удаляет проект текущего пользователя. После этого проект исчезает из списков и больше не доступен по API, но запись остаётся в системе для истории и будущих связей.
       operationId: deleteProject
       tags:
         - Projects
@@ -1514,15 +1514,19 @@ components:
         title:
           type: string
           minLength: 1
+          maxLength: 200
           example: Кроссовки Nike Air Max
         marketplace:
           type: string
+          maxLength: 100
           example: wildberries
         product_name:
           type: string
+          maxLength: 255
           example: Nike Air Max 90
         product_description:
           type: string
+          maxLength: 5000
           example: Белые кроссовки для повседневной носки
     PatchProjectRequest:
       type: object
@@ -1532,15 +1536,19 @@ components:
         title:
           type: string
           minLength: 1
+          maxLength: 200
           example: Обновлённое название проекта
         marketplace:
           type: string
+          maxLength: 100
           example: ozon
         product_name:
           type: string
+          maxLength: 255
           example: Nike Air Max 90 Premium
         product_description:
           type: string
+          maxLength: 5000
           example: Новое описание товара для карточки
     Project:
       type: object

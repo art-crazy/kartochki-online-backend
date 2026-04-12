@@ -14,7 +14,7 @@ import (
 const createProject = `-- name: CreateProject :one
 insert into projects (user_id, title, marketplace, product_name, product_description, status)
 values ($1, $2, $3, $4, $5, 'draft')
-returning id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at
+returning id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at, deleted_at
 `
 
 type CreateProjectParams struct {
@@ -25,7 +25,7 @@ type CreateProjectParams struct {
 	ProductDescription string
 }
 
-// Создаёт новый проект со статусом draft.
+// Создаёт новый проект пользователя со статусом draft.
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
 	row := q.db.QueryRow(ctx, createProject,
 		arg.UserID,
@@ -45,32 +45,16 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
-const deleteProject = `-- name: DeleteProject :execrows
-delete from projects where id = $1 and user_id = $2
-`
-
-type DeleteProjectParams struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
-}
-
-// Удаляет проект. Возвращает количество удалённых строк для проверки владения.
-func (q *Queries) DeleteProject(ctx context.Context, arg DeleteProjectParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteProject, arg.ID, arg.UserID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getProjectByID = `-- name: GetProjectByID :one
-select id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at from projects
+select id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at, deleted_at from projects
 where id = $1
   and user_id = $2
+  and deleted_at is null
 `
 
 type GetProjectByIDParams struct {
@@ -78,7 +62,8 @@ type GetProjectByIDParams struct {
 	UserID uuid.UUID
 }
 
-// Возвращает проект только для его владельца.
+// Возвращает только активный проект его владельца.
+// Мягко удалённые проекты снаружи считаются несуществующими.
 func (q *Queries) GetProjectByID(ctx context.Context, arg GetProjectByIDParams) (Project, error) {
 	row := q.db.QueryRow(ctx, getProjectByID, arg.ID, arg.UserID)
 	var i Project
@@ -92,17 +77,20 @@ func (q *Queries) GetProjectByID(ctx context.Context, arg GetProjectByIDParams) 
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const listUserProjects = `-- name: ListUserProjects :many
-select id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at from projects
+select id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at, deleted_at from projects
 where user_id = $1
+  and deleted_at is null
 order by updated_at desc
 `
 
-// Возвращает все проекты пользователя, отсортированные по дате обновления.
+// Возвращает только активные проекты пользователя,
+// отсортированные по дате последнего обновления.
 func (q *Queries) ListUserProjects(ctx context.Context, userID uuid.UUID) ([]Project, error) {
 	rows, err := q.db.Query(ctx, listUserProjects, userID)
 	if err != nil {
@@ -122,6 +110,7 @@ func (q *Queries) ListUserProjects(ctx context.Context, userID uuid.UUID) ([]Pro
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -133,6 +122,31 @@ func (q *Queries) ListUserProjects(ctx context.Context, userID uuid.UUID) ([]Pro
 	return items, nil
 }
 
+const softDeleteProject = `-- name: SoftDeleteProject :execrows
+update projects
+set status = 'archived',
+    deleted_at = now(),
+    updated_at = now()
+where id = $1
+  and user_id = $2
+  and deleted_at is null
+`
+
+type SoftDeleteProjectParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+// Мягко удаляет проект: он исчезает из пользовательских списков,
+// но остаётся в БД для истории, связей и будущих фоновых задач.
+func (q *Queries) SoftDeleteProject(ctx context.Context, arg SoftDeleteProjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeleteProject, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateProject = `-- name: UpdateProject :one
 update projects
 set title               = $1,
@@ -140,8 +154,10 @@ set title               = $1,
     product_name        = $3,
     product_description = $4,
     updated_at          = now()
-where id = $5 and user_id = $6
-returning id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at
+where id = $5
+  and user_id = $6
+  and deleted_at is null
+returning id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at, deleted_at
 `
 
 type UpdateProjectParams struct {
@@ -153,7 +169,8 @@ type UpdateProjectParams struct {
 	UserID             uuid.UUID
 }
 
-// Обновляет поля проекта. user_id в WHERE гарантирует, что чужой проект не изменить.
+// Обновляет поля только у активного проекта.
+// user_id в WHERE гарантирует, что чужой проект нельзя изменить.
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
 	row := q.db.QueryRow(ctx, updateProject,
 		arg.Title,
@@ -174,6 +191,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

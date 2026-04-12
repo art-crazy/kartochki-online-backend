@@ -60,6 +60,8 @@ type Project struct {
 	Status             string
 	CreatedAt          pgtype.Timestamptz
 	UpdatedAt          pgtype.Timestamptz
+	// Момент мягкого удаления проекта. NULL означает, что проект активен.
+	DeletedAt pgtype.Timestamptz
 }
 
 // Сессии входа. В базе хранится только хэш токена.

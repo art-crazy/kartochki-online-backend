@@ -66,15 +66,7 @@ func (h ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ProductDescription: req.ProductDescription,
 	})
 	if err != nil {
-		if errors.Is(err, projects.ErrTitleRequired) {
-			response.WriteError(
-				w,
-				r,
-				http.StatusBadRequest,
-				"validation_error",
-				"request validation failed",
-				contracts.ErrorDetail{Field: "title", Message: "field is required"},
-			)
+		if writeProjectDomainError(w, r, err) {
 			return
 		}
 
@@ -87,7 +79,7 @@ func (h ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusCreated, contracts.ProjectResponse{Project: toProjectContract(project)})
 }
 
-// List возвращает все проекты текущего пользователя.
+// List возвращает все активные проекты текущего пользователя.
 func (h ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.currentUser(w, r)
 	if !ok {
@@ -105,7 +97,7 @@ func (h ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, contracts.ProjectListResponse{Projects: toProjectContracts(list)})
 }
 
-// Get возвращает один проект текущего пользователя.
+// Get возвращает один активный проект текущего пользователя.
 func (h ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.currentUser(w, r)
 	if !ok {
@@ -155,20 +147,11 @@ func (h ProjectsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		ProductDescription: req.ProductDescription,
 	})
 	if err != nil {
-		if errors.Is(err, projects.ErrTitleRequired) {
-			response.WriteError(
-				w,
-				r,
-				http.StatusBadRequest,
-				"validation_error",
-				"request validation failed",
-				contracts.ErrorDetail{Field: "title", Message: "must not be empty"},
-			)
-			return
-		}
-
 		if errors.Is(err, projects.ErrNotFound) {
 			response.WriteError(w, r, http.StatusNotFound, "project_not_found", "project not found")
+			return
+		}
+		if writeProjectDomainError(w, r, err) {
 			return
 		}
 
@@ -181,7 +164,7 @@ func (h ProjectsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, contracts.ProjectResponse{Project: toProjectContract(project)})
 }
 
-// Delete удаляет проект текущего пользователя.
+// Delete мягко удаляет проект текущего пользователя.
 func (h ProjectsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.currentUser(w, r)
 	if !ok {
@@ -205,13 +188,7 @@ func (h ProjectsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func validateCreateProjectRequest(req contracts.CreateProjectRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
-
-	if strings.TrimSpace(req.Title) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "title", Message: "field is required"})
-	}
-
-	return details
+	return validateProjectFields(req.Title, req.Marketplace, req.ProductName, req.ProductDescription, true)
 }
 
 func validatePatchProjectRequest(req contracts.PatchProjectRequest) []contracts.ErrorDetail {
@@ -219,13 +196,114 @@ func validatePatchProjectRequest(req contracts.PatchProjectRequest) []contracts.
 
 	if req.Title == nil && req.Marketplace == nil && req.ProductName == nil && req.ProductDescription == nil {
 		details = append(details, contracts.ErrorDetail{Message: "at least one field must be provided"})
+		return details
 	}
 
-	if req.Title != nil && strings.TrimSpace(*req.Title) == "" {
+	title := ""
+	marketplace := ""
+	productName := ""
+	productDescription := ""
+
+	if req.Title != nil {
+		title = *req.Title
+	}
+	if req.Marketplace != nil {
+		marketplace = *req.Marketplace
+	}
+	if req.ProductName != nil {
+		productName = *req.ProductName
+	}
+	if req.ProductDescription != nil {
+		productDescription = *req.ProductDescription
+	}
+
+	return validateProjectFields(title, marketplace, productName, productDescription, false)
+}
+
+// validateProjectFields повторяет transport-валидацию до вызова сервиса,
+// чтобы клиент сразу получил понятную ошибку по полю, а не общий отказ домена.
+func validateProjectFields(title string, marketplace string, productName string, productDescription string, titleRequired bool) []contracts.ErrorDetail {
+	var details []contracts.ErrorDetail
+
+	trimmedTitle := strings.TrimSpace(title)
+	if titleRequired && trimmedTitle == "" {
+		details = append(details, contracts.ErrorDetail{Field: "title", Message: "field is required"})
+	}
+	if title != "" && trimmedTitle == "" {
 		details = append(details, contracts.ErrorDetail{Field: "title", Message: "must not be empty"})
+	}
+	if len(trimmedTitle) > projects.MaxProjectTitleLength {
+		details = append(details, contracts.ErrorDetail{Field: "title", Message: "must be at most 200 characters"})
+	}
+
+	if len(strings.TrimSpace(marketplace)) > projects.MaxMarketplaceLength {
+		details = append(details, contracts.ErrorDetail{Field: "marketplace", Message: "must be at most 100 characters"})
+	}
+	if len(strings.TrimSpace(productName)) > projects.MaxProjectProductNameLength {
+		details = append(details, contracts.ErrorDetail{Field: "product_name", Message: "must be at most 255 characters"})
+	}
+	if len(strings.TrimSpace(productDescription)) > projects.MaxProjectDescriptionLength {
+		details = append(details, contracts.ErrorDetail{Field: "product_description", Message: "must be at most 5000 characters"})
 	}
 
 	return details
+}
+
+func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) bool {
+	switch {
+	case errors.Is(err, projects.ErrTitleRequired):
+		response.WriteError(
+			w,
+			r,
+			http.StatusBadRequest,
+			"validation_error",
+			"request validation failed",
+			contracts.ErrorDetail{Field: "title", Message: "field is required"},
+		)
+		return true
+	case errors.Is(err, projects.ErrTitleTooLong):
+		response.WriteError(
+			w,
+			r,
+			http.StatusBadRequest,
+			"validation_error",
+			"request validation failed",
+			contracts.ErrorDetail{Field: "title", Message: "must be at most 200 characters"},
+		)
+		return true
+	case errors.Is(err, projects.ErrMarketplaceTooLong):
+		response.WriteError(
+			w,
+			r,
+			http.StatusBadRequest,
+			"validation_error",
+			"request validation failed",
+			contracts.ErrorDetail{Field: "marketplace", Message: "must be at most 100 characters"},
+		)
+		return true
+	case errors.Is(err, projects.ErrProductNameTooLong):
+		response.WriteError(
+			w,
+			r,
+			http.StatusBadRequest,
+			"validation_error",
+			"request validation failed",
+			contracts.ErrorDetail{Field: "product_name", Message: "must be at most 255 characters"},
+		)
+		return true
+	case errors.Is(err, projects.ErrProductDescriptionTooLong):
+		response.WriteError(
+			w,
+			r,
+			http.StatusBadRequest,
+			"validation_error",
+			"request validation failed",
+			contracts.ErrorDetail{Field: "product_description", Message: "must be at most 5000 characters"},
+		)
+		return true
+	default:
+		return false
+	}
 }
 
 func toProjectContract(project projects.Project) contracts.Project {

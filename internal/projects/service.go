@@ -14,7 +14,21 @@ import (
 	"kartochki-online-backend/internal/dbgen"
 )
 
-const recentProjectsLimit = 5
+const (
+	recentProjectsLimit = 5
+)
+
+// MaxProjectTitleLength ограничивает длину названия проекта.
+const MaxProjectTitleLength = 200
+
+// MaxMarketplaceLength ограничивает длину идентификатора маркетплейса.
+const MaxMarketplaceLength = 100
+
+// MaxProjectProductNameLength ограничивает длину названия товара внутри проекта.
+const MaxProjectProductNameLength = 255
+
+// MaxProjectDescriptionLength ограничивает длину описания товара внутри проекта.
+const MaxProjectDescriptionLength = 5000
 
 // Project описывает проект пользователя без HTTP-деталей.
 type Project struct {
@@ -78,7 +92,7 @@ type CreateInput struct {
 	ProductDescription string
 }
 
-// UpdateInput содержит поля для обновления проекта.
+// UpdateInput содержит поля для полного обновления проекта.
 type UpdateInput struct {
 	Title              string
 	Marketplace        string
@@ -106,8 +120,8 @@ func NewService(queries *dbgen.Queries) *Service {
 }
 
 // GetDashboard возвращает данные для `/app` без HTTP-деталей.
-// Здесь собирается бизнес-ответ для дашборда, чтобы handler только
-// проверял доступ и преобразовывал результат в transport-контракт.
+// Здесь собирается бизнес-ответ для дашборда, чтобы handler только проверял доступ
+// и преобразовывал результат в transport-контракт.
 func (s *Service) GetDashboard(ctx context.Context, userID string) (Dashboard, error) {
 	allProjects, err := s.ListByUser(ctx, userID)
 	if err != nil {
@@ -131,8 +145,8 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (Dashboard, e
 // Create создаёт проект и возвращает его.
 func (s *Service) Create(ctx context.Context, input CreateInput) (Project, error) {
 	input = normalizeCreateInput(input)
-	if input.Title == "" {
-		return Project{}, ErrTitleRequired
+	if err := validateCreateOrUpdateInput(input.Title, input.Marketplace, input.ProductName, input.ProductDescription); err != nil {
+		return Project{}, err
 	}
 
 	userID, err := uuid.Parse(input.UserID)
@@ -181,7 +195,7 @@ func (s *Service) GetByID(ctx context.Context, id string, ownerUserID string) (P
 	return toProject(row), nil
 }
 
-// ListByUser возвращает все проекты пользователя, отсортированные по дате обновления.
+// ListByUser возвращает все активные проекты пользователя, отсортированные по дате обновления.
 func (s *Service) ListByUser(ctx context.Context, userID string) ([]Project, error) {
 	uid, err := uuid.Parse(userID)
 	if err != nil {
@@ -196,11 +210,11 @@ func (s *Service) ListByUser(ctx context.Context, userID string) ([]Project, err
 	return toProjects(rows), nil
 }
 
-// Update обновляет поля проекта. user_id проверяется на уровне SQL — один запрос к БД.
+// Update обновляет поля проекта. user_id проверяется на уровне SQL одним запросом к БД.
 func (s *Service) Update(ctx context.Context, id string, ownerUserID string, input UpdateInput) (Project, error) {
 	input = normalizeUpdateInput(input)
-	if input.Title == "" {
-		return Project{}, ErrTitleRequired
+	if err := validateCreateOrUpdateInput(input.Title, input.Marketplace, input.ProductName, input.ProductDescription); err != nil {
+		return Project{}, err
 	}
 
 	projectID, err := uuid.Parse(id)
@@ -264,7 +278,9 @@ func (s *Service) Patch(ctx context.Context, id string, ownerUserID string, inpu
 	return s.Update(ctx, id, ownerUserID, update)
 }
 
-// Delete удаляет проект пользователя. Возвращает ErrNotFound, если проект не найден или чужой.
+// Delete мягко удаляет проект пользователя.
+// Мы не стираем строку физически, чтобы позже не потерять историю генераций,
+// файлов и других связанных сущностей, которые будут ссылаться на проект.
 func (s *Service) Delete(ctx context.Context, id string, ownerUserID string) error {
 	projectID, err := uuid.Parse(id)
 	if err != nil {
@@ -276,12 +292,12 @@ func (s *Service) Delete(ctx context.Context, id string, ownerUserID string) err
 		return ErrNotFound
 	}
 
-	rows, err := s.queries.DeleteProject(ctx, dbgen.DeleteProjectParams{
+	rows, err := s.queries.SoftDeleteProject(ctx, dbgen.SoftDeleteProjectParams{
 		ID:     projectID,
 		UserID: userID,
 	})
 	if err != nil {
-		return fmt.Errorf("delete project: %w", err)
+		return fmt.Errorf("soft delete project: %w", err)
 	}
 
 	if rows == 0 {
@@ -345,7 +361,7 @@ func buildQuickStart(totalProjects int) DashboardQuickStart {
 	if totalProjects == 0 {
 		return DashboardQuickStart{
 			Title:       "Создайте первый проект",
-			Description: "Загрузите фото товара — мы сгенерируем карточки для маркетплейса",
+			Description: "Загрузите фото товара - мы сгенерируем карточки для маркетплейса",
 		}
 	}
 
@@ -370,4 +386,26 @@ func normalizeUpdateInput(input UpdateInput) UpdateInput {
 	input.ProductName = strings.TrimSpace(input.ProductName)
 	input.ProductDescription = strings.TrimSpace(input.ProductDescription)
 	return input
+}
+
+// validateCreateOrUpdateInput держит доменные ограничения в одном месте,
+// чтобы Create и Update не разъезжались по правилам.
+func validateCreateOrUpdateInput(title string, marketplace string, productName string, productDescription string) error {
+	if title == "" {
+		return ErrTitleRequired
+	}
+	if len(title) > MaxProjectTitleLength {
+		return ErrTitleTooLong
+	}
+	if len(marketplace) > MaxMarketplaceLength {
+		return ErrMarketplaceTooLong
+	}
+	if len(productName) > MaxProjectProductNameLength {
+		return ErrProductNameTooLong
+	}
+	if len(productDescription) > MaxProjectDescriptionLength {
+		return ErrProductDescriptionTooLong
+	}
+
+	return nil
 }

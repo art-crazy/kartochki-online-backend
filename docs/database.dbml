@@ -274,16 +274,18 @@ Table projects {
   id uuid [pk]
   user_id uuid [not null]
   title varchar [not null]
-  marketplace varchar
-  product_name varchar
-  product_description text
-  status varchar [not null]
+  marketplace varchar [not null, default: '']
+  product_name varchar [not null, default: '']
+  product_description text [not null, default: '']
+  status varchar [not null, default: 'draft', note: 'draft, active, archived']
+  deleted_at timestamptz [note: 'NULL означает, что проект активен']
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
   indexes {
     user_id
-    updated_at
+    (user_id, updated_at)
+    (user_id, deleted_at, updated_at)
   }
 
   Note: 'Рабочая сущность пользователя для генерации карточек.'

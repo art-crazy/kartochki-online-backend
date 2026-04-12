@@ -222,12 +222,23 @@ create table projects (
     user_id uuid not null
         references users (id) on delete cascade,
     title varchar not null,
-    marketplace varchar,
-    product_name varchar,
-    product_description text,
-    status varchar not null,
+    marketplace varchar not null default '',
+    product_name varchar not null default '',
+    product_description text not null default '',
+    status varchar not null default 'draft',
+    deleted_at timestamptz,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
+    updated_at timestamptz not null default now(),
+    constraint projects_status_check
+        check (status in ('draft', 'active', 'archived')),
+    constraint projects_title_length_check
+        check (char_length(title) between 1 and 200),
+    constraint projects_marketplace_length_check
+        check (char_length(marketplace) <= 100),
+    constraint projects_product_name_length_check
+        check (char_length(product_name) <= 255),
+    constraint projects_product_description_length_check
+        check (char_length(product_description) <= 5000)
 );
 
 comment on table projects is 'Рабочая сущность пользователя для генерации карточек.';
@@ -421,7 +432,8 @@ create index payments_user_id_idx on payments (user_id);
 create index payments_subscription_id_idx on payments (subscription_id);
 create index payments_addon_product_id_idx on payments (addon_product_id);
 create index projects_user_id_idx on projects (user_id);
-create index projects_updated_at_idx on projects (updated_at);
+create index projects_user_id_updated_at_idx on projects (user_id, updated_at desc);
+create index projects_user_id_deleted_at_updated_at_idx on projects (user_id, deleted_at, updated_at desc);
 create index assets_user_id_idx on assets (user_id);
 create index assets_project_id_idx on assets (project_id);
 create index assets_kind_idx on assets (kind);
