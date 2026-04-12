@@ -19,12 +19,25 @@ type Config struct {
 	Asynq    AsynqConfig
 	Auth     AuthConfig
 	Storage  StorageConfig
+	Email    EmailConfig
 }
 
 // AppConfig хранит общие параметры приложения.
 type AppConfig struct {
-	Name string
-	Env  string
+	Name        string
+	Env         string
+	FrontendURL string
+}
+
+// EmailConfig хранит настройки SMTP-отправителя писем.
+// При пустом Host приложение использует NoopSender (только логирование).
+type EmailConfig struct {
+	Host        string
+	Port        int
+	User        string
+	Password    string
+	FromAddress string
+	FromName    string
 }
 
 // HTTPConfig описывает настройки HTTP-сервера.
@@ -107,6 +120,11 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	smtpPort, err := getInt("SMTP_PORT", 465)
+	if err != nil {
+		return Config{}, err
+	}
+
 	asynqConcurrency, err := getInt("ASYNQ_CONCURRENCY", 10)
 	if err != nil {
 		return Config{}, err
@@ -174,8 +192,9 @@ func loadFromEnv() (Config, error) {
 
 	cfg := Config{
 		App: AppConfig{
-			Name: getEnv("APP_NAME", "kartochki-online-backend"),
-			Env:  getEnv("APP_ENV", "local"),
+			Name:        getEnv("APP_NAME", "kartochki-online-backend"),
+			Env:         getEnv("APP_ENV", "local"),
+			FrontendURL: getEnv("FRONTEND_URL", "http://localhost:3000"),
 		},
 		HTTP: HTTPConfig{
 			Host:            getEnv("HTTP_HOST", "0.0.0.0"),
@@ -200,6 +219,14 @@ func loadFromEnv() (Config, error) {
 		Storage: StorageConfig{
 			RootDir:    getEnv("STORAGE_ROOT_DIR", "./storage"),
 			PublicPath: normalizePublicPath(getEnv("STORAGE_PUBLIC_PATH", "/media")),
+		},
+		Email: EmailConfig{
+			Host:        getEnv("SMTP_HOST", ""),
+			Port:        smtpPort,
+			User:        getEnv("SMTP_USER", ""),
+			Password:    getEnv("SMTP_PASSWORD", ""),
+			FromAddress: getEnv("EMAIL_FROM", ""),
+			FromName:    getEnv("EMAIL_FROM_NAME", "kartochki.online"),
 		},
 		Auth: AuthConfig{
 			SessionTTL:            sessionTTL,
@@ -365,6 +392,16 @@ func validate(cfg Config) error {
 
 	if cfg.Auth.TelegramAuth.AuthMaxAge <= 0 {
 		return fmt.Errorf("AUTH_TELEGRAM_AUTH_MAX_AGE must be greater than zero")
+	}
+
+	// Валидируем Email только если SMTP включён — при пустом Host используется NoopSender.
+	if cfg.Email.Host != "" {
+		if cfg.Email.Port <= 0 {
+			return fmt.Errorf("SMTP_PORT must be greater than zero when SMTP_HOST is set")
+		}
+		if cfg.Email.FromAddress == "" {
+			return fmt.Errorf("EMAIL_FROM must not be empty when SMTP_HOST is set")
+		}
 	}
 
 	return nil

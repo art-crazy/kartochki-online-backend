@@ -85,9 +85,14 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	)
 	healthHandler := handlers.NewHealthHandler(readiness, logger)
 	queries := dbgen.New(db.Pool)
-	// Используем NoopSender, пока отправка письма не вынесена в Asynq-джоб.
-	// До миграции на джоб токен сброса выводится только в лог.
-	emailSender := email.NewNoopSender(logger)
+	// Если SMTP_HOST задан — используем реальный отправитель.
+	// Иначе NoopSender: токен выводится в лог для локальной разработки.
+	var emailSender auth.EmailSender
+	if cfg.Email.Host != "" {
+		emailSender = email.NewSMTPSender(cfg.Email, cfg.App.FrontendURL)
+	} else {
+		emailSender = email.NewNoopSender(logger)
+	}
 	authService := auth.NewService(db.Pool, queries, redisClient, emailSender, logger, cfg.Auth)
 	authHandler := handlers.NewAuthHandler(authService)
 
