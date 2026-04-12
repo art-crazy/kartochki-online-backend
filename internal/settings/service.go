@@ -547,6 +547,9 @@ func (s *Service) ExportData(ctx context.Context, userID string) error {
 }
 
 // DeleteAccount удаляет пользователя целиком вместе с каскадно связанными данными.
+// Сессии отзываются явно внутри транзакции до удаления пользователя,
+// чтобы исключить race window: middleware не сможет авторизовать запрос
+// по токену, который формально ещё числился активным в момент DELETE.
 func (s *Service) DeleteAccount(ctx context.Context, userID string, confirmWord string) error {
 	if strings.TrimSpace(confirmWord) != deleteAccountConfirmWord {
 		return ErrInvalidConfirmWord
@@ -557,12 +560,31 @@ func (s *Service) DeleteAccount(ctx context.Context, userID string, confirmWord 
 		return ErrUserNotFound
 	}
 
-	rows, err := s.queries.DeleteUserByID(ctx, uid)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin delete account tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txQueries := s.queries.WithTx(tx)
+
+	// Сначала отзываем все сессии, пока строка пользователя ещё существует.
+	// Каскад ON DELETE CASCADE всё равно удалил бы их, но явный отзыв
+	// гарантирует, что токены перестают работать до удаления пользователя.
+	if err := txQueries.RevokeAllUserSessions(ctx, uid); err != nil {
+		return fmt.Errorf("revoke sessions before account delete: %w", err)
+	}
+
+	rows, err := txQueries.DeleteUserByID(ctx, uid)
 	if err != nil {
 		return fmt.Errorf("delete user account: %w", err)
 	}
 	if rows == 0 {
 		return ErrUserNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete account tx: %w", err)
 	}
 
 	return nil

@@ -5,6 +5,9 @@ import "errors"
 var (
 	// ErrUserNotFound возвращается, когда billing-сценарий запрошен для несуществующего пользователя.
 	ErrUserNotFound = errors.New("billing user not found")
+	// ErrFreePlanNotFound возвращается, когда таблица plans не содержит строку с кодом "free".
+	// Это означает, что нужная миграция не была применена к базе данных.
+	ErrFreePlanNotFound = errors.New("billing free plan not found in database")
 	// ErrPlanNotFound возвращается, когда frontend передал неизвестный план.
 	ErrPlanNotFound = errors.New("billing plan not found")
 	// ErrAddonNotFound возвращается, когда frontend передал неизвестный addon-пакет.

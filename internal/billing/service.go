@@ -418,6 +418,11 @@ func (s *Service) getUsageQuotaSnapshot(ctx context.Context, subscription dbgen.
 func (s *Service) buildFreeBillingSnapshot(ctx context.Context, userID uuid.UUID) (dbgen.GetCurrentSubscriptionByUserIDRow, dbgen.UsageQuota, error) {
 	plan, err := s.queries.GetBillingPlanByCode(ctx, freePlanCode)
 	if err != nil {
+		// Если план не найден — миграция не применена. Возвращаем явную ошибку,
+		// чтобы оператор сразу понял причину, а не получил невнятный internal_error.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return dbgen.GetCurrentSubscriptionByUserIDRow{}, dbgen.UsageQuota{}, ErrFreePlanNotFound
+		}
 		return dbgen.GetCurrentSubscriptionByUserIDRow{}, dbgen.UsageQuota{}, fmt.Errorf("get free billing plan: %w", err)
 	}
 

@@ -67,7 +67,10 @@ type generationBillingLimits struct {
 	billing *billing.Service
 }
 
-// EnsureGenerationAllowed проверяет квоту и переводит billing-ошибку в доменную ошибку generation.
+// EnsureGenerationAllowed проверяет квоту и переводит billing-ошибки в доменные ошибки generation.
+// Известные billing-ошибки отображаются в конкретные generation-ошибки, чтобы HTTP-слой
+// не зависел от billing-пакета и мог корректно формировать ответ.
+// Неожиданные ошибки оборачиваются с пометкой "billing check", чтобы в логе было видно источник.
 func (a generationBillingLimits) EnsureGenerationAllowed(ctx context.Context, userID string, requestedCards int) error {
 	if a.billing == nil {
 		return nil
@@ -81,7 +84,9 @@ func (a generationBillingLimits) EnsureGenerationAllowed(ctx context.Context, us
 		return generation.ErrQuotaExceeded
 	}
 
-	return err
+	// Неожиданная ошибка из billing-сервиса: оборачиваем с контекстом,
+	// чтобы в логе был виден источник, а handler вернул 500 с понятным сообщением.
+	return fmt.Errorf("billing check failed: %w", err)
 }
 
 // App хранит собранные runtime-зависимости приложения.
