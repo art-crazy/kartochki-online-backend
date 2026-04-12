@@ -5,7 +5,7 @@ flowchart LR
     P["Page: /auth"] --> A1["POST /api/v1/auth/login"]
     P --> A2["POST /api/v1/auth/register"]
     P --> A3["POST /api/v1/auth/forgot-password"]
-    P --> A4["GET /api/v1/auth/google/start"]
+    P --> A4["GET /api/v1/auth/vk/start"]
 
     A1 --> D1["user"]
     A2 --> D2["user"]

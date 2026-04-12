@@ -16,6 +16,7 @@ type Config struct {
 	Postgres PostgresConfig
 	Redis    RedisConfig
 	Asynq    AsynqConfig
+	Auth     AuthConfig
 }
 
 // AppConfig хранит общие параметры приложения.
@@ -52,17 +53,44 @@ type AsynqConfig struct {
 	Concurrency int
 }
 
+// AuthConfig хранит параметры локальной авторизации и OAuth-провайдеров.
+type AuthConfig struct {
+	SessionTTL        time.Duration
+	PasswordMinLength int
+	VKOAuth           VKOAuthConfig
+	YandexOAuth       YandexOAuthConfig
+	TelegramAuth      TelegramAuthConfig
+}
+
+// VKOAuthConfig хранит env-параметры для входа через VK ID.
+type VKOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	StateTTL     time.Duration
+}
+
+// YandexOAuthConfig хранит env-параметры для входа через Яндекс ID.
+type YandexOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	StateTTL     time.Duration
+}
+
+// TelegramAuthConfig хранит env-параметры для входа через Telegram Login Widget.
+type TelegramAuthConfig struct {
+	BotToken   string
+	AuthMaxAge time.Duration
+}
+
 // Load читает конфигурацию из env и возвращает ошибку, если значения невалидны.
-//
-// Для production безопаснее упасть на старте, чем молча принять неправильный
-// timeout или номер Redis DB и получить трудноуловимое поведение позже.
 func Load() (Config, error) {
 	_ = godotenv.Load()
 
 	return loadFromEnv()
 }
 
-// loadFromEnv собирает конфигурацию из уже доступных env-переменных.
 func loadFromEnv() (Config, error) {
 	redisDB, err := getInt("REDIS_DB", 0)
 	if err != nil {
@@ -70,6 +98,11 @@ func loadFromEnv() (Config, error) {
 	}
 
 	asynqConcurrency, err := getInt("ASYNQ_CONCURRENCY", 10)
+	if err != nil {
+		return Config{}, err
+	}
+
+	passwordMinLength, err := getInt("AUTH_PASSWORD_MIN_LENGTH", 8)
 	if err != nil {
 		return Config{}, err
 	}
@@ -99,6 +132,26 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	sessionTTL, err := getDuration("AUTH_SESSION_TTL", 30*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+
+	vkStateTTL, err := getDuration("AUTH_VK_STATE_TTL", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+
+	yandexStateTTL, err := getDuration("AUTH_YANDEX_STATE_TTL", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+
+	telegramAuthMaxAge, err := getDuration("AUTH_TELEGRAM_AUTH_MAX_AGE", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		App: AppConfig{
 			Name: getEnv("APP_NAME", "kartochki-online-backend"),
@@ -124,6 +177,26 @@ func loadFromEnv() (Config, error) {
 		Asynq: AsynqConfig{
 			Concurrency: asynqConcurrency,
 		},
+		Auth: AuthConfig{
+			SessionTTL:        sessionTTL,
+			PasswordMinLength: passwordMinLength,
+			VKOAuth: VKOAuthConfig{
+				ClientID:     getEnv("AUTH_VK_CLIENT_ID", ""),
+				ClientSecret: getEnv("AUTH_VK_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("AUTH_VK_REDIRECT_URL", ""),
+				StateTTL:     vkStateTTL,
+			},
+			YandexOAuth: YandexOAuthConfig{
+				ClientID:     getEnv("AUTH_YANDEX_CLIENT_ID", ""),
+				ClientSecret: getEnv("AUTH_YANDEX_CLIENT_SECRET", ""),
+				RedirectURL:  getEnv("AUTH_YANDEX_REDIRECT_URL", ""),
+				StateTTL:     yandexStateTTL,
+			},
+			TelegramAuth: TelegramAuthConfig{
+				BotToken:   getEnv("AUTH_TELEGRAM_BOT_TOKEN", ""),
+				AuthMaxAge: telegramAuthMaxAge,
+			},
+		},
 	}
 
 	if err := validate(cfg); err != nil {
@@ -141,7 +214,6 @@ func getEnv(key string, fallback string) string {
 	return fallback
 }
 
-// getInt читает целочисленную env-переменную.
 func getInt(key string, fallback int) (int, error) {
 	value, ok := os.LookupEnv(key)
 	if !ok || value == "" {
@@ -156,7 +228,6 @@ func getInt(key string, fallback int) (int, error) {
 	return parsed, nil
 }
 
-// getDuration читает env-переменную с Go duration-форматом.
 func getDuration(key string, fallback time.Duration) (time.Duration, error) {
 	value, ok := os.LookupEnv(key)
 	if !ok || value == "" {
@@ -171,7 +242,6 @@ func getDuration(key string, fallback time.Duration) (time.Duration, error) {
 	return parsed, nil
 }
 
-// validate проверяет базовые инварианты конфигурации, важные для старта сервиса.
 func validate(cfg Config) error {
 	if cfg.HTTP.Host == "" {
 		return fmt.Errorf("HTTP_HOST must not be empty")
@@ -215,6 +285,26 @@ func validate(cfg Config) error {
 
 	if cfg.Redis.DB < 0 {
 		return fmt.Errorf("REDIS_DB must not be negative")
+	}
+
+	if cfg.Auth.SessionTTL <= 0 {
+		return fmt.Errorf("AUTH_SESSION_TTL must be greater than zero")
+	}
+
+	if cfg.Auth.PasswordMinLength <= 0 {
+		return fmt.Errorf("AUTH_PASSWORD_MIN_LENGTH must be greater than zero")
+	}
+
+	if cfg.Auth.VKOAuth.StateTTL <= 0 {
+		return fmt.Errorf("AUTH_VK_STATE_TTL must be greater than zero")
+	}
+
+	if cfg.Auth.YandexOAuth.StateTTL <= 0 {
+		return fmt.Errorf("AUTH_YANDEX_STATE_TTL must be greater than zero")
+	}
+
+	if cfg.Auth.TelegramAuth.AuthMaxAge <= 0 {
+		return fmt.Errorf("AUTH_TELEGRAM_AUTH_MAX_AGE must be greater than zero")
 	}
 
 	return nil

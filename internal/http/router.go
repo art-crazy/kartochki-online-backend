@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 
+	"kartochki-online-backend/internal/auth"
 	"kartochki-online-backend/internal/config"
 	"kartochki-online-backend/internal/http/handlers"
 	"kartochki-online-backend/internal/http/requestctx"
@@ -14,8 +15,15 @@ import (
 )
 
 // NewRouter собирает HTTP-маршруты и middleware для публичного API и служебных endpoint.
-func NewRouter(cfg config.HTTPConfig, logger zerolog.Logger, healthHandler handlers.HealthHandler) stdhttp.Handler {
+func NewRouter(
+	cfg config.HTTPConfig,
+	logger zerolog.Logger,
+	healthHandler handlers.HealthHandler,
+	authHandler handlers.AuthHandler,
+	authService *auth.Service,
+) stdhttp.Handler {
 	router := chi.NewRouter()
+	authMiddleware := newAuthMiddleware(authService)
 
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
@@ -41,6 +49,21 @@ func NewRouter(cfg config.HTTPConfig, logger zerolog.Logger, healthHandler handl
 
 	router.Get("/health/live", healthHandler.Live)
 	router.Get("/health/ready", healthHandler.Ready)
+
+	router.Route("/api/v1", func(api chi.Router) {
+		api.Route("/auth", func(authRouter chi.Router) {
+			authRouter.Post("/register", authHandler.Register)
+			authRouter.Post("/login", authHandler.Login)
+			authRouter.Post("/telegram/login", authHandler.TelegramLogin)
+			authRouter.With(authMiddleware.RequireUser).Post("/logout", authHandler.Logout)
+			authRouter.Get("/vk/start", authHandler.VKStart)
+			authRouter.Get("/vk/callback", authHandler.VKCallback)
+			authRouter.Get("/yandex/start", authHandler.YandexStart)
+			authRouter.Get("/yandex/callback", authHandler.YandexCallback)
+		})
+
+		api.With(authMiddleware.RequireUser).Get("/me", authHandler.Me)
+	})
 
 	registerDocsRoutes(router)
 

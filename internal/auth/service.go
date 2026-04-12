@@ -1,0 +1,510 @@
+package auth
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/oauth2"
+
+	"kartochki-online-backend/internal/config"
+	"kartochki-online-backend/internal/dbgen"
+)
+
+const (
+	providerVK       = "vk"
+	providerYandex   = "yandex"
+	providerTelegram = "telegram"
+)
+
+// User описывает пользователя в auth-сценариях без HTTP-деталей.
+type User struct {
+	ID    string
+	Name  string
+	Email string
+}
+
+// Session описывает выданную клиенту локальную сессию.
+type Session struct {
+	AccessToken string
+	ExpiresAt   time.Time
+}
+
+// AuthResult объединяет пользователя и сессию после логина или регистрации.
+type AuthResult struct {
+	User    User
+	Session Session
+}
+
+// RegisterInput содержит данные для регистрации по email и паролю.
+type RegisterInput struct {
+	Name     string
+	Email    string
+	Password string
+}
+
+// LoginInput содержит данные для входа по email и паролю.
+type LoginInput struct {
+	Email    string
+	Password string
+}
+
+// OAuthProviderConfig хранит данные о провайдере, которые пригодятся позже.
+type OAuthProviderConfig struct {
+	Name         string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	StateTTL     time.Duration
+}
+
+// TelegramAuthConfig хранит параметры серверной проверки Telegram Login Widget.
+type TelegramAuthConfig struct {
+	BotToken   string
+	AuthMaxAge time.Duration
+}
+
+// Service хранит auth-логику и общее место расширения под OAuth.
+type Service struct {
+	queries           *dbgen.Queries
+	pool              *pgxpool.Pool
+	stateStore        OAuthStateStore
+	sessionTTL        time.Duration
+	passwordMinLength int
+	vkOAuth           OAuthProviderConfig
+	yandexOAuth       OAuthProviderConfig
+	telegramAuth      TelegramAuthConfig
+}
+
+// NewService создаёт auth-сервис с настройками локальных сессий и OAuth-провайдеров.
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, stateStore OAuthStateStore, cfg config.AuthConfig) *Service {
+	return &Service{
+		queries:           queries,
+		pool:              pool,
+		stateStore:        stateStore,
+		sessionTTL:        cfg.SessionTTL,
+		passwordMinLength: cfg.PasswordMinLength,
+		vkOAuth: OAuthProviderConfig{
+			Name:         providerVK,
+			ClientID:     cfg.VKOAuth.ClientID,
+			ClientSecret: cfg.VKOAuth.ClientSecret,
+			RedirectURL:  cfg.VKOAuth.RedirectURL,
+			StateTTL:     cfg.VKOAuth.StateTTL,
+		},
+		yandexOAuth: OAuthProviderConfig{
+			Name:         providerYandex,
+			ClientID:     cfg.YandexOAuth.ClientID,
+			ClientSecret: cfg.YandexOAuth.ClientSecret,
+			RedirectURL:  cfg.YandexOAuth.RedirectURL,
+			StateTTL:     cfg.YandexOAuth.StateTTL,
+		},
+		telegramAuth: TelegramAuthConfig{
+			BotToken:   cfg.TelegramAuth.BotToken,
+			AuthMaxAge: cfg.TelegramAuth.AuthMaxAge,
+		},
+	}
+}
+
+// PasswordMinLength возвращает минимальную длину пароля для transport-валидации.
+func (s *Service) PasswordMinLength() int {
+	return s.passwordMinLength
+}
+
+// Register создаёт пользователя, а затем сразу выдаёт ему первую сессию.
+func (s *Service) Register(ctx context.Context, input RegisterInput) (AuthResult, error) {
+	email := normalizeEmail(input.Email)
+	if len(input.Password) < s.passwordMinLength {
+		return AuthResult{}, ErrPasswordTooShort
+	}
+
+	passwordHash, err := HashPassword(input.Password)
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("hash password: %w", err)
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("begin auth register tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txQueries := s.queries.WithTx(tx)
+	user, err := txQueries.CreateUser(ctx, dbgen.CreateUserParams{
+		Email:        pgtype.Text{String: email, Valid: true},
+		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
+		Name:         strings.TrimSpace(input.Name),
+	})
+	if err != nil {
+		if isUniqueViolation(err) {
+			return AuthResult{}, ErrEmailAlreadyExists
+		}
+
+		return AuthResult{}, fmt.Errorf("create user: %w", err)
+	}
+
+	result, err := s.createSessionForUser(ctx, txQueries, User{
+		ID:    user.ID.String(),
+		Name:  strings.TrimSpace(user.Name),
+		Email: user.Email,
+	})
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return AuthResult{}, fmt.Errorf("commit auth register tx: %w", err)
+	}
+
+	return result, nil
+}
+
+// Login проверяет пароль и создаёт новую сессию.
+func (s *Service) Login(ctx context.Context, input LoginInput) (AuthResult, error) {
+	user, err := s.queries.GetLoginUserByEmail(ctx, nullableText(normalizeEmail(input.Email)))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AuthResult{}, ErrInvalidCredentials
+		}
+
+		return AuthResult{}, fmt.Errorf("get user by email: %w", err)
+	}
+
+	if user.PasswordHash == "" {
+		return AuthResult{}, ErrInvalidCredentials
+	}
+
+	if err := ComparePassword(input.Password, user.PasswordHash); err != nil {
+		return AuthResult{}, ErrInvalidCredentials
+	}
+
+	return s.createSessionForUser(ctx, s.queries, User{
+		ID:    user.ID.String(),
+		Name:  strings.TrimSpace(user.Name),
+		Email: nullableTextValue(user.Email),
+	})
+}
+
+// Authenticate находит активную сессию по Bearer-токену и возвращает её владельца.
+func (s *Service) Authenticate(ctx context.Context, accessToken string) (User, error) {
+	identity, err := s.queries.GetAuthIdentityByTokenHash(ctx, HashSessionToken(accessToken))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, ErrUnauthorized
+		}
+
+		return User{}, fmt.Errorf("get auth identity by token: %w", err)
+	}
+
+	return User{
+		ID:    identity.ID.String(),
+		Name:  strings.TrimSpace(identity.Name),
+		Email: identity.Email,
+	}, nil
+}
+
+// Logout отзывает текущую сессию по токену.
+func (s *Service) Logout(ctx context.Context, accessToken string) error {
+	rows, err := s.queries.RevokeSessionByTokenHash(ctx, HashSessionToken(accessToken))
+	if err != nil {
+		return fmt.Errorf("revoke session: %w", err)
+	}
+
+	if rows == 0 {
+		return ErrUnauthorized
+	}
+
+	return nil
+}
+
+// StartVKOAuth подготавливает redirect URL на VK ID и сохраняет одноразовый state в Redis.
+func (s *Service) StartVKOAuth(ctx context.Context) (string, error) {
+	if !s.vkOAuthConfigured() {
+		return "", ErrOAuthNotConfigured
+	}
+
+	state, err := generateOAuthState()
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.stateStore.SaveOAuthState(ctx, oauthStateKey(s.vkOAuth.Name, state), s.vkOAuth.StateTTL); err != nil {
+		return "", fmt.Errorf("save vk oauth state: %w", err)
+	}
+
+	redirectURL := newVKOAuthClient(s.vkOAuth).AuthCodeURL(state, oauth2.AccessTypeOffline)
+	return redirectURL, nil
+}
+
+// FinishVKOAuth завершает внешний вход через VK ID и создаёт обычную локальную сессию backend.
+func (s *Service) FinishVKOAuth(ctx context.Context, code string, state string) (AuthResult, error) {
+	if !s.vkOAuthConfigured() {
+		return AuthResult{}, ErrOAuthNotConfigured
+	}
+
+	ok, err := s.stateStore.ConsumeOAuthState(ctx, oauthStateKey(s.vkOAuth.Name, strings.TrimSpace(state)))
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("consume vk oauth state: %w", err)
+	}
+
+	if !ok {
+		return AuthResult{}, ErrInvalidOAuthState
+	}
+
+	profile, err := fetchVKOAuthProfile(ctx, newVKOAuthClient(s.vkOAuth), strings.TrimSpace(code))
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if profile.Email == "" {
+		return AuthResult{}, ErrOAuthEmailMissing
+	}
+
+	return s.loginOrCreateVKOAuthUser(ctx, profile)
+}
+
+// StartYandexOAuth подготавливает redirect URL на Яндекс ID и сохраняет одноразовый state в Redis.
+func (s *Service) StartYandexOAuth(ctx context.Context) (string, error) {
+	if !s.providerConfigured(s.yandexOAuth) {
+		return "", ErrOAuthNotConfigured
+	}
+
+	state, err := generateOAuthState()
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.stateStore.SaveOAuthState(ctx, oauthStateKey(s.yandexOAuth.Name, state), s.yandexOAuth.StateTTL); err != nil {
+		return "", fmt.Errorf("save yandex oauth state: %w", err)
+	}
+
+	redirectURL := newYandexOAuthClient(s.yandexOAuth).AuthCodeURL(state)
+	return redirectURL, nil
+}
+
+// FinishYandexOAuth завершает внешний вход через Яндекс ID и создаёт обычную локальную сессию backend.
+func (s *Service) FinishYandexOAuth(ctx context.Context, code string, state string) (AuthResult, error) {
+	if !s.providerConfigured(s.yandexOAuth) {
+		return AuthResult{}, ErrOAuthNotConfigured
+	}
+
+	ok, err := s.stateStore.ConsumeOAuthState(ctx, oauthStateKey(s.yandexOAuth.Name, strings.TrimSpace(state)))
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("consume yandex oauth state: %w", err)
+	}
+
+	if !ok {
+		return AuthResult{}, ErrInvalidOAuthState
+	}
+
+	profile, err := fetchYandexOAuthProfile(ctx, newYandexOAuthClient(s.yandexOAuth), strings.TrimSpace(code))
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if profile.DefaultEmail == "" {
+		return AuthResult{}, ErrOAuthEmailMissing
+	}
+
+	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName)
+}
+
+// LoginWithTelegram проверяет подпись Telegram Login Widget и открывает локальную сессию.
+func (s *Service) LoginWithTelegram(ctx context.Context, data TelegramLoginData) (AuthResult, error) {
+	if !s.telegramAuthConfigured() {
+		return AuthResult{}, ErrTelegramAuthNotConfigured
+	}
+
+	if err := VerifyTelegramLogin(data, s.telegramAuth.BotToken, s.telegramAuth.AuthMaxAge, time.Now()); err != nil {
+		return AuthResult{}, err
+	}
+
+	return s.loginOrCreateOAuthUser(ctx, providerTelegram, fmt.Sprintf("%d", data.ID), "", BuildTelegramDisplayName(data))
+}
+
+func (s *Service) createSessionForUser(ctx context.Context, queries *dbgen.Queries, user User) (AuthResult, error) {
+	accessToken, err := GenerateSessionToken()
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("generate session token: %w", err)
+	}
+
+	expiresAt := time.Now().UTC().Add(s.sessionTTL)
+	userID, err := uuid.Parse(user.ID)
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("parse user id: %w", err)
+	}
+
+	_, err = queries.CreateSession(ctx, dbgen.CreateSessionParams{
+		UserID:    userID,
+		TokenHash: HashSessionToken(accessToken),
+		ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
+	})
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("create session: %w", err)
+	}
+
+	return AuthResult{
+		User: user,
+		Session: Session{
+			AccessToken: accessToken,
+			ExpiresAt:   expiresAt,
+		},
+	}, nil
+}
+
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func (s *Service) vkOAuthConfigured() bool {
+	return s.providerConfigured(s.vkOAuth)
+}
+
+func (s *Service) loginOrCreateVKOAuthUser(ctx context.Context, profile VKOAuthProfile) (AuthResult, error) {
+	return s.loginOrCreateOAuthUser(ctx, s.vkOAuth.Name, profile.Subject, profile.Email, profile.Name)
+}
+
+func (s *Service) providerConfigured(provider OAuthProviderConfig) bool {
+	return s.stateStore != nil &&
+		strings.TrimSpace(provider.ClientID) != "" &&
+		strings.TrimSpace(provider.ClientSecret) != "" &&
+		isRedirectURLConfigured(provider.RedirectURL)
+}
+
+func (s *Service) telegramAuthConfigured() bool {
+	return strings.TrimSpace(s.telegramAuth.BotToken) != ""
+}
+
+func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName string, providerUserID string, email string, name string) (AuthResult, error) {
+	email = normalizeEmail(email)
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("begin oauth tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	txQueries := s.queries.WithTx(tx)
+	existingIdentity, err := txQueries.GetOAuthIdentityByProviderUserID(ctx, dbgen.GetOAuthIdentityByProviderUserIDParams{
+		Provider:       providerName,
+		ProviderUserID: providerUserID,
+	})
+	switch {
+	case err == nil:
+		result, sessionErr := s.createSessionForUser(ctx, txQueries, User{
+			ID:    existingIdentity.ID.String(),
+			Name:  strings.TrimSpace(existingIdentity.Name),
+			Email: existingIdentity.Email,
+		})
+		if sessionErr != nil {
+			return AuthResult{}, sessionErr
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			return AuthResult{}, fmt.Errorf("commit oauth tx: %w", err)
+		}
+
+		return result, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return AuthResult{}, fmt.Errorf("get oauth identity: %w", err)
+	}
+
+	if email != "" {
+		user, err := txQueries.GetAuthUserByEmail(ctx, nullableText(email))
+		switch {
+		case err == nil:
+			if _, err := txQueries.CreateOAuthAccount(ctx, dbgen.CreateOAuthAccountParams{
+				UserID:         user.ID,
+				Provider:       providerName,
+				ProviderUserID: providerUserID,
+				Email:          nullableText(email),
+			}); err != nil {
+				if !isUniqueViolation(err) {
+					return AuthResult{}, fmt.Errorf("link oauth account: %w", err)
+				}
+			}
+
+			result, sessionErr := s.createSessionForUser(ctx, txQueries, User{
+				ID:    user.ID.String(),
+				Name:  strings.TrimSpace(user.Name),
+				Email: user.Email,
+			})
+			if sessionErr != nil {
+				return AuthResult{}, sessionErr
+			}
+
+			if err := tx.Commit(ctx); err != nil {
+				return AuthResult{}, fmt.Errorf("commit oauth tx: %w", err)
+			}
+
+			return result, nil
+		case !errors.Is(err, pgx.ErrNoRows):
+			return AuthResult{}, fmt.Errorf("get user by email for oauth: %w", err)
+		}
+	}
+
+	createdUser, err := txQueries.CreateUser(ctx, dbgen.CreateUserParams{
+		Email:        nullableText(email),
+		PasswordHash: pgtype.Text{},
+		Name:         strings.TrimSpace(name),
+	})
+	if err != nil {
+		return AuthResult{}, fmt.Errorf("create user from oauth: %w", err)
+	}
+
+	if _, err := txQueries.CreateOAuthAccount(ctx, dbgen.CreateOAuthAccountParams{
+		UserID:         createdUser.ID,
+		Provider:       providerName,
+		ProviderUserID: providerUserID,
+		Email:          nullableText(email),
+	}); err != nil {
+		return AuthResult{}, fmt.Errorf("create oauth account: %w", err)
+	}
+
+	result, err := s.createSessionForUser(ctx, txQueries, User{
+		ID:    createdUser.ID.String(),
+		Name:  strings.TrimSpace(createdUser.Name),
+		Email: createdUser.Email,
+	})
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return AuthResult{}, fmt.Errorf("commit oauth tx: %w", err)
+	}
+
+	return result, nil
+}
+
+func nullableText(value string) pgtype.Text {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return pgtype.Text{}
+	}
+
+	return pgtype.Text{String: value, Valid: true}
+}
+
+func nullableTextValue(value pgtype.Text) string {
+	if !value.Valid {
+		return ""
+	}
+
+	return strings.TrimSpace(value.String)
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+
+	return pgErr.Code == "23505"
+}

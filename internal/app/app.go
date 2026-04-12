@@ -7,7 +7,9 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"kartochki-online-backend/internal/auth"
 	"kartochki-online-backend/internal/config"
+	"kartochki-online-backend/internal/dbgen"
 	"kartochki-online-backend/internal/health"
 	httptransport "kartochki-online-backend/internal/http"
 	"kartochki-online-backend/internal/http/handlers"
@@ -44,8 +46,11 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		health.NewChecker("redis", redisClient.Ping),
 	)
 	healthHandler := handlers.NewHealthHandler(readiness, logger)
+	queries := dbgen.New(db.Pool)
+	authService := auth.NewService(db.Pool, queries, redisClient, cfg.Auth)
+	authHandler := handlers.NewAuthHandler(authService)
 
-	router := httptransport.NewRouter(cfg.HTTP, logger, healthHandler)
+	router := httptransport.NewRouter(cfg.HTTP, logger, healthHandler, authHandler, authService)
 	server := httpserver.New(cfg.HTTP, router)
 
 	return &App{
