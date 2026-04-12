@@ -1690,6 +1690,111 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/public/blog:
+    get:
+      summary: Публичный список статей блога
+      description: Возвращает SEO-страницу `/blog` с featured-материалом, списком статей и боковыми блоками.
+      operationId: listPublicBlogPosts
+      tags:
+        - Blog
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Номер страницы списка статей.
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 12
+          description: Размер страницы серверной пагинации.
+      responses:
+        "200":
+          description: Данные публичного списка статей
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogListResponse"
+        "400":
+          description: Ошибка валидации query params
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке списка статей
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/public/blog/{slug}:
+    get:
+      summary: Публичная статья блога
+      description: Возвращает SEO-страницу статьи `/blog/{slug}` вместе с секциями и related-материалами.
+      operationId: getPublicBlogPostBySlug
+      tags:
+        - Blog
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+          description: Человекочитаемый slug статьи.
+      responses:
+        "200":
+          description: Данные одной опубликованной статьи
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlogPostResponse"
+        "404":
+          description: Опубликованная статья не найдена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке статьи
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/billing:
     get:
       summary: РџРѕР»СѓС‡РёС‚СЊ РґР°РЅРЅС‹Рµ billing-СЃС‚СЂР°РЅРёС†С‹
@@ -2907,4 +3012,356 @@ components:
         confirm_word:
           type: string
           example: DELETE
+    BlogListResponse:
+      type: object
+      required:
+        - posts
+        - categories
+        - popular_posts
+        - tags
+        - pagination
+      properties:
+        featured_post:
+          $ref: "#/components/schemas/FeaturedBlogPost"
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogListItem"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogCategory"
+        popular_posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogSidebarPost"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogTag"
+        pagination:
+          $ref: "#/components/schemas/BlogPagination"
+    FeaturedBlogPost:
+      type: object
+      required:
+        - slug
+        - title
+        - excerpt
+        - published_at
+        - reading_time_minutes
+        - canonical_path
+      properties:
+        slug:
+          type: string
+          example: trebovaniya-foto-marketplejsy-2025
+        title:
+          type: string
+          example: Требования к фото для маркетплейсов в 2025 году
+        excerpt:
+          type: string
+          example: Размеры, фон, ракурсы и правила модерации в одной статье.
+        published_at:
+          type: string
+          format: date-time
+        reading_time_minutes:
+          type: integer
+          example: 10
+        canonical_path:
+          type: string
+          example: /blog/trebovaniya-foto-marketplejsy-2025
+    BlogListItem:
+      type: object
+      required:
+        - slug
+        - title
+        - excerpt
+        - category_label
+        - published_at
+        - reading_time_minutes
+        - canonical_path
+      properties:
+        slug:
+          type: string
+          example: infografika-dlya-ozon-conversion
+        title:
+          type: string
+          example: Как сделать инфографику для Ozon, которая увеличивает конверсию
+        excerpt:
+          type: string
+          example: Разбираем структуру, иконки, тексты и цвета.
+        category_label:
+          type: string
+          example: Инфографика
+        published_at:
+          type: string
+          format: date-time
+        reading_time_minutes:
+          type: integer
+          example: 7
+        canonical_path:
+          type: string
+          example: /blog/infografika-dlya-ozon-conversion
+    BlogCategory:
+      type: object
+      required:
+        - slug
+        - label
+        - count
+      properties:
+        slug:
+          type: string
+          example: wildberries
+        label:
+          type: string
+          example: Wildberries
+        count:
+          type: integer
+          example: 9
+    BlogSidebarPost:
+      type: object
+      required:
+        - slug
+        - title
+        - canonical_path
+      properties:
+        slug:
+          type: string
+          example: trebovaniya-foto-marketplejsy-2025
+        title:
+          type: string
+          example: Требования к фото для WB 2025
+        canonical_path:
+          type: string
+          example: /blog/trebovaniya-foto-marketplejsy-2025
+    BlogTag:
+      type: object
+      required:
+        - slug
+        - label
+      properties:
+        slug:
+          type: string
+          example: seo
+        label:
+          type: string
+          example: SEO
+    BlogPagination:
+      type: object
+      required:
+        - page
+        - page_size
+        - total_pages
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 12
+        total_pages:
+          type: integer
+          example: 11
+    BlogPostResponse:
+      type: object
+      required:
+        - post
+        - article_sections
+        - related_posts
+      properties:
+        post:
+          $ref: "#/components/schemas/BlogPostDetail"
+        article_sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogArticleSection"
+        related_posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/RelatedBlogPost"
+    BlogPostDetail:
+      type: object
+      required:
+        - slug
+        - title
+        - description
+        - excerpt
+        - canonical_path
+        - published_at
+        - updated_at
+        - reading_time_minutes
+        - views
+        - tags
+      properties:
+        slug:
+          type: string
+          example: trebovaniya-foto-marketplejsy-2025
+        title:
+          type: string
+          example: Требования к фото для маркетплейсов в 2025 году
+        description:
+          type: string
+          example: Подробный разбор требований маркетплейсов к фото товаров.
+        excerpt:
+          type: string
+          example: Размеры, фон, ракурсы и правила модерации в одной статье.
+        canonical_path:
+          type: string
+          example: /blog/trebovaniya-foto-marketplejsy-2025
+        published_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        reading_time_minutes:
+          type: integer
+          example: 10
+        views:
+          type: integer
+          example: 1240
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogTag"
+    BlogArticleSection:
+      type: object
+      required:
+        - id
+        - title
+        - level
+        - kind
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Основные требования к фото
+        level:
+          type: integer
+          minimum: 1
+          maximum: 6
+          example: 2
+        kind:
+          $ref: "#/components/schemas/BlogSectionKind"
+        body:
+          type: string
+        list:
+          type: array
+          items:
+            type: string
+        table:
+          $ref: "#/components/schemas/BlogSectionTable"
+        callout:
+          $ref: "#/components/schemas/BlogSectionCallout"
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogSectionCard"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogSectionStep"
+    BlogSectionKind:
+      type: string
+      enum:
+        - text
+        - list
+        - table
+        - callout
+        - cards
+        - steps
+    BlogSectionTable:
+      type: object
+      required:
+        - head
+        - rows
+      properties:
+        head:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+        tones:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+    BlogSectionCallout:
+      type: object
+      required:
+        - tone
+        - title
+        - text
+      properties:
+        tone:
+          type: string
+          example: warning
+        title:
+          type: string
+          example: Важно
+        text:
+          type: string
+          example: Проверяйте ограничения по размеру изображения до загрузки.
+    BlogSectionCard:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          example: Wildberries
+        tone:
+          type: string
+          example: positive
+        meta:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogSectionCardMetaRow"
+    BlogSectionCardMetaRow:
+      type: object
+      required:
+        - label
+        - value
+      properties:
+        label:
+          type: string
+          example: Формат
+        value:
+          type: string
+          example: JPG или PNG
+    BlogSectionStep:
+      type: object
+      required:
+        - title
+        - description
+      properties:
+        title:
+          type: string
+          example: Подготовьте исходное фото
+        description:
+          type: string
+          example: Убедитесь, что товар хорошо освещён и занимает большую часть кадра.
+    RelatedBlogPost:
+      type: object
+      required:
+        - slug
+        - title
+        - canonical_path
+      properties:
+        slug:
+          type: string
+          example: infografika-dlya-ozon-conversion
+        title:
+          type: string
+          example: Как сделать инфографику для Ozon
+        canonical_path:
+          type: string
+          example: /blog/infografika-dlya-ozon-conversion
 

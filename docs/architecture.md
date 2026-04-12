@@ -293,6 +293,7 @@ As business logic appears, add explicit domain-owned packages such as:
 - `internal/templates`
 - `internal/generation`
 - `internal/billing`
+- `internal/blog`
 - `internal/integrations`
 
 Each domain can contain its own:
@@ -328,6 +329,15 @@ It owns:
 - creation of generation jobs and linked projects
 - polling-ready generation status reads
 - coordination with Asynq worker and local artifact storage
+
+`internal/blog` is now used for the public `/api/v1/public/blog` and `/api/v1/public/blog/{slug}` surface.
+
+It owns:
+
+- read-only loading of published SEO articles
+- server pagination for the public blog list
+- mapping typed article sections from JSON payloads
+- related posts, tags, categories, and sidebar data for blog pages
 
 ## Data and Persistence Conventions
 

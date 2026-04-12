@@ -9,6 +9,7 @@ import (
 
 	"kartochki-online-backend/internal/auth"
 	"kartochki-online-backend/internal/billing"
+	"kartochki-online-backend/internal/blog"
 	"kartochki-online-backend/internal/config"
 	"kartochki-online-backend/internal/dbgen"
 	"kartochki-online-backend/internal/generation"
@@ -91,6 +92,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	authHandler := handlers.NewAuthHandler(authService)
 
 	projectService := projects.NewService(queries)
+	blogService := blog.NewService(queries)
 	billingService := billing.NewService(queries)
 	generationService := generation.NewService(
 		db.Pool,
@@ -101,6 +103,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	)
 	settingsService := settings.NewService(db.Pool, queries, asynqClient, authService.PasswordMinLength())
 	dashboardHandler := handlers.NewDashboardHandler(projectService, logger)
+	blogHandler := handlers.NewBlogHandler(blogService, logger)
 	projectsHandler := handlers.NewProjectsHandler(projectService, logger)
 	generationHandler := handlers.NewGenerationHandler(generationService, logger)
 	billingHandler := handlers.NewBillingHandler(billingService, logger)
@@ -113,6 +116,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		healthHandler,
 		authHandler,
 		dashboardHandler,
+		blogHandler,
 		projectsHandler,
 		generationHandler,
 		billingHandler,

@@ -45,6 +45,68 @@ type Asset struct {
 	CreatedAt        pgtype.Timestamptz
 }
 
+type BlogCategory struct {
+	ID        uuid.UUID
+	Slug      string
+	Label     string
+	CreatedAt pgtype.Timestamptz
+}
+
+// Статьи блога для SEO-страниц.
+type BlogPost struct {
+	ID             uuid.UUID
+	Slug           string
+	Title          string
+	Excerpt        pgtype.Text
+	SeoTitle       pgtype.Text
+	SeoDescription pgtype.Text
+	CoverAssetID   pgtype.UUID
+	Status         string
+	PublishedAt    pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+type BlogPostCategory struct {
+	ID             uuid.UUID
+	BlogPostID     uuid.UUID
+	BlogCategoryID uuid.UUID
+}
+
+type BlogPostMetric struct {
+	BlogPostID         uuid.UUID
+	ViewsCount         int64
+	ReadingTimeMinutes pgtype.Int4
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+// Универсальные секции статьи. Детали блока лежат в JSON payload.
+type BlogPostSection struct {
+	ID         uuid.UUID
+	BlogPostID uuid.UUID
+	SortOrder  int32
+	Kind       string
+	Title      pgtype.Text
+	Level      pgtype.Int4
+	Payload    []byte
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
+type BlogPostTag struct {
+	ID         uuid.UUID
+	BlogPostID uuid.UUID
+	BlogTagID  uuid.UUID
+}
+
+type BlogTag struct {
+	ID        uuid.UUID
+	Slug      string
+	Label     string
+	CreatedAt pgtype.Timestamptz
+}
+
 // Готовые карточки, полученные после завершения генерации.
 type GeneratedCard struct {
 	ID           uuid.UUID

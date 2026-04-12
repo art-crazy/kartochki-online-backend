@@ -22,6 +22,7 @@ func NewRouter(
 	healthHandler handlers.HealthHandler,
 	authHandler handlers.AuthHandler,
 	dashboardHandler handlers.DashboardHandler,
+	blogHandler handlers.BlogHandler,
 	projectsHandler handlers.ProjectsHandler,
 	generationHandler handlers.GenerationHandler,
 	billingHandler handlers.BillingHandler,
@@ -97,6 +98,10 @@ func NewRouter(
 		api.With(authMiddleware.RequireUser).Post("/settings/api-key/rotate", settingsHandler.RotateAPIKey)
 		api.With(authMiddleware.RequireUser).Post("/settings/export", settingsHandler.ExportData)
 		api.With(authMiddleware.RequireUser).Delete("/settings/account", settingsHandler.DeleteAccount)
+		api.Route("/public", func(publicRouter chi.Router) {
+			publicRouter.Get("/blog", blogHandler.List)
+			publicRouter.Get("/blog/{slug}", blogHandler.GetBySlug)
+		})
 	})
 
 	registerDocsRoutes(router)
