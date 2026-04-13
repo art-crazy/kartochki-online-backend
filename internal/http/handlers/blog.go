@@ -10,8 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 
+	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/blog"
-	"kartochki-online-backend/internal/http/contracts"
 	"kartochki-online-backend/internal/http/requestctx"
 	"kartochki-online-backend/internal/http/response"
 )
@@ -81,17 +81,17 @@ func (h BlogHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, toBlogPostResponse(post))
 }
 
-func parseBlogListInput(r *http.Request) (blog.ListInput, []contracts.ErrorDetail) {
+func parseBlogListInput(r *http.Request) (blog.ListInput, []openapi.ErrorDetail) {
 	query := r.URL.Query()
 	input := blog.ListInput{}
-	var details []contracts.ErrorDetail
+	var details []openapi.ErrorDetail
 
 	// Значение 0 означает «параметр не передан» — NormalizeListInput подставит дефолты.
 	// Некорректный диапазон (< 1 или > MaxPageSize) вернёт ошибку уже в нормализации.
 	if rawPage := strings.TrimSpace(query.Get("page")); rawPage != "" {
 		page, err := strconv.Atoi(rawPage)
 		if err != nil {
-			details = append(details, contracts.ErrorDetail{Field: "page", Message: "must be an integer"})
+			details = append(details, openapi.ErrorDetail{Field: strPtr("page"), Message: "must be an integer"})
 		} else {
 			input.Page = page
 		}
@@ -100,7 +100,7 @@ func parseBlogListInput(r *http.Request) (blog.ListInput, []contracts.ErrorDetai
 	if rawPageSize := strings.TrimSpace(query.Get("page_size")); rawPageSize != "" {
 		pageSize, err := strconv.Atoi(rawPageSize)
 		if err != nil {
-			details = append(details, contracts.ErrorDetail{Field: "page_size", Message: "must be an integer"})
+			details = append(details, openapi.ErrorDetail{Field: strPtr("page_size"), Message: "must be an integer"})
 		} else {
 			input.PageSize = pageSize
 		}
@@ -114,9 +114,9 @@ func parseBlogListInput(r *http.Request) (blog.ListInput, []contracts.ErrorDetai
 	if err != nil {
 		switch {
 		case errors.Is(err, blog.ErrInvalidPageSize):
-			details = append(details, contracts.ErrorDetail{Field: "page_size", Message: err.Error()})
+			details = append(details, openapi.ErrorDetail{Field: strPtr("page_size"), Message: err.Error()})
 		default:
-			details = append(details, contracts.ErrorDetail{Field: "page", Message: err.Error()})
+			details = append(details, openapi.ErrorDetail{Field: strPtr("page"), Message: err.Error()})
 		}
 		return blog.ListInput{}, details
 	}
@@ -124,13 +124,13 @@ func parseBlogListInput(r *http.Request) (blog.ListInput, []contracts.ErrorDetai
 	return normalized, nil
 }
 
-func toBlogListResponse(result blog.ListResult) contracts.BlogListResponse {
-	responsePayload := contracts.BlogListResponse{
+func toBlogListResponse(result blog.ListResult) openapi.BlogListResponse {
+	responsePayload := openapi.BlogListResponse{
 		Posts:        toBlogListItems(result.Posts),
 		Categories:   toBlogCategories(result.Categories),
 		PopularPosts: toBlogSidebarPosts(result.PopularPosts),
 		Tags:         toBlogTags(result.Tags),
-		Pagination: contracts.Pagination{
+		Pagination: openapi.BlogPagination{
 			Page:       result.Pagination.Page,
 			PageSize:   result.Pagination.PageSize,
 			TotalPages: result.Pagination.TotalPages,
@@ -138,7 +138,7 @@ func toBlogListResponse(result blog.ListResult) contracts.BlogListResponse {
 	}
 
 	if result.FeaturedPost != nil {
-		responsePayload.FeaturedPost = &contracts.FeaturedBlogPost{
+		responsePayload.FeaturedPost = &openapi.FeaturedBlogPost{
 			Slug:               result.FeaturedPost.Slug,
 			Title:              result.FeaturedPost.Title,
 			Excerpt:            result.FeaturedPost.Excerpt,
@@ -151,9 +151,9 @@ func toBlogListResponse(result blog.ListResult) contracts.BlogListResponse {
 	return responsePayload
 }
 
-func toBlogPostResponse(post blog.Post) contracts.BlogPostResponse {
-	return contracts.BlogPostResponse{
-		Post: contracts.BlogPostDetail{
+func toBlogPostResponse(post blog.Post) openapi.BlogPostResponse {
+	return openapi.BlogPostResponse{
+		Post: openapi.BlogPostDetail{
 			Slug:               post.Slug,
 			Title:              post.Title,
 			Description:        post.Description,
@@ -170,10 +170,10 @@ func toBlogPostResponse(post blog.Post) contracts.BlogPostResponse {
 	}
 }
 
-func toBlogListItems(items []blog.ListItem) []contracts.BlogListItem {
-	result := make([]contracts.BlogListItem, len(items))
+func toBlogListItems(items []blog.ListItem) []openapi.BlogListItem {
+	result := make([]openapi.BlogListItem, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogListItem{
+		result[i] = openapi.BlogListItem{
 			Slug:               item.Slug,
 			Title:              item.Title,
 			Excerpt:            item.Excerpt,
@@ -186,10 +186,10 @@ func toBlogListItems(items []blog.ListItem) []contracts.BlogListItem {
 	return result
 }
 
-func toBlogCategories(items []blog.Category) []contracts.BlogCategory {
-	result := make([]contracts.BlogCategory, len(items))
+func toBlogCategories(items []blog.Category) []openapi.BlogCategory {
+	result := make([]openapi.BlogCategory, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogCategory{
+		result[i] = openapi.BlogCategory{
 			Slug:  item.Slug,
 			Label: item.Label,
 			Count: item.Count,
@@ -198,10 +198,10 @@ func toBlogCategories(items []blog.Category) []contracts.BlogCategory {
 	return result
 }
 
-func toBlogSidebarPosts(items []blog.SidebarPost) []contracts.BlogSidebarPost {
-	result := make([]contracts.BlogSidebarPost, len(items))
+func toBlogSidebarPosts(items []blog.SidebarPost) []openapi.BlogSidebarPost {
+	result := make([]openapi.BlogSidebarPost, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogSidebarPost{
+		result[i] = openapi.BlogSidebarPost{
 			Slug:          item.Slug,
 			Title:         item.Title,
 			CanonicalPath: blogCanonicalPrefix + item.Slug,
@@ -210,10 +210,10 @@ func toBlogSidebarPosts(items []blog.SidebarPost) []contracts.BlogSidebarPost {
 	return result
 }
 
-func toRelatedBlogPosts(items []blog.SidebarPost) []contracts.RelatedBlogPost {
-	result := make([]contracts.RelatedBlogPost, len(items))
+func toRelatedBlogPosts(items []blog.SidebarPost) []openapi.RelatedBlogPost {
+	result := make([]openapi.RelatedBlogPost, len(items))
 	for i, item := range items {
-		result[i] = contracts.RelatedBlogPost{
+		result[i] = openapi.RelatedBlogPost{
 			Slug:          item.Slug,
 			Title:         item.Title,
 			CanonicalPath: blogCanonicalPrefix + item.Slug,
@@ -222,10 +222,10 @@ func toRelatedBlogPosts(items []blog.SidebarPost) []contracts.RelatedBlogPost {
 	return result
 }
 
-func toBlogTags(items []blog.Tag) []contracts.BlogTag {
-	result := make([]contracts.BlogTag, len(items))
+func toBlogTags(items []blog.Tag) []openapi.BlogTag {
+	result := make([]openapi.BlogTag, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogTag{
+		result[i] = openapi.BlogTag{
 			Slug:  item.Slug,
 			Label: item.Label,
 		}
@@ -233,63 +233,86 @@ func toBlogTags(items []blog.Tag) []contracts.BlogTag {
 	return result
 }
 
-func toBlogArticleSections(items []blog.ArticleSection) []contracts.BlogArticleSection {
-	result := make([]contracts.BlogArticleSection, len(items))
+func toBlogArticleSections(items []blog.ArticleSection) []openapi.BlogArticleSection {
+	result := make([]openapi.BlogArticleSection, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogArticleSection{
-			ID:      item.ID,
+		id := mustParseUUID(item.ID)
+
+		section := openapi.BlogArticleSection{
+			Id:      id,
 			Title:   item.Title,
 			Level:   item.Level,
-			Kind:    contracts.BlogSectionKind(item.Kind),
-			Body:    item.Body,
-			List:    item.List,
+			Kind:    openapi.BlogSectionKind(item.Kind),
 			Table:   toBlogSectionTable(item.Table),
 			Callout: toBlogSectionCallout(item.Callout),
-			Cards:   toBlogSectionCards(item.Cards),
-			Steps:   toBlogSectionSteps(item.Steps),
 		}
+		if item.Body != "" {
+			section.Body = &item.Body
+		}
+		if len(item.List) > 0 {
+			list := item.List
+			section.List = &list
+		}
+		if len(item.Cards) > 0 {
+			cards := toBlogSectionCards(item.Cards)
+			section.Cards = &cards
+		}
+		if len(item.Steps) > 0 {
+			steps := toBlogSectionSteps(item.Steps)
+			section.Steps = &steps
+		}
+		result[i] = section
 	}
 	return result
 }
 
-func toBlogSectionTable(table *blog.SectionTable) *contracts.BlogSectionTable {
+func toBlogSectionTable(table *blog.SectionTable) *openapi.BlogSectionTable {
 	if table == nil {
 		return nil
 	}
-	return &contracts.BlogSectionTable{
-		Head:  table.Head,
-		Rows:  table.Rows,
-		Tones: table.Tones,
+	t := &openapi.BlogSectionTable{
+		Head: table.Head,
+		Rows: table.Rows,
 	}
+	if len(table.Tones) > 0 {
+		t.Tones = &table.Tones
+	}
+	return t
 }
 
-func toBlogSectionCallout(callout *blog.SectionCallout) *contracts.BlogSectionCallout {
+func toBlogSectionCallout(callout *blog.SectionCallout) *openapi.BlogSectionCallout {
 	if callout == nil {
 		return nil
 	}
-	return &contracts.BlogSectionCallout{
+	return &openapi.BlogSectionCallout{
 		Tone:  callout.Tone,
 		Title: callout.Title,
 		Text:  callout.Text,
 	}
 }
 
-func toBlogSectionCards(items []blog.SectionCard) []contracts.BlogSectionCard {
-	result := make([]contracts.BlogSectionCard, len(items))
+func toBlogSectionCards(items []blog.SectionCard) []openapi.BlogSectionCard {
+	result := make([]openapi.BlogSectionCard, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogSectionCard{
+		card := openapi.BlogSectionCard{
 			Title: item.Title,
-			Tone:  item.Tone,
-			Meta:  toBlogSectionCardMetaRows(item.Meta),
 		}
+		if item.Tone != "" {
+			card.Tone = &item.Tone
+		}
+		if len(item.Meta) > 0 {
+			meta := toBlogSectionCardMetaRows(item.Meta)
+			card.Meta = &meta
+		}
+		result[i] = card
 	}
 	return result
 }
 
-func toBlogSectionCardMetaRows(items []blog.SectionCardMetaRow) []contracts.BlogSectionCardMetaRow {
-	result := make([]contracts.BlogSectionCardMetaRow, len(items))
+func toBlogSectionCardMetaRows(items []blog.SectionCardMetaRow) []openapi.BlogSectionCardMetaRow {
+	result := make([]openapi.BlogSectionCardMetaRow, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogSectionCardMetaRow{
+		result[i] = openapi.BlogSectionCardMetaRow{
 			Label: item.Label,
 			Value: item.Value,
 		}
@@ -297,10 +320,10 @@ func toBlogSectionCardMetaRows(items []blog.SectionCardMetaRow) []contracts.Blog
 	return result
 }
 
-func toBlogSectionSteps(items []blog.SectionStep) []contracts.BlogSectionStep {
-	result := make([]contracts.BlogSectionStep, len(items))
+func toBlogSectionSteps(items []blog.SectionStep) []openapi.BlogSectionStep {
+	result := make([]openapi.BlogSectionStep, len(items))
 	for i, item := range items {
-		result[i] = contracts.BlogSectionStep{
+		result[i] = openapi.BlogSectionStep{
 			Title:       item.Title,
 			Description: item.Description,
 		}

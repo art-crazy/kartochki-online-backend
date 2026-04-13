@@ -2,6 +2,25 @@ APP_NAME=kartochki-online-backend
 POSTGRES_DSN?=postgres://postgres:postgres@localhost:5432/kartochki_online?sslmode=disable
 SQLC_VERSION?=v1.29.0
 MIGRATE_VERSION?=v4.18.3
+OAPI_CODEGEN_VERSION?=v2.4.1
+
+OPENAPI_SRC=api/openapi/src/openapi.yaml
+OPENAPI_BUNDLE=api/openapi/openapi.yaml
+OPENAPI_GEN=api/gen/openapi.gen.go
+OPENAPI_CFG=api/openapi/oapi-codegen.yaml
+
+# bundle: собирает многофайловую src/ спецификацию в единый openapi.yaml для embed и oapi-codegen.
+# Требует npx (Node.js). Результат коммитится в репозиторий.
+.PHONY: bundle
+bundle:
+	npx --yes @redocly/cli@latest bundle $(OPENAPI_SRC) --output $(OPENAPI_BUNDLE) --ext yaml
+
+# generate: генерирует Go-типы из bundled спецификации.
+# Запускать после bundle или при изменении openapi.yaml.
+.PHONY: generate
+generate:
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION) \
+		--config $(OPENAPI_CFG) $(OPENAPI_BUNDLE)
 
 .PHONY: dev
 dev:

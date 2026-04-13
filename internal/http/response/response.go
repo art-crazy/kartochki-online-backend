@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"kartochki-online-backend/internal/http/contracts"
+	openapi "kartochki-online-backend/api/gen"
 )
 
 const requestIDHeader = "X-Request-ID"
@@ -32,16 +32,21 @@ func WriteError(
 	status int,
 	code string,
 	message string,
-	details ...contracts.ErrorDetail,
+	details ...openapi.ErrorDetail,
 ) {
-	payload := contracts.ErrorResponse{
+	payload := openapi.ErrorResponse{
 		Code:    code,
 		Message: message,
-		Details: details,
+	}
+
+	if len(details) > 0 {
+		payload.Details = &details
 	}
 
 	if r != nil {
-		payload.RequestID = middleware.GetReqID(r.Context())
+		if reqID := middleware.GetReqID(r.Context()); reqID != "" {
+			payload.RequestId = &reqID
+		}
 	}
 
 	WriteJSON(w, r, status, payload)

@@ -1,0 +1,107 @@
+paths:
+  /api/v1/public/blog:
+    get:
+      summary: Публичный список статей блога
+      description: Возвращает SEO-страницу `/blog` с featured-материалом, списком статей и боковыми блоками.
+      operationId: listPublicBlogPosts
+      tags:
+        - Blog
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Номер страницы списка статей.
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 12
+          description: Размер страницы серверной пагинации.
+      responses:
+        "200":
+          description: Данные публичного списка статей
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/blog.yaml#/schemas/BlogListResponse"
+        "400":
+          description: Ошибка валидации query params
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке списка статей
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/public/blog/{slug}:
+    get:
+      summary: Публичная статья блога
+      description: Возвращает SEO-страницу статьи `/blog/{slug}` вместе с секциями и related-материалами.
+      operationId: getPublicBlogPostBySlug
+      tags:
+        - Blog
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+          description: Человекочитаемый slug статьи.
+      responses:
+        "200":
+          description: Данные одной опубликованной статьи
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/blog.yaml#/schemas/BlogPostResponse"
+        "404":
+          description: Опубликованная статья не найдена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке статьи
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"

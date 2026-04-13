@@ -190,11 +190,23 @@ The frontend will generate an API client from Swagger/OpenAPI, so the contract d
 
 ### Source of truth
 
-The canonical public contract lives in:
+The spec is authored as a multi-file source tree and bundled into a single file for tooling:
 
-- `api/openapi/openapi.yaml`
+- `api/openapi/src/openapi.yaml` — root source file, references all path and schema fragments
+- `api/openapi/src/paths/` — one YAML file per route group
+- `api/openapi/src/components/schemas/` — one YAML file per domain
+- `api/openapi/openapi.yaml` — bundled output, committed to the repo, consumed by `embed.FS` and `oapi-codegen`
 
-The running API should expose this file so tooling can consume it directly.
+### Code generation pipeline
+
+1. Edit the source files in `api/openapi/src/`.
+2. Run `make bundle` — uses `@redocly/cli` to produce `api/openapi/openapi.yaml`.
+3. Run `make generate` — uses `oapi-codegen v2` to produce `api/gen/openapi.gen.go` (package `openapi`, models only).
+4. Commit both the bundled YAML and the generated Go file.
+
+The generated Go types in `api/gen` are the single authoritative set of request and response types for the HTTP layer. Handlers must not define parallel struct types for the same purpose.
+
+`api/openapi/oapi-codegen.yaml` controls generation: models only, no server stubs, no client code.
 
 ### Rules
 
@@ -203,6 +215,7 @@ The running API should expose this file so tooling can consume it directly.
 - document request and response schemas before frontend integration depends on them
 - maintain a consistent error model
 - do not create undocumented frontend-critical endpoints
+- after any spec edit, re-run `make bundle && make generate` before committing
 
 If the implementation and the spec diverge, the spec is no longer useful. That must be treated as a defect.
 
@@ -244,14 +257,13 @@ Responsibilities:
 - router setup
 - middleware
 - handlers
-- transport DTOs
 - request parsing and response mapping
 
-Transport DTOs may live in explicit subpackages when that keeps contracts readable, for example:
+Transport DTOs are generated from the OpenAPI spec and live in `api/gen` (package `openapi`). Handlers import that package directly — there is no separate `internal/http/contracts` package.
 
-- `internal/http/contracts`
+Transport response helpers live in `internal/http/response`. The `WriteError` function accepts `openapi.ErrorDetail` from `api/gen` and builds the consistent error envelope from there.
 
-Transport response helpers may live in a small dedicated package when that keeps handlers thin and preserves one error format for the whole API.
+Shared handler utilities (UUID parsing, JSON decoding, auth context extraction) live in `internal/http/handlers/helpers.go` as package-level functions so that individual handler structs stay focused on their own domain.
 
 Do not put database access or cross-domain orchestration directly in handlers.
 

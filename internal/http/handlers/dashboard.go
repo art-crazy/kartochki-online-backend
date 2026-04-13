@@ -6,8 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"kartochki-online-backend/internal/http/authctx"
-	"kartochki-online-backend/internal/http/contracts"
+	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/http/requestctx"
 	"kartochki-online-backend/internal/http/response"
 	"kartochki-online-backend/internal/projects"
@@ -33,9 +32,8 @@ func NewDashboardHandler(projectService dashboardProjectService, logger zerolog.
 
 // Get возвращает данные для главной страницы приложения /app.
 func (h DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user, ok := authctx.User(r.Context())
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
-		response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "authorization token is invalid")
 		return
 	}
 
@@ -50,12 +48,12 @@ func (h DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, toDashboardResponse(dashboard))
 }
 
-func toDashboardResponse(dashboard projects.Dashboard) contracts.DashboardResponse {
-	return contracts.DashboardResponse{
+func toDashboardResponse(dashboard projects.Dashboard) openapi.DashboardResponse {
+	return openapi.DashboardResponse{
 		Stats:          toDashboardStats(dashboard.Stats),
 		RecentProjects: toDashboardProjects(dashboard.RecentProjects),
 		AllProjects:    toDashboardProjects(dashboard.AllProjects),
-		QuickStart: contracts.DashboardQuickStart{
+		QuickStart: openapi.DashboardQuickStart{
 			Title:         dashboard.QuickStart.Title,
 			Description:   dashboard.QuickStart.Description,
 			CanonicalPath: dashboardQuickStartPath,
@@ -63,42 +61,54 @@ func toDashboardResponse(dashboard projects.Dashboard) contracts.DashboardRespon
 	}
 }
 
-func toDashboardStats(stats []projects.DashboardStat) []contracts.DashboardStat {
-	result := make([]contracts.DashboardStat, len(stats))
+func toDashboardStats(stats []projects.DashboardStat) []openapi.DashboardStat {
+	result := make([]openapi.DashboardStat, len(stats))
 	for i, stat := range stats {
-		var progress *contracts.DashboardProgress
-		if stat.Progress != nil {
-			progress = &contracts.DashboardProgress{
-				Value: stat.Progress.Value,
-				Max:   stat.Progress.Max,
-			}
-		}
-
-		result[i] = contracts.DashboardStat{
+		s := openapi.DashboardStat{
 			Key:         stat.Key,
 			Label:       stat.Label,
 			Value:       stat.Value,
 			Description: stat.Description,
-			AccentText:  stat.AccentText,
-			Progress:    progress,
 		}
+		if stat.AccentText != "" {
+			s.AccentText = &stat.AccentText
+		}
+		if stat.Progress != nil {
+			s.Progress = &struct {
+				Max   *int `json:"max,omitempty"`
+				Value *int `json:"value,omitempty"`
+			}{
+				Value: &stat.Progress.Value,
+				Max:   &stat.Progress.Max,
+			}
+		}
+		result[i] = s
 	}
 
 	return result
 }
 
-func toDashboardProjects(list []projects.DashboardProject) []contracts.DashboardProject {
-	result := make([]contracts.DashboardProject, len(list))
+func toDashboardProjects(list []projects.DashboardProject) []openapi.DashboardProject {
+	result := make([]openapi.DashboardProject, len(list))
 	for i, p := range list {
-		result[i] = contracts.DashboardProject{
-			ID:            p.ID,
+		id := mustParseUUID(p.ID)
+		proj := openapi.DashboardProject{
+			Id:            id,
 			Title:         p.Title,
-			CardCount:     p.CardCount,
-			MarketplaceID: p.MarketplaceID,
 			UpdatedAt:     p.UpdatedAt,
-			PreviewURLs:   p.PreviewURLs,
 			CanonicalPath: "/app/projects/" + p.ID,
 		}
+		if p.CardCount > 0 {
+			proj.CardCount = &p.CardCount
+		}
+		if p.MarketplaceID != "" {
+			proj.MarketplaceId = &p.MarketplaceID
+		}
+		if len(p.PreviewURLs) > 0 {
+			urls := p.PreviewURLs
+			proj.PreviewUrls = &urls
+		}
+		result[i] = proj
 	}
 
 	return result

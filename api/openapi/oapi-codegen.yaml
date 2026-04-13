@@ -1,0 +1,11 @@
+# Конфигурация oapi-codegen для генерации Go-типов из bundled OpenAPI-спецификации.
+# Генерирует только типы (без серверного кода) — роутинг и middleware остаются на chi.
+package: openapi
+generate:
+  models: true
+  strict-server: false
+  chi-server: false
+  client: false
+output: api/gen/openapi.gen.go
+output-options:
+  skip-prune: false

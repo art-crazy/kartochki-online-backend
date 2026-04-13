@@ -1,0 +1,185 @@
+schemas:
+  GenerateMarketplace:
+    type: object
+    required:
+      - id
+      - label
+    properties:
+      id:
+        type: string
+        example: wildberries
+      label:
+        type: string
+        example: Wildberries
+
+  GenerateStyle:
+    type: object
+    required:
+      - id
+      - label
+    properties:
+      id:
+        type: string
+        example: clean_catalog
+      label:
+        type: string
+        example: Чистый каталог
+
+  GenerateCardType:
+    type: object
+    required:
+      - id
+      - label
+    properties:
+      id:
+        type: string
+        example: cover
+      label:
+        type: string
+        example: Обложка
+      default_selected:
+        type: boolean
+        example: true
+
+  GenerateConfigResponse:
+    type: object
+    required:
+      - marketplaces
+      - styles
+      - card_types
+      - card_count_options
+    properties:
+      marketplaces:
+        type: array
+        items:
+          $ref: "#/schemas/GenerateMarketplace"
+      styles:
+        type: array
+        items:
+          $ref: "#/schemas/GenerateStyle"
+      card_types:
+        type: array
+        items:
+          $ref: "#/schemas/GenerateCardType"
+      card_count_options:
+        type: array
+        items:
+          type: integer
+
+  UploadImageResponse:
+    type: object
+    required:
+      - asset_id
+      - preview_url
+    properties:
+      asset_id:
+        type: string
+        format: uuid
+      preview_url:
+        type: string
+        format: uri
+        example: http://localhost:8080/media/uploads/user-id/source.png
+
+  CreateGenerationRequest:
+    type: object
+    required:
+      - marketplace_id
+      - style_id
+      - card_type_ids
+      - card_count
+      - source_asset_id
+    properties:
+      project_name:
+        type: string
+        maxLength: 200
+        example: Карточки для летней коллекции
+      marketplace_id:
+        type: string
+        example: wildberries
+      style_id:
+        type: string
+        example: clean_catalog
+      card_type_ids:
+        type: array
+        minItems: 1
+        items:
+          type: string
+        example: [cover, benefits, details]
+      card_count:
+        type: integer
+        example: 5
+      source_asset_id:
+        type: string
+        format: uuid
+
+  CreateGenerationResponse:
+    type: object
+    required:
+      - generation_id
+      - status
+    properties:
+      generation_id:
+        type: string
+        format: uuid
+      status:
+        type: string
+        enum:
+          - queued
+        example: queued
+
+  GeneratedCard:
+    type: object
+    required:
+      - id
+      - card_type_id
+      - asset_id
+      - preview_url
+    properties:
+      id:
+        type: string
+        format: uuid
+      card_type_id:
+        type: string
+        example: cover
+      asset_id:
+        type: string
+        format: uuid
+      preview_url:
+        type: string
+        format: uri
+        example: http://localhost:8080/media/generated/generation-id/01-cover.png
+
+  GenerationStatusResponse:
+    type: object
+    required:
+      - generation_id
+      - status
+    properties:
+      generation_id:
+        type: string
+        format: uuid
+      status:
+        type: string
+        enum:
+          - queued
+          - processing
+          - completed
+          - failed
+        example: processing
+      current_step:
+        type: string
+        example: rendering_cards
+      progress_percent:
+        type: integer
+        example: 60
+      error_message:
+        type: string
+        example: failed to create archive
+      archive_download_url:
+        type: string
+        format: uri
+        example: http://localhost:8080/media/archives/generation-id/cards.zip
+      result_cards:
+        type: array
+        items:
+          $ref: "#/schemas/GeneratedCard"

@@ -1,16 +1,16 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"net/mail"
 	"strings"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
+	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/auth"
 	"kartochki-online-backend/internal/http/authctx"
-	"kartochki-online-backend/internal/http/contracts"
 	"kartochki-online-backend/internal/http/response"
 )
 
@@ -26,7 +26,7 @@ func NewAuthHandler(authService *auth.Service) AuthHandler {
 
 // Register создаёт пользователя и сразу логинит его в первую сессию.
 func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var req contracts.RegisterRequest
+	var req openapi.RegisterRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -38,8 +38,8 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.authService.Register(r.Context(), auth.RegisterInput{
-		Name:     req.Name,
-		Email:    req.Email,
+		Name:     stringOrEmpty(req.Name),
+		Email:    string(req.Email),
 		Password: req.Password,
 	}, sessionMetadataFromRequest(r))
 	if err != nil {
@@ -53,8 +53,8 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 				http.StatusBadRequest,
 				"validation_error",
 				"request validation failed",
-				contracts.ErrorDetail{
-					Field:   "password",
+				openapi.ErrorDetail{
+					Field:   strPtr("password"),
 					Message: fmt.Sprintf("must be at least %d characters", h.authService.PasswordMinLength()),
 				},
 			)
@@ -69,7 +69,7 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 // Login создаёт новую сессию по корректной паре email и пароль.
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req contracts.LoginRequest
+	var req openapi.LoginRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -81,7 +81,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.authService.Login(r.Context(), auth.LoginInput{
-		Email:    req.Email,
+		Email:    string(req.Email),
 		Password: req.Password,
 	}, sessionMetadataFromRequest(r))
 	if err != nil {
@@ -99,7 +99,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 // TelegramLogin завершает вход через Telegram Login Widget и создаёт локальную сессию.
 func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
-	var req contracts.TelegramLoginRequest
+	var req openapi.TelegramLoginRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -111,11 +111,11 @@ func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.authService.LoginWithTelegram(r.Context(), auth.TelegramLoginData{
-		ID:        req.ID,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		Username:  req.Username,
-		PhotoURL:  req.PhotoURL,
+		ID:        req.Id,
+		FirstName: stringOrEmpty(req.FirstName),
+		LastName:  stringOrEmpty(req.LastName),
+		Username:  stringOrEmpty(req.Username),
+		PhotoURL:  stringOrEmpty(req.PhotoUrl),
 		AuthDate:  req.AuthDate,
 		Hash:      req.Hash,
 	}, sessionMetadataFromRequest(r))
@@ -154,23 +154,18 @@ func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "logged_out"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusLoggedOut})
 }
 
 // Me возвращает текущего пользователя, который уже был загружен middleware.
 func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
-	user, ok := authctx.User(r.Context())
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
-		response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "authorization token is invalid")
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.CurrentUserResponse{
-		User: contracts.AuthUser{
-			ID:    user.ID,
-			Name:  user.Name,
-			Email: user.Email,
-		},
+	response.WriteJSON(w, r, http.StatusOK, openapi.CurrentUserResponse{
+		User: authUserToAPI(user),
 	})
 }
 
@@ -179,7 +174,7 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 // Ответ всегда 200 независимо от того, найден пользователь или нет — чтобы не раскрывать
 // факт существования аккаунта по email.
 func (h AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
-	var req contracts.ForgotPasswordRequest
+	var req openapi.ForgotPasswordRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -190,17 +185,17 @@ func (h AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authService.ForgotPassword(r.Context(), req.Email); err != nil {
+	if err := h.authService.ForgotPassword(r.Context(), string(req.Email)); err != nil {
 		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to process password reset request")
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "accepted"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusAccepted})
 }
 
 // ResetPassword принимает токен из письма и новый пароль, затем обновляет пароль пользователя.
 func (h AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	var req contracts.ResetPasswordRequest
+	var req openapi.ResetPasswordRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -221,7 +216,7 @@ func (h AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "password_changed"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusPasswordChanged})
 }
 
 // VKStart начинает внешний OAuth-flow и перенаправляет пользователя на страницу VK ID.
@@ -310,35 +305,21 @@ func (h AuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
-func decodeJSON(r *http.Request, dst any) error {
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
+func validateRegisterRequest(req openapi.RegisterRequest, passwordMinLength int) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
-	if err := decoder.Decode(dst); err != nil {
-		return err
-	}
-
-	if decoder.More() {
-		return fmt.Errorf("multiple JSON values are not allowed")
-	}
-
-	return nil
-}
-
-func validateRegisterRequest(req contracts.RegisterRequest, passwordMinLength int) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
-
-	if strings.TrimSpace(req.Email) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "email", Message: "field is required"})
-	} else if !isLikelyEmail(req.Email) {
-		details = append(details, contracts.ErrorDetail{Field: "email", Message: "must be a valid email"})
+	emailStr := strings.TrimSpace(string(req.Email))
+	if emailStr == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "field is required"})
+	} else if !isValidEmail(emailStr) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "must be a valid email"})
 	}
 
 	if strings.TrimSpace(req.Password) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "password", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "field is required"})
 	} else if len(req.Password) < passwordMinLength {
-		details = append(details, contracts.ErrorDetail{
-			Field:   "password",
+		details = append(details, openapi.ErrorDetail{
+			Field:   strPtr("password"),
 			Message: fmt.Sprintf("must be at least %d characters", passwordMinLength),
 		})
 	}
@@ -346,46 +327,48 @@ func validateRegisterRequest(req contracts.RegisterRequest, passwordMinLength in
 	return details
 }
 
-func validateLoginRequest(req contracts.LoginRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateLoginRequest(req openapi.LoginRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
-	if strings.TrimSpace(req.Email) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "email", Message: "field is required"})
-	} else if !isLikelyEmail(req.Email) {
-		details = append(details, contracts.ErrorDetail{Field: "email", Message: "must be a valid email"})
+	emailStr := strings.TrimSpace(string(req.Email))
+	if emailStr == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "field is required"})
+	} else if !isValidEmail(emailStr) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "must be a valid email"})
 	}
 
 	if strings.TrimSpace(req.Password) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "password", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "field is required"})
 	}
 
 	return details
 }
 
-func validateForgotPasswordRequest(req contracts.ForgotPasswordRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateForgotPasswordRequest(req openapi.ForgotPasswordRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
-	if strings.TrimSpace(req.Email) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "email", Message: "field is required"})
-	} else if !isLikelyEmail(req.Email) {
-		details = append(details, contracts.ErrorDetail{Field: "email", Message: "must be a valid email"})
+	emailStr := strings.TrimSpace(string(req.Email))
+	if emailStr == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "field is required"})
+	} else if !isValidEmail(emailStr) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "must be a valid email"})
 	}
 
 	return details
 }
 
-func validateResetPasswordRequest(req contracts.ResetPasswordRequest, passwordMinLength int) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateResetPasswordRequest(req openapi.ResetPasswordRequest, passwordMinLength int) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.Token) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "token", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("token"), Message: "field is required"})
 	}
 
 	if strings.TrimSpace(req.Password) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "password", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "field is required"})
 	} else if len(req.Password) < passwordMinLength {
-		details = append(details, contracts.ErrorDetail{
-			Field:   "password",
+		details = append(details, openapi.ErrorDetail{
+			Field:   strPtr("password"),
 			Message: fmt.Sprintf("must be at least %d characters", passwordMinLength),
 		})
 	}
@@ -393,32 +376,29 @@ func validateResetPasswordRequest(req contracts.ResetPasswordRequest, passwordMi
 	return details
 }
 
-func validateTelegramLoginRequest(req contracts.TelegramLoginRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateTelegramLoginRequest(req openapi.TelegramLoginRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
-	if req.ID <= 0 {
-		details = append(details, contracts.ErrorDetail{Field: "id", Message: "must be greater than zero"})
+	if req.Id <= 0 {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("id"), Message: "must be greater than zero"})
 	}
 
 	if req.AuthDate <= 0 {
-		details = append(details, contracts.ErrorDetail{Field: "auth_date", Message: "must be a valid unix timestamp"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("auth_date"), Message: "must be a valid unix timestamp"})
 	}
 
 	if strings.TrimSpace(req.Hash) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "hash", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("hash"), Message: "field is required"})
 	}
 
 	return details
 }
 
-func toAuthResponse(result auth.AuthResult) contracts.AuthResponse {
-	return contracts.AuthResponse{
-		User: contracts.AuthUser{
-			ID:    result.User.ID,
-			Name:  result.User.Name,
-			Email: result.User.Email,
-		},
-		Session: contracts.AuthSession{
+// toAuthResponse конвертирует доменный AuthResult в openapi.AuthResponse для HTTP-ответа.
+func toAuthResponse(result auth.AuthResult) openapi.AuthResponse {
+	return openapi.AuthResponse{
+		User:    authUserToAPI(result.User),
+		Session: openapi.AuthSession{
 			AccessToken: result.Session.AccessToken,
 			TokenType:   "Bearer",
 			ExpiresAt:   result.Session.ExpiresAt,
@@ -426,12 +406,19 @@ func toAuthResponse(result auth.AuthResult) contracts.AuthResponse {
 	}
 }
 
-func isLikelyEmail(value string) bool {
-	email := strings.TrimSpace(value)
-	parsed, err := mail.ParseAddress(email)
-	if err != nil {
-		return false
+// authUserToAPI конвертирует доменного auth.User в openapi.AuthUser.
+// auth.User.ID — строковый UUID, openapi.AuthUser.Id — типизированный openapi_types.UUID.
+func authUserToAPI(user auth.User) openapi.AuthUser {
+	email := openapi_types.Email(user.Email)
+
+	apiUser := openapi.AuthUser{
+		Id:    mustParseUUID(user.ID),
+		Email: &email,
+	}
+	if user.Name != "" {
+		apiUser.Name = &user.Name
 	}
 
-	return parsed.Address == email
+	return apiUser
 }
+

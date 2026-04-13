@@ -1,0 +1,247 @@
+schemas:
+  BillingUsage:
+    type: object
+    required:
+      - value
+      - max
+    properties:
+      value:
+        type: integer
+        example: 87
+      max:
+        type: integer
+        example: 500
+
+  BillingPlanFeature:
+    type: object
+    required:
+      - label
+      - enabled
+    properties:
+      label:
+        type: string
+        example: Все стили генерации
+      enabled:
+        type: boolean
+        example: true
+
+  BillingPlan:
+    type: object
+    required:
+      - id
+      - name
+      - monthly_price
+      - cards_per_month
+      - features
+    properties:
+      id:
+        type: string
+        example: pro
+      name:
+        type: string
+        example: Профи
+      monthly_price:
+        type: integer
+        example: 1490
+      yearly_monthly_price:
+        type: integer
+        example: 990
+      cards_per_month:
+        type: integer
+        example: 500
+      features:
+        type: array
+        items:
+          $ref: "#/schemas/BillingPlanFeature"
+      current:
+        type: boolean
+      popular:
+        type: boolean
+
+  BillingAddon:
+    type: object
+    required:
+      - id
+      - title
+      - description
+      - price
+    properties:
+      id:
+        type: string
+        example: cards_100
+      title:
+        type: string
+        example: 100 карточек
+      description:
+        type: string
+        example: Разовый пакет для срочного объёма.
+      price:
+        type: integer
+        example: 490
+
+  BillingSubscription:
+    type: object
+    required:
+      - plan_id
+      - plan_name
+      - has_payment_method
+      - usage
+    properties:
+      plan_id:
+        type: string
+        example: pro
+      plan_name:
+        type: string
+        example: Профи
+      renews_at:
+        type: string
+        format: date-time
+      cancels_at:
+        type: string
+        format: date-time
+      has_payment_method:
+        type: boolean
+        example: true
+      usage:
+        $ref: "#/schemas/BillingUsage"
+
+  BillingResponse:
+    type: object
+    required:
+      - current_subscription
+      - plans
+      - addons
+    properties:
+      current_subscription:
+        $ref: "#/schemas/BillingSubscription"
+      plans:
+        type: array
+        items:
+          $ref: "#/schemas/BillingPlan"
+      addons:
+        type: array
+        items:
+          $ref: "#/schemas/BillingAddon"
+
+  CreateCheckoutRequest:
+    type: object
+    required:
+      - plan_id
+      - period
+    properties:
+      plan_id:
+        type: string
+        example: pro
+      period:
+        type: string
+        enum:
+          - monthly
+          - yearly
+        example: monthly
+
+  CreateCheckoutResponse:
+    type: object
+    required:
+      - checkout_url
+    properties:
+      checkout_url:
+        type: string
+        format: uri
+        example: https://pay.example.com/checkout/session-123
+
+  PurchaseAddonRequest:
+    type: object
+    required:
+      - addon_id
+    properties:
+      addon_id:
+        type: string
+        example: cards_100
+
+  PurchaseAddonResponse:
+    type: object
+    required:
+      - checkout_url
+    properties:
+      checkout_url:
+        type: string
+        format: uri
+        example: https://pay.example.com/checkout/session-456
+
+  CancelSubscriptionResponse:
+    type: object
+    required:
+      - status
+    properties:
+      status:
+        type: string
+        enum:
+          - scheduled_cancel
+        example: scheduled_cancel
+
+  YooKassaPaymentObject:
+    type: object
+    required:
+      - id
+      - status
+      - amount
+      - metadata
+    properties:
+      id:
+        type: string
+        example: 2a4e4c49-000f-5000-a000-1e1ce5e3b4c4
+      status:
+        type: string
+        enum:
+          - succeeded
+          - canceled
+        example: succeeded
+      amount:
+        type: object
+        properties:
+          value:
+            type: string
+            example: "1490.00"
+          currency:
+            type: string
+            example: RUB
+      captured_at:
+        type: string
+        format: date-time
+      metadata:
+        type: object
+        properties:
+          user_id:
+            type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          plan_code:
+            type: string
+            example: pro
+          addon_code:
+            type: string
+            example: cards_100
+          period:
+            type: string
+            enum:
+              - monthly
+              - yearly
+          type:
+            type: string
+            enum:
+              - subscription
+              - addon
+
+  YooKassaWebhookEvent:
+    type: object
+    required:
+      - type
+      - object
+    properties:
+      type:
+        type: string
+        enum:
+          - payment.succeeded
+          - payment.canceled
+        example: payment.succeeded
+      object:
+        $ref: "#/schemas/YooKassaPaymentObject"

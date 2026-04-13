@@ -1,0 +1,369 @@
+schemas:
+  FeaturedBlogPost:
+    type: object
+    required:
+      - slug
+      - title
+      - excerpt
+      - published_at
+      - reading_time_minutes
+      - canonical_path
+    properties:
+      slug:
+        type: string
+        example: trebovaniya-foto-marketplejsy-2025
+      title:
+        type: string
+        example: Требования к фото для маркетплейсов в 2025 году
+      excerpt:
+        type: string
+        example: Размеры, фон, ракурсы и правила модерации в одной статье.
+      published_at:
+        type: string
+        format: date-time
+      reading_time_minutes:
+        type: integer
+        example: 10
+      canonical_path:
+        type: string
+        example: /blog/trebovaniya-foto-marketplejsy-2025
+
+  BlogListItem:
+    type: object
+    required:
+      - slug
+      - title
+      - excerpt
+      - category_label
+      - published_at
+      - reading_time_minutes
+      - canonical_path
+    properties:
+      slug:
+        type: string
+        example: infografika-dlya-ozon-conversion
+      title:
+        type: string
+        example: Как сделать инфографику для Ozon, которая увеличивает конверсию
+      excerpt:
+        type: string
+        example: Разбираем структуру, иконки, тексты и цвета.
+      category_label:
+        type: string
+        example: Инфографика
+      published_at:
+        type: string
+        format: date-time
+      reading_time_minutes:
+        type: integer
+        example: 7
+      canonical_path:
+        type: string
+        example: /blog/infografika-dlya-ozon-conversion
+
+  BlogCategory:
+    type: object
+    required:
+      - slug
+      - label
+      - count
+    properties:
+      slug:
+        type: string
+        example: wildberries
+      label:
+        type: string
+        example: Wildberries
+      count:
+        type: integer
+        example: 9
+
+  BlogSidebarPost:
+    type: object
+    required:
+      - slug
+      - title
+      - canonical_path
+    properties:
+      slug:
+        type: string
+        example: trebovaniya-foto-marketplejsy-2025
+      title:
+        type: string
+        example: Требования к фото для WB 2025
+      canonical_path:
+        type: string
+        example: /blog/trebovaniya-foto-marketplejsy-2025
+
+  BlogTag:
+    type: object
+    required:
+      - slug
+      - label
+    properties:
+      slug:
+        type: string
+        example: seo
+      label:
+        type: string
+        example: SEO
+
+  BlogPagination:
+    type: object
+    required:
+      - page
+      - page_size
+      - total_pages
+    properties:
+      page:
+        type: integer
+        example: 1
+      page_size:
+        type: integer
+        example: 12
+      total_pages:
+        type: integer
+        example: 11
+
+  BlogListResponse:
+    type: object
+    required:
+      - posts
+      - categories
+      - popular_posts
+      - tags
+      - pagination
+    properties:
+      featured_post:
+        $ref: "#/schemas/FeaturedBlogPost"
+      posts:
+        type: array
+        items:
+          $ref: "#/schemas/BlogListItem"
+      categories:
+        type: array
+        items:
+          $ref: "#/schemas/BlogCategory"
+      popular_posts:
+        type: array
+        items:
+          $ref: "#/schemas/BlogSidebarPost"
+      tags:
+        type: array
+        items:
+          $ref: "#/schemas/BlogTag"
+      pagination:
+        $ref: "#/schemas/BlogPagination"
+
+  BlogSectionKind:
+    type: string
+    enum:
+      - text
+      - list
+      - table
+      - callout
+      - cards
+      - steps
+
+  BlogSectionTable:
+    type: object
+    required:
+      - head
+      - rows
+    properties:
+      head:
+        type: array
+        items:
+          type: string
+      rows:
+        type: array
+        items:
+          type: array
+          items:
+            type: string
+      tones:
+        type: array
+        items:
+          type: array
+          items:
+            type: string
+
+  BlogSectionCallout:
+    type: object
+    required:
+      - tone
+      - title
+      - text
+    properties:
+      tone:
+        type: string
+        example: warning
+      title:
+        type: string
+        example: Важно
+      text:
+        type: string
+        example: Проверяйте ограничения по размеру изображения до загрузки.
+
+  BlogSectionCardMetaRow:
+    type: object
+    required:
+      - label
+      - value
+    properties:
+      label:
+        type: string
+        example: Формат
+      value:
+        type: string
+        example: JPG или PNG
+
+  BlogSectionCard:
+    type: object
+    required:
+      - title
+    properties:
+      title:
+        type: string
+        example: Wildberries
+      tone:
+        type: string
+        example: positive
+      meta:
+        type: array
+        items:
+          $ref: "#/schemas/BlogSectionCardMetaRow"
+
+  BlogSectionStep:
+    type: object
+    required:
+      - title
+      - description
+    properties:
+      title:
+        type: string
+        example: Подготовьте исходное фото
+      description:
+        type: string
+        example: Убедитесь, что товар хорошо освещён и занимает большую часть кадра.
+
+  BlogArticleSection:
+    type: object
+    required:
+      - id
+      - title
+      - level
+      - kind
+    properties:
+      id:
+        type: string
+        format: uuid
+      title:
+        type: string
+        example: Основные требования к фото
+      level:
+        type: integer
+        minimum: 1
+        maximum: 6
+        example: 2
+      kind:
+        $ref: "#/schemas/BlogSectionKind"
+      body:
+        type: string
+      list:
+        type: array
+        items:
+          type: string
+      table:
+        $ref: "#/schemas/BlogSectionTable"
+      callout:
+        $ref: "#/schemas/BlogSectionCallout"
+      cards:
+        type: array
+        items:
+          $ref: "#/schemas/BlogSectionCard"
+      steps:
+        type: array
+        items:
+          $ref: "#/schemas/BlogSectionStep"
+
+  RelatedBlogPost:
+    type: object
+    required:
+      - slug
+      - title
+      - canonical_path
+    properties:
+      slug:
+        type: string
+        example: infografika-dlya-ozon-conversion
+      title:
+        type: string
+        example: Как сделать инфографику для Ozon
+      canonical_path:
+        type: string
+        example: /blog/infografika-dlya-ozon-conversion
+
+  BlogPostDetail:
+    type: object
+    required:
+      - slug
+      - title
+      - description
+      - excerpt
+      - canonical_path
+      - published_at
+      - updated_at
+      - reading_time_minutes
+      - views
+      - tags
+    properties:
+      slug:
+        type: string
+        example: trebovaniya-foto-marketplejsy-2025
+      title:
+        type: string
+        example: Требования к фото для маркетплейсов в 2025 году
+      description:
+        type: string
+        example: Подробный разбор требований маркетплейсов к фото товаров.
+      excerpt:
+        type: string
+        example: Размеры, фон, ракурсы и правила модерации в одной статье.
+      canonical_path:
+        type: string
+        example: /blog/trebovaniya-foto-marketplejsy-2025
+      published_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+      reading_time_minutes:
+        type: integer
+        example: 10
+      views:
+        type: integer
+        example: 1240
+      tags:
+        type: array
+        items:
+          $ref: "#/schemas/BlogTag"
+
+  BlogPostResponse:
+    type: object
+    required:
+      - post
+      - article_sections
+      - related_posts
+    properties:
+      post:
+        $ref: "#/schemas/BlogPostDetail"
+      article_sections:
+        type: array
+        items:
+          $ref: "#/schemas/BlogArticleSection"
+      related_posts:
+        type: array
+        items:
+          $ref: "#/schemas/RelatedBlogPost"

@@ -1,0 +1,262 @@
+openapi: 3.0.3
+info:
+  title: kartochki.online API
+  version: 0.1.0
+  description: |
+    Публичный API сервиса kartochki.online.
+
+    Эта спецификация является источником правды для автогенерации frontend-клиента.
+    Реализация backend и этот файл должны оставаться синхронными.
+servers:
+  - url: http://localhost:8080
+
+paths:
+  # Infrastructure endpoints stay outside /api/v1 because deployment tooling
+  # and local checks often call them directly without user auth.
+  /health/live:
+    $ref: "./paths/health.yaml#/paths/~1health~1live"
+  /health/ready:
+    $ref: "./paths/health.yaml#/paths/~1health~1ready"
+
+  /api/v1/auth/register:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1register"
+  /api/v1/auth/login:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1login"
+  /api/v1/auth/telegram/login:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1telegram~1login"
+  /api/v1/auth/logout:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1logout"
+  /api/v1/me:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1me"
+  /api/v1/auth/forgot-password:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1forgot-password"
+  /api/v1/auth/reset-password:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1reset-password"
+  /api/v1/auth/vk/start:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1vk~1start"
+  /api/v1/auth/vk/callback:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1vk~1callback"
+  /api/v1/auth/yandex/start:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1yandex~1start"
+  /api/v1/auth/yandex/callback:
+    $ref: "./paths/auth.yaml#/paths/~1api~1v1~1auth~1yandex~1callback"
+
+  /api/v1/projects:
+    $ref: "./paths/projects.yaml#/paths/~1api~1v1~1projects"
+  /api/v1/projects/{id}:
+    $ref: "./paths/projects.yaml#/paths/~1api~1v1~1projects~1{id}"
+
+  /api/v1/dashboard:
+    $ref: "./paths/dashboard.yaml#/paths/~1api~1v1~1dashboard"
+
+  /api/v1/generate/config:
+    $ref: "./paths/generation.yaml#/paths/~1api~1v1~1generate~1config"
+  /api/v1/uploads/images:
+    $ref: "./paths/generation.yaml#/paths/~1api~1v1~1uploads~1images"
+  /api/v1/generations:
+    $ref: "./paths/generation.yaml#/paths/~1api~1v1~1generations"
+  /api/v1/generations/{id}:
+    $ref: "./paths/generation.yaml#/paths/~1api~1v1~1generations~1{id}"
+
+  /api/v1/settings:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings"
+  /api/v1/settings/profile:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1profile"
+  /api/v1/settings/defaults:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1defaults"
+  /api/v1/settings/change-password:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1change-password"
+  /api/v1/settings/notifications:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1notifications"
+  /api/v1/settings/sessions/{id}:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1sessions~1{id}"
+  /api/v1/settings/api-key/rotate:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1api-key~1rotate"
+  /api/v1/settings/export:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1export"
+  /api/v1/settings/account:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1account"
+
+  /api/v1/billing:
+    $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing"
+  /api/v1/billing/checkout:
+    $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing~1checkout"
+  /api/v1/billing/addons:
+    $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing~1addons"
+  /api/v1/billing/cancel:
+    $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing~1cancel"
+  /api/v1/billing/webhook:
+    $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing~1webhook"
+
+  /api/v1/public/blog:
+    $ref: "./paths/blog.yaml#/paths/~1api~1v1~1public~1blog"
+  /api/v1/public/blog/{slug}:
+    $ref: "./paths/blog.yaml#/paths/~1api~1v1~1public~1blog~1{slug}"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: "Передавайте токен в заголовке Authorization: Bearer <token>."
+  schemas:
+    HealthResponse:
+      $ref: "./components/schemas/common.yaml#/schemas/HealthResponse"
+    StatusResponse:
+      $ref: "./components/schemas/common.yaml#/schemas/StatusResponse"
+    ErrorResponse:
+      $ref: "./components/schemas/common.yaml#/schemas/ErrorResponse"
+    ErrorDetail:
+      $ref: "./components/schemas/common.yaml#/schemas/ErrorDetail"
+
+    RegisterRequest:
+      $ref: "./components/schemas/auth.yaml#/schemas/RegisterRequest"
+    LoginRequest:
+      $ref: "./components/schemas/auth.yaml#/schemas/LoginRequest"
+    TelegramLoginRequest:
+      $ref: "./components/schemas/auth.yaml#/schemas/TelegramLoginRequest"
+    ForgotPasswordRequest:
+      $ref: "./components/schemas/auth.yaml#/schemas/ForgotPasswordRequest"
+    ResetPasswordRequest:
+      $ref: "./components/schemas/auth.yaml#/schemas/ResetPasswordRequest"
+    AuthUser:
+      $ref: "./components/schemas/auth.yaml#/schemas/AuthUser"
+    AuthSession:
+      $ref: "./components/schemas/auth.yaml#/schemas/AuthSession"
+    AuthResponse:
+      $ref: "./components/schemas/auth.yaml#/schemas/AuthResponse"
+    CurrentUserResponse:
+      $ref: "./components/schemas/auth.yaml#/schemas/CurrentUserResponse"
+
+    CreateProjectRequest:
+      $ref: "./components/schemas/projects.yaml#/schemas/CreateProjectRequest"
+    PatchProjectRequest:
+      $ref: "./components/schemas/projects.yaml#/schemas/PatchProjectRequest"
+    Project:
+      $ref: "./components/schemas/projects.yaml#/schemas/Project"
+    ProjectResponse:
+      $ref: "./components/schemas/projects.yaml#/schemas/ProjectResponse"
+    ProjectListResponse:
+      $ref: "./components/schemas/projects.yaml#/schemas/ProjectListResponse"
+
+    DashboardProject:
+      $ref: "./components/schemas/dashboard.yaml#/schemas/DashboardProject"
+    DashboardStat:
+      $ref: "./components/schemas/dashboard.yaml#/schemas/DashboardStat"
+    DashboardQuickStart:
+      $ref: "./components/schemas/dashboard.yaml#/schemas/DashboardQuickStart"
+    DashboardResponse:
+      $ref: "./components/schemas/dashboard.yaml#/schemas/DashboardResponse"
+
+    GenerateConfigResponse:
+      $ref: "./components/schemas/generation.yaml#/schemas/GenerateConfigResponse"
+    GenerateMarketplace:
+      $ref: "./components/schemas/generation.yaml#/schemas/GenerateMarketplace"
+    GenerateStyle:
+      $ref: "./components/schemas/generation.yaml#/schemas/GenerateStyle"
+    GenerateCardType:
+      $ref: "./components/schemas/generation.yaml#/schemas/GenerateCardType"
+    UploadImageResponse:
+      $ref: "./components/schemas/generation.yaml#/schemas/UploadImageResponse"
+    CreateGenerationRequest:
+      $ref: "./components/schemas/generation.yaml#/schemas/CreateGenerationRequest"
+    CreateGenerationResponse:
+      $ref: "./components/schemas/generation.yaml#/schemas/CreateGenerationResponse"
+    GenerationStatusResponse:
+      $ref: "./components/schemas/generation.yaml#/schemas/GenerationStatusResponse"
+    GeneratedCard:
+      $ref: "./components/schemas/generation.yaml#/schemas/GeneratedCard"
+
+    BillingResponse:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingResponse"
+    BillingSubscription:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingSubscription"
+    BillingUsage:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingUsage"
+    BillingPlan:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingPlan"
+    BillingPlanFeature:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingPlanFeature"
+    BillingAddon:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingAddon"
+    CreateCheckoutRequest:
+      $ref: "./components/schemas/billing.yaml#/schemas/CreateCheckoutRequest"
+    CreateCheckoutResponse:
+      $ref: "./components/schemas/billing.yaml#/schemas/CreateCheckoutResponse"
+    PurchaseAddonRequest:
+      $ref: "./components/schemas/billing.yaml#/schemas/PurchaseAddonRequest"
+    PurchaseAddonResponse:
+      $ref: "./components/schemas/billing.yaml#/schemas/PurchaseAddonResponse"
+    CancelSubscriptionResponse:
+      $ref: "./components/schemas/billing.yaml#/schemas/CancelSubscriptionResponse"
+    YooKassaWebhookEvent:
+      $ref: "./components/schemas/billing.yaml#/schemas/YooKassaWebhookEvent"
+    YooKassaPaymentObject:
+      $ref: "./components/schemas/billing.yaml#/schemas/YooKassaPaymentObject"
+
+    SettingsResponse:
+      $ref: "./components/schemas/settings.yaml#/schemas/SettingsResponse"
+    SettingsProfile:
+      $ref: "./components/schemas/settings.yaml#/schemas/SettingsProfile"
+    SettingsDefaults:
+      $ref: "./components/schemas/settings.yaml#/schemas/SettingsDefaults"
+    SettingsNotifications:
+      $ref: "./components/schemas/settings.yaml#/schemas/SettingsNotifications"
+    SettingsSession:
+      $ref: "./components/schemas/settings.yaml#/schemas/SettingsSession"
+    SettingsIntegration:
+      $ref: "./components/schemas/settings.yaml#/schemas/SettingsIntegration"
+    SettingsAPIKey:
+      $ref: "./components/schemas/settings.yaml#/schemas/SettingsAPIKey"
+    UpdateProfileRequest:
+      $ref: "./components/schemas/settings.yaml#/schemas/UpdateProfileRequest"
+    UpdateDefaultsRequest:
+      $ref: "./components/schemas/settings.yaml#/schemas/UpdateDefaultsRequest"
+    ChangePasswordRequest:
+      $ref: "./components/schemas/settings.yaml#/schemas/ChangePasswordRequest"
+    UpdateNotificationsRequest:
+      $ref: "./components/schemas/settings.yaml#/schemas/UpdateNotificationsRequest"
+    UpdateNotificationItem:
+      $ref: "./components/schemas/settings.yaml#/schemas/UpdateNotificationItem"
+    RotateAPIKeyResponse:
+      $ref: "./components/schemas/settings.yaml#/schemas/RotateAPIKeyResponse"
+    ExportDataResponse:
+      $ref: "./components/schemas/settings.yaml#/schemas/ExportDataResponse"
+    DeleteAccountRequest:
+      $ref: "./components/schemas/settings.yaml#/schemas/DeleteAccountRequest"
+
+    BlogListResponse:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogListResponse"
+    FeaturedBlogPost:
+      $ref: "./components/schemas/blog.yaml#/schemas/FeaturedBlogPost"
+    BlogListItem:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogListItem"
+    BlogCategory:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogCategory"
+    BlogSidebarPost:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogSidebarPost"
+    BlogTag:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogTag"
+    BlogPagination:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogPagination"
+    BlogPostResponse:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogPostResponse"
+    BlogPostDetail:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogPostDetail"
+    BlogArticleSection:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogArticleSection"
+    BlogSectionKind:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogSectionKind"
+    BlogSectionTable:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogSectionTable"
+    BlogSectionCallout:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogSectionCallout"
+    BlogSectionCard:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogSectionCard"
+    BlogSectionCardMetaRow:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogSectionCardMetaRow"
+    BlogSectionStep:
+      $ref: "./components/schemas/blog.yaml#/schemas/BlogSectionStep"
+    RelatedBlogPost:
+      $ref: "./components/schemas/blog.yaml#/schemas/RelatedBlogPost"

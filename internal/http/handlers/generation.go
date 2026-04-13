@@ -10,10 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 
-	"kartochki-online-backend/internal/auth"
+	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/generation"
-	"kartochki-online-backend/internal/http/authctx"
-	"kartochki-online-backend/internal/http/contracts"
 	"kartochki-online-backend/internal/http/requestctx"
 	"kartochki-online-backend/internal/http/response"
 )
@@ -44,13 +42,13 @@ func NewGenerationHandler(service generationService, logger zerolog.Logger) Gene
 
 // GetConfig возвращает справочные данные для формы запуска генерации.
 func (h GenerationHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
-	if _, ok := h.currentUser(w, r); !ok {
+	if _, ok := currentUserFromCtx(w, r); !ok {
 		return
 	}
 
 	cfg := h.service.GetConfig(r.Context())
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.GenerateConfigResponse{
+	response.WriteJSON(w, r, http.StatusOK, openapi.GenerateConfigResponse{
 		Marketplaces:     toGenerateMarketplaces(cfg.Marketplaces),
 		Styles:           toGenerateStyles(cfg.Styles),
 		CardTypes:        toGenerateCardTypes(cfg.CardTypes),
@@ -60,7 +58,7 @@ func (h GenerationHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 // UploadImage принимает multipart upload исходного изображения и сохраняет его как source asset.
 func (h GenerationHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
@@ -103,20 +101,20 @@ func (h GenerationHandler) UploadImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusCreated, contracts.UploadImageResponse{
-		AssetID:    uploadedAsset.AssetID,
-		PreviewURL: uploadedAsset.PreviewURL,
+	response.WriteJSON(w, r, http.StatusCreated, openapi.UploadImageResponse{
+		AssetId:    mustParseUUID(uploadedAsset.AssetID),
+		PreviewUrl: uploadedAsset.PreviewURL,
 	})
 }
 
 // CreateGeneration создаёт проект и ставит запуск генерации в очередь.
 func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
 
-	var req contracts.CreateGenerationRequest
+	var req openapi.CreateGenerationRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -129,40 +127,40 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 
 	result, err := h.service.Create(r.Context(), generation.CreateInput{
 		UserID:        user.ID,
-		ProjectName:   req.ProjectName,
-		MarketplaceID: req.MarketplaceID,
-		StyleID:       req.StyleID,
-		CardTypeIDs:   req.CardTypeIDs,
+		ProjectName:   stringOrEmpty(req.ProjectName),
+		MarketplaceID: req.MarketplaceId,
+		StyleID:       req.StyleId,
+		CardTypeIDs:   req.CardTypeIds,
 		CardCount:     req.CardCount,
-		SourceAssetID: req.SourceAssetID,
+		SourceAssetID: req.SourceAssetId.String(),
 	})
 	if err != nil {
 		switch {
 		case errors.Is(err, generation.ErrSourceAssetNotFound):
 			response.WriteError(w, r, http.StatusNotFound, "source_asset_not_found", "source image not found")
 		case errors.Is(err, generation.ErrInvalidMarketplace):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "marketplace_id",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("marketplace_id"),
 				Message: "unknown marketplace",
 			})
 		case errors.Is(err, generation.ErrInvalidStyle):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "style_id",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("style_id"),
 				Message: "unknown style",
 			})
 		case errors.Is(err, generation.ErrInvalidCardType):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "card_type_ids",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("card_type_ids"),
 				Message: "one or more card types are invalid",
 			})
 		case errors.Is(err, generation.ErrInvalidCardCount):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "card_count",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("card_count"),
 				Message: "unsupported card count",
 			})
 		case errors.Is(err, generation.ErrProjectNameTooLong):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "project_name",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("project_name"),
 				Message: "must be at most 200 characters",
 			})
 		case errors.Is(err, generation.ErrQuotaExceeded):
@@ -175,15 +173,15 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusAccepted, contracts.CreateGenerationResponse{
-		GenerationID: result.GenerationID,
-		Status:       result.Status,
+	response.WriteJSON(w, r, http.StatusAccepted, openapi.CreateGenerationResponse{
+		GenerationId: mustParseUUID(result.GenerationID),
+		Status:       openapi.CreateGenerationResponseStatusQueued,
 	})
 }
 
 // GetGenerationStatus возвращает текущий статус generation job и итоговые карточки после завершения.
 func (h GenerationHandler) GetGenerationStatus(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
@@ -202,47 +200,40 @@ func (h GenerationHandler) GetGenerationStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.GenerationStatusResponse{
-		GenerationID:       result.GenerationID,
-		Status:             result.Status,
-		CurrentStep:        result.CurrentStep,
-		ProgressPercent:    result.ProgressPercent,
-		ErrorMessage:       result.ErrorMessage,
-		ArchiveDownloadURL: result.ArchiveDownloadURL,
-		ResultCards:        toGeneratedCards(result.ResultCards),
-	})
+	response.WriteJSON(w, r, http.StatusOK, toGenerationStatusResponse(result))
 }
 
-func validateCreateGenerationRequest(req contracts.CreateGenerationRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateCreateGenerationRequest(req openapi.CreateGenerationRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
-	if len(strings.TrimSpace(req.ProjectName)) > 200 {
-		details = append(details, contracts.ErrorDetail{Field: "project_name", Message: "must be at most 200 characters"})
+	if len(strings.TrimSpace(stringOrEmpty(req.ProjectName))) > 200 {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("project_name"), Message: "must be at most 200 characters"})
 	}
-	if strings.TrimSpace(req.MarketplaceID) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "marketplace_id", Message: "field is required"})
+	if strings.TrimSpace(req.MarketplaceId) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("marketplace_id"), Message: "field is required"})
 	}
-	if strings.TrimSpace(req.StyleID) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "style_id", Message: "field is required"})
+	if strings.TrimSpace(req.StyleId) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("style_id"), Message: "field is required"})
 	}
-	if len(req.CardTypeIDs) == 0 {
-		details = append(details, contracts.ErrorDetail{Field: "card_type_ids", Message: "at least one card type is required"})
+	if len(req.CardTypeIds) == 0 {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("card_type_ids"), Message: "at least one card type is required"})
 	}
 	if req.CardCount <= 0 {
-		details = append(details, contracts.ErrorDetail{Field: "card_count", Message: "must be greater than zero"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("card_count"), Message: "must be greater than zero"})
 	}
-	if strings.TrimSpace(req.SourceAssetID) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "source_asset_id", Message: "field is required"})
+	// SourceAssetId — типизированный UUID, нулевой UUID (00000000-...) означает что поле не передано.
+	if req.SourceAssetId == [16]byte{} {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("source_asset_id"), Message: "field is required"})
 	}
 
 	return details
 }
 
-func toGenerateMarketplaces(items []generation.CatalogOption) []contracts.GenerateMarketplace {
-	result := make([]contracts.GenerateMarketplace, len(items))
+func toGenerateMarketplaces(items []generation.CatalogOption) []openapi.GenerateMarketplace {
+	result := make([]openapi.GenerateMarketplace, len(items))
 	for i, item := range items {
-		result[i] = contracts.GenerateMarketplace{
-			ID:    item.ID,
+		result[i] = openapi.GenerateMarketplace{
+			Id:    item.ID,
 			Label: item.Label,
 		}
 	}
@@ -250,11 +241,11 @@ func toGenerateMarketplaces(items []generation.CatalogOption) []contracts.Genera
 	return result
 }
 
-func toGenerateStyles(items []generation.CatalogOption) []contracts.GenerateStyle {
-	result := make([]contracts.GenerateStyle, len(items))
+func toGenerateStyles(items []generation.CatalogOption) []openapi.GenerateStyle {
+	result := make([]openapi.GenerateStyle, len(items))
 	for i, item := range items {
-		result[i] = contracts.GenerateStyle{
-			ID:    item.ID,
+		result[i] = openapi.GenerateStyle{
+			Id:    item.ID,
 			Label: item.Label,
 		}
 	}
@@ -262,41 +253,60 @@ func toGenerateStyles(items []generation.CatalogOption) []contracts.GenerateStyl
 	return result
 }
 
-func toGenerateCardTypes(items []generation.CardTypeOption) []contracts.GenerateCardType {
-	result := make([]contracts.GenerateCardType, len(items))
+func toGenerateCardTypes(items []generation.CardTypeOption) []openapi.GenerateCardType {
+	result := make([]openapi.GenerateCardType, len(items))
 	for i, item := range items {
-		result[i] = contracts.GenerateCardType{
-			ID:              item.ID,
-			Label:           item.Label,
-			DefaultSelected: item.DefaultSelected,
+		ct := openapi.GenerateCardType{
+			Id:    item.ID,
+			Label: item.Label,
+		}
+		if item.DefaultSelected {
+			ct.DefaultSelected = &item.DefaultSelected
+		}
+		result[i] = ct
+	}
+
+	return result
+}
+
+func toGeneratedCards(items []generation.GeneratedCard) []openapi.GeneratedCard {
+	result := make([]openapi.GeneratedCard, len(items))
+	for i, item := range items {
+		result[i] = openapi.GeneratedCard{
+			Id:         mustParseUUID(item.ID),
+			CardTypeId: item.CardTypeID,
+			AssetId:    mustParseUUID(item.AssetID),
+			PreviewUrl: item.PreviewURL,
 		}
 	}
 
 	return result
 }
 
-func toGeneratedCards(items []generation.GeneratedCard) []contracts.GeneratedCard {
-	result := make([]contracts.GeneratedCard, len(items))
-	for i, item := range items {
-		result[i] = contracts.GeneratedCard{
-			ID:         item.ID,
-			CardTypeID: item.CardTypeID,
-			AssetID:    item.AssetID,
-			PreviewURL: item.PreviewURL,
-		}
+// toGenerationStatusResponse конвертирует доменный Status в openapi.GenerationStatusResponse.
+// Опциональные поля передаются как указатели — nil сериализуется с omitempty.
+func toGenerationStatusResponse(result generation.Status) openapi.GenerationStatusResponse {
+	resp := openapi.GenerationStatusResponse{
+		GenerationId: mustParseUUID(result.GenerationID),
+		Status:       openapi.GenerationStatusResponseStatus(result.Status),
 	}
-
-	return result
-}
-
-func (h GenerationHandler) currentUser(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
-	user, ok := authctx.User(r.Context())
-	if !ok {
-		response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "authorization token is invalid")
-		return auth.User{}, false
+	if result.CurrentStep != "" {
+		resp.CurrentStep = &result.CurrentStep
 	}
-
-	return user, true
+	if result.ProgressPercent > 0 {
+		resp.ProgressPercent = &result.ProgressPercent
+	}
+	if result.ErrorMessage != "" {
+		resp.ErrorMessage = &result.ErrorMessage
+	}
+	if result.ArchiveDownloadURL != "" {
+		resp.ArchiveDownloadUrl = &result.ArchiveDownloadURL
+	}
+	if len(result.ResultCards) > 0 {
+		cards := toGeneratedCards(result.ResultCards)
+		resp.ResultCards = &cards
+	}
+	return resp
 }
 
 func (h GenerationHandler) requestLogger(r *http.Request) zerolog.Logger {

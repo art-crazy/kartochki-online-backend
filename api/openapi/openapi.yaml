@@ -3,70 +3,64 @@ info:
   title: kartochki.online API
   version: 0.1.0
   description: |
-    РџСѓР±Р»РёС‡РЅС‹Р№ API СЃРµСЂРІРёСЃР° kartochki.online.
+    Публичный API сервиса kartochki.online.
 
-    Р­С‚Р° СЃРїРµС†РёС„РёРєР°С†РёСЏ СЏРІР»СЏРµС‚СЃСЏ РёСЃС‚РѕС‡РЅРёРєРѕРј РїСЂР°РІРґС‹ РґР»СЏ Р°РІС‚РѕРіРµРЅРµСЂР°С†РёРё frontend-РєР»РёРµРЅС‚Р°.
-    Р РµР°Р»РёР·Р°С†РёСЏ backend Рё СЌС‚РѕС‚ С„Р°Р№Р» РґРѕР»Р¶РЅС‹ РѕСЃС‚Р°РІР°С‚СЊСЃСЏ СЃРёРЅС…СЂРѕРЅРЅС‹РјРё.
+    Эта спецификация является источником правды для автогенерации frontend-клиента.
+    Реализация backend и этот файл должны оставаться синхронными.
 servers:
   - url: http://localhost:8080
 paths:
-  # Infrastructure endpoints stay outside /api/v1 because deployment tooling
-  # and local checks often call them directly without user auth.
   /health/live:
     get:
-      summary: РџСЂРѕРІРµСЂРєР°, С‡С‚Рѕ HTTP-РїСЂРѕС†РµСЃСЃ Р·Р°РїСѓС‰РµРЅ
+      summary: Проверка, что HTTP-процесс запущен
       operationId: getLiveHealth
       tags:
         - Health
       responses:
-        "200":
-          description: РЎРµСЂРІРёСЃ Р·Р°РїСѓС‰РµРЅ Рё РѕС‚РІРµС‡Р°РµС‚ РЅР° HTTP-Р·Р°РїСЂРѕСЃС‹
+        '200':
+          description: Сервис запущен и отвечает на HTTP-запросы
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
+                $ref: '#/components/schemas/HealthResponse'
   /health/ready:
     get:
-      summary: РџСЂРѕРІРµСЂРєР° РіРѕС‚РѕРІРЅРѕСЃС‚Рё Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№
+      summary: Проверка готовности зависимостей
       operationId: getReadyHealth
       tags:
         - Health
       responses:
-        "200":
-          description: Р‘Р°Р·Р° РґР°РЅРЅС‹С… Рё РѕСЃС‚Р°Р»СЊРЅС‹Рµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РґРѕСЃС‚СѓРїРЅС‹
+        '200':
+          description: База данных и остальные обязательные зависимости доступны
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
-        "503":
-          description: РћРґРЅР° РёР»Рё РЅРµСЃРєРѕР»СЊРєРѕ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹С… Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№ РЅРµРґРѕСЃС‚СѓРїРЅС‹
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Одна или несколько обязательных зависимостей недоступны
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
-
-  # Auth endpoints below define the first real frontend-facing contract.
-  # OAuth routes are intentionally documented now so frontend and backend
-  # converge on stable URLs before provider integration starts.
+                $ref: '#/components/schemas/HealthResponse'
   /api/v1/auth/register:
     post:
-      summary: Р РµРіРёСЃС‚СЂР°С†РёСЏ РїРѕ email Рё РїР°СЂРѕР»СЋ
-      description: РЎРѕР·РґР°С‘С‚ РЅРѕРІРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё СЃСЂР°Р·Сѓ РѕС‚РєСЂС‹РІР°РµС‚ РїРµСЂРІСѓСЋ СЃРµСЃСЃРёСЋ.
+      summary: Регистрация по email и паролю
+      description: Создаёт нового пользователя и сразу открывает первую сессию.
       operationId: registerAuthUser
       tags:
         - Auth
@@ -75,45 +69,45 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterRequest"
+              $ref: '#/components/schemas/RegisterRequest'
       responses:
-        "201":
-          description: РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃРѕР·РґР°РЅ Рё СЃСЂР°Р·Сѓ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ
+        '201':
+          description: Пользователь создан и сразу авторизован
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РІС…РѕРґРЅС‹С… РґР°РЅРЅС‹С…
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Ошибка валидации входных данных
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СЃ С‚Р°РєРёРј email СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Пользователь с таким email уже существует
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/login:
     post:
-      summary: Р’С…РѕРґ РїРѕ email Рё РїР°СЂРѕР»СЋ
-      description: РџСЂРѕРІРµСЂСЏРµС‚ СѓС‡С‘С‚РЅС‹Рµ РґР°РЅРЅС‹Рµ Рё СЃРѕР·РґР°С‘С‚ РЅРѕРІСѓСЋ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєСѓСЋ СЃРµСЃСЃРёСЋ.
+      summary: Вход по email и паролю
+      description: Проверяет учётные данные и создаёт новую пользовательскую сессию.
       operationId: loginAuthUser
       tags:
         - Auth
@@ -122,56 +116,56 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginRequest"
+              $ref: '#/components/schemas/LoginRequest'
       responses:
-        "200":
-          description: РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓСЃРїРµС€РЅРѕ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ
+        '200':
+          description: Пользователь успешно авторизован
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РІС…РѕРґРЅС‹С… РґР°РЅРЅС‹С…
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Ошибка валидации входных данных
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РќРµРІРµСЂРЅС‹Р№ email РёР»Рё РїР°СЂРѕР»СЊ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неверный email или пароль
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/telegram/login:
     post:
-      summary: Р’С…РѕРґ С‡РµСЂРµР· Telegram
+      summary: Вход через Telegram
       description: |
-        Р—Р°РІРµСЂС€Р°РµС‚ РІС…РѕРґ С‡РµСЂРµР· Telegram Login Widget.
+        Завершает вход через Telegram Login Widget.
 
-        Frontend СЃРЅР°С‡Р°Р»Р° РїРѕРєР°Р·С‹РІР°РµС‚ РѕС„РёС†РёР°Р»СЊРЅС‹Р№ Telegram Login Widget. РџРѕСЃР»Рµ СѓСЃРїРµС€РЅРѕРіРѕ РІС…РѕРґР°
-        Telegram РІРѕР·РІСЂР°С‰Р°РµС‚ РЅР°Р±РѕСЂ РїРѕРґРїРёСЃР°РЅРЅС‹С… РїРѕР»РµР№: `id`, `first_name`, `last_name`,
+        Frontend сначала показывает официальный Telegram Login Widget. После успешного входа
+        Telegram возвращает набор подписанных полей: `id`, `first_name`, `last_name`,
         `username`, `photo_url`, `auth_date`, `hash`.
 
-        Frontend РґРѕР»Р¶РµРЅ РѕС‚РїСЂР°РІРёС‚СЊ СЌС‚Рё РїРѕР»СЏ РЅР° backend Р±РµР· РёР·РјРµРЅРµРЅРёР№. Backend РїСЂРѕРІРµСЂСЏРµС‚ РїРѕРґРїРёСЃСЊ
-        РїРѕ С‚РѕРєРµРЅСѓ Telegram-Р±РѕС‚Р°, СѓР±РµР¶РґР°РµС‚СЃСЏ С‡С‚Рѕ РґР°РЅРЅС‹Рµ РµС‰С‘ РЅРµ СѓСЃС‚Р°СЂРµР»Рё, Р° Р·Р°С‚РµРј РЅР°С…РѕРґРёС‚
-        РёР»Рё СЃРѕР·РґР°С‘С‚ Р»РѕРєР°Р»СЊРЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё РѕС‚РєСЂС‹РІР°РµС‚ РѕР±С‹С‡РЅСѓСЋ Р»РѕРєР°Р»СЊРЅСѓСЋ СЃРµСЃСЃРёСЋ.
+        Frontend должен отправить эти поля на backend без изменений. Backend проверяет подпись
+        по токену Telegram-бота, убеждается что данные ещё не устарели, а затем находит
+        или создаёт локального пользователя и открывает обычную локальную сессию.
 
-        РЈ Telegram РјРѕР¶РµС‚ РЅРµ Р±С‹С‚СЊ email. РџРѕСЌС‚РѕРјСѓ РІ РѕС‚РІРµС‚Рµ РїРѕР»Рµ `user.email` РјРѕР¶РµС‚ РѕС‚СЃСѓС‚СЃС‚РІРѕРІР°С‚СЊ.
+        У Telegram может не быть email. Поэтому в ответе поле `user.email` может отсутствовать.
       operationId: loginWithTelegram
       tags:
         - Auth
@@ -180,116 +174,116 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TelegramLoginRequest"
+              $ref: '#/components/schemas/TelegramLoginRequest'
       responses:
-        "200":
-          description: Р’С…РѕРґ С‡РµСЂРµР· Telegram Р·Р°РІРµСЂС€С‘РЅ, Р»РѕРєР°Р»СЊРЅР°СЏ СЃРµСЃСЃРёСЏ СЃРѕР·РґР°РЅР°
+        '200':
+          description: Вход через Telegram завершён, локальная сессия создана
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "400":
-          description: РџРѕРґРїРёСЃР°РЅРЅС‹Рµ РґР°РЅРЅС‹Рµ Telegram РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚, РёСЃРїРѕСЂС‡РµРЅС‹ РёР»Рё СѓСЃС‚Р°СЂРµР»Рё
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Подписанные данные Telegram отсутствуют, испорчены или устарели
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "501":
-          description: Р’С…РѕРґ С‡РµСЂРµР· Telegram РїРѕРєР° РЅРµ РЅР°СЃС‚СЂРѕРµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Вход через Telegram пока не настроен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/logout:
     post:
-      summary: Р’С‹С…РѕРґ РёР· С‚РµРєСѓС‰РµР№ СЃРµСЃСЃРёРё
-      description: РћС‚Р·С‹РІР°РµС‚ С‚РµРєСѓС‰РёР№ Bearer-С‚РѕРєРµРЅ Рё Р·Р°РІРµСЂС€Р°РµС‚ Р°РєС‚РёРІРЅСѓСЋ СЃРµСЃСЃРёСЋ.
+      summary: Выход из текущей сессии
+      description: Отзывает текущий Bearer-токен и завершает активную сессию.
       operationId: logoutAuthUser
       tags:
         - Auth
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: РўРµРєСѓС‰Р°СЏ СЃРµСЃСЃРёСЏ Р·Р°РІРµСЂС€РµРЅР°
+        '200':
+          description: Текущая сессия завершена
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/StatusResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/me:
     get:
-      summary: РџРѕР»СѓС‡РёС‚СЊ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
-      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РёР· С‚РµРєСѓС‰РµР№ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅРѕР№ СЃРµСЃСЃРёРё.
+      summary: Получить текущего пользователя
+      description: Возвращает данные пользователя из текущей авторизованной сессии.
       operationId: getCurrentUser
       tags:
         - Auth
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: Р”Р°РЅРЅС‹Рµ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        '200':
+          description: Данные текущего пользователя
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CurrentUserResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/forgot-password:
     post:
-      summary: Р—Р°РїСЂРѕСЃРёС‚СЊ СЃР±СЂРѕСЃ РїР°СЂРѕР»СЏ
+      summary: Запросить сброс пароля
       description: |
-        РћС‚РїСЂР°РІР»СЏРµС‚ РїРёСЃСЊРјРѕ СЃРѕ СЃСЃС‹Р»РєРѕР№ РґР»СЏ СЃР±СЂРѕСЃР° РїР°СЂРѕР»СЏ РЅР° СѓРєР°Р·Р°РЅРЅС‹Р№ email.
+        Отправляет письмо со ссылкой для сброса пароля на указанный email.
 
-        РћС‚РІРµС‚ РІСЃРµРіРґР° `200` РЅРµР·Р°РІРёСЃРёРјРѕ РѕС‚ С‚РѕРіРѕ, РЅР°Р№РґРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РёР»Рё РЅРµС‚.
-        Р­С‚Рѕ СЃРґРµР»Р°РЅРѕ РЅР°РјРµСЂРµРЅРЅРѕ, С‡С‚РѕР±С‹ РЅРµ СЂР°СЃРєСЂС‹РІР°С‚СЊ С„Р°РєС‚ СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёСЏ Р°РєРєР°СѓРЅС‚Р° РїРѕ email.
+        Ответ всегда `200` независимо от того, найден пользователь или нет.
+        Это сделано намеренно, чтобы не раскрывать факт существования аккаунта по email.
 
-        Р’СЃРµ РїСЂРµРґС‹РґСѓС‰РёРµ Р°РєС‚РёРІРЅС‹Рµ С‚РѕРєРµРЅС‹ СЃР±СЂРѕСЃР° РґР»СЏ СЌС‚РѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РёРЅРІР°Р»РёРґРёСЂСѓСЋС‚СЃСЏ вЂ”
-        РІ РєР°Р¶РґС‹Р№ РјРѕРјРµРЅС‚ РІСЂРµРјРµРЅРё РґРµР№СЃС‚РІСѓРµС‚ С‚РѕР»СЊРєРѕ РѕРґРёРЅ С‚РѕРєРµРЅ.
+        Все предыдущие активные токены сброса для этого пользователя инвалидируются —
+        в каждый момент времени действует только один токен.
       operationId: forgotPassword
       tags:
         - Auth
@@ -298,38 +292,38 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ForgotPasswordRequest"
+              $ref: '#/components/schemas/ForgotPasswordRequest'
       responses:
-        "200":
-          description: Р—Р°РїСЂРѕСЃ РїСЂРёРЅСЏС‚. Р•СЃР»Рё Р°РєРєР°СѓРЅС‚ РЅР°Р№РґРµРЅ вЂ” РїРёСЃСЊРјРѕ Р±СѓРґРµС‚ РѕС‚РїСЂР°РІР»РµРЅРѕ.
+        '200':
+          description: Запрос принят. Если аккаунт найден — письмо будет отправлено.
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РІС…РѕРґРЅС‹С… РґР°РЅРЅС‹С…
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Ошибка валидации входных данных
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/reset-password:
     post:
-      summary: РЈСЃС‚Р°РЅРѕРІРёС‚СЊ РЅРѕРІС‹Р№ РїР°СЂРѕР»СЊ РїРѕ С‚РѕРєРµРЅСѓ РёР· РїРёСЃСЊРјР°
+      summary: Установить новый пароль по токену из письма
       description: |
-        РџСЂРѕРІРµСЂСЏРµС‚ РѕРґРЅРѕСЂР°Р·РѕРІС‹Р№ С‚РѕРєРµРЅ РёР· РїРёСЃСЊРјР° Рё СѓСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ РЅРѕРІС‹Р№ РїР°СЂРѕР»СЊ.
+        Проверяет одноразовый токен из письма и устанавливает новый пароль.
 
-        РўРѕРєРµРЅ РґРµР№СЃС‚РІРёС‚РµР»РµРЅ РѕРґРЅРѕРєСЂР°С‚РЅРѕ Рё С‚РѕР»СЊРєРѕ РІ С‚РµС‡РµРЅРёРµ СЃСЂРѕРєР° Р¶РёР·РЅРё, Р·Р°РґР°РЅРЅРѕРіРѕ РЅР° backend.
-        РџРѕСЃР»Рµ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ С‚РѕРєРµРЅ РїРѕРјРµС‡Р°РµС‚СЃСЏ Рё РїРѕРІС‚РѕСЂРЅС‹Р№ Р·Р°РїСЂРѕСЃ СЃ С‚РµРј Р¶Рµ С‚РѕРєРµРЅРѕРј РІРµСЂРЅС‘С‚ РѕС€РёР±РєСѓ.
+        Токен действителен однократно и только в течение срока жизни, заданного на backend.
+        После использования токен помечается и повторный запрос с тем же токеном вернёт ошибку.
       operationId: resetPassword
       tags:
         - Auth
@@ -338,90 +332,90 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ResetPasswordRequest"
+              $ref: '#/components/schemas/ResetPasswordRequest'
       responses:
-        "200":
-          description: РџР°СЂРѕР»СЊ СѓСЃРїРµС€РЅРѕ РёР·РјРµРЅС‘РЅ
+        '200':
+          description: Пароль успешно изменён
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "400":
-          description: РўРѕРєРµРЅ РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ, РёСЃС‚С‘Рє РёР»Рё СѓР¶Рµ Р±С‹Р» РёСЃРїРѕР»СЊР·РѕРІР°РЅ; Р»РёР±Рѕ РїР°СЂРѕР»СЊ РЅРµ РїСЂРѕС€С‘Р» РІР°Р»РёРґР°С†РёСЋ
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Токен недействителен, истёк или уже был использован; либо пароль не прошёл валидацию
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/vk/start:
     get:
-      summary: РќР°С‡Р°С‚СЊ РІС…РѕРґ С‡РµСЂРµР· VK
+      summary: Начать вход через VK
       description: |
-        РџРµСЂРІС‹Р№ С€Р°Рі РІС…РѕРґР° С‡РµСЂРµР· VK ID.
+        Первый шаг входа через VK ID.
 
-        Frontend РѕС‚РєСЂС‹РІР°РµС‚ СЌС‚РѕС‚ endpoint, РєРѕРіРґР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅР°Р¶РёРјР°РµС‚ РєРЅРѕРїРєСѓ
-        "Р’РѕР№С‚Рё С‡РµСЂРµР· VK". Backend РїРѕРґРіРѕС‚Р°РІР»РёРІР°РµС‚ OAuth-Р·Р°РїСЂРѕСЃ, СЃРѕС…СЂР°РЅСЏРµС‚
-        РѕРґРЅРѕСЂР°Р·РѕРІС‹Р№ `state` Рё РїРµСЂРµРЅР°РїСЂР°РІР»СЏРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° СЃС‚СЂР°РЅРёС†Сѓ VK ID.
+        Frontend открывает этот endpoint, когда пользователь нажимает кнопку
+        "Войти через VK". Backend подготавливает OAuth-запрос, сохраняет
+        одноразовый `state` и перенаправляет пользователя на страницу VK ID.
 
-        Р­С‚РѕС‚ endpoint РЅРµ Р»РѕРіРёРЅРёС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃР°Рј РїРѕ СЃРµР±Рµ.
-        Р•РіРѕ Р·Р°РґР°С‡Р° С‚РѕР»СЊРєРѕ РЅР°С‡Р°С‚СЊ РІРЅРµС€РЅРёР№ OAuth-flow Рё РѕС‚РїСЂР°РІРёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рє РїСЂРѕРІР°Р№РґРµСЂСѓ.
+        Этот endpoint не логинит пользователя сам по себе.
+        Его задача только начать внешний OAuth-flow и отправить пользователя к провайдеру.
       operationId: startVkOAuth
       tags:
         - Auth
       responses:
-        "302":
-          description: Backend РїРµСЂРµРЅР°РїСЂР°РІРёР» РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° СЃС‚СЂР°РЅРёС†Сѓ VK ID РґР»СЏ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ РІС…РѕРґР°
+        '302':
+          description: Backend перенаправил пользователя на страницу VK ID для подтверждения входа
           headers:
             Location:
-              description: URL СЃС‚СЂР°РЅРёС†С‹ VK ID, РєСѓРґР° РЅСѓР¶РЅРѕ РїРµСЂРµР№С‚Рё РґР»СЏ РїСЂРѕРґРѕР»Р¶РµРЅРёСЏ РІС…РѕРґР°.
+              description: URL страницы VK ID, куда нужно перейти для продолжения входа.
               schema:
                 type: string
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
-        "500":
-          description: РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°С‡Р°С‚СЊ OAuth-flow РёР·-Р·Р° РІРЅСѓС‚СЂРµРЅРЅРµР№ РѕС€РёР±РєРё backend
+        '500':
+          description: Не удалось начать OAuth-flow из-за внутренней ошибки backend
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "501":
-          description: Р’С…РѕРґ С‡РµСЂРµР· VK РїРѕРєР° РЅРµ РЅР°СЃС‚СЂРѕРµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Вход через VK пока не настроен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/vk/callback:
     get:
-      summary: Р—Р°РІРµСЂС€РёС‚СЊ РІС…РѕРґ С‡РµСЂРµР· VK
+      summary: Завершить вход через VK
       description: |
-        Р’С‚РѕСЂРѕР№ С€Р°Рі РІС…РѕРґР° С‡РµСЂРµР· VK ID.
+        Второй шаг входа через VK ID.
 
-        РЎСЋРґР° VK ID РІРµСЂРЅС‘С‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕСЃР»Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ РІС…РѕРґР°.
-        РћР±С‹С‡РЅРѕ frontend РЅРµ РІС‹Р·С‹РІР°РµС‚ СЌС‚РѕС‚ endpoint РІСЂСѓС‡РЅСѓСЋ.
+        Сюда VK ID вернёт пользователя после подтверждения входа.
+        Обычно frontend не вызывает этот endpoint вручную.
 
-        Backend РїСЂРѕРІРµСЂСЏРµС‚ `state`, РїРѕР»СѓС‡Р°РµС‚ РїСЂРѕС„РёР»СЊ VK ID, РЅР°С…РѕРґРёС‚ РёР»Рё СЃРѕР·РґР°С‘С‚
-        Р»РѕРєР°Р»СЊРЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё Р·Р°С‚РµРј РѕС‚РєСЂС‹РІР°РµС‚ РѕР±С‹С‡РЅСѓСЋ Р»РѕРєР°Р»СЊРЅСѓСЋ СЃРµСЃСЃРёСЋ backend.
+        Backend проверяет `state`, получает профиль VK ID, находит или создаёт
+        локального пользователя и затем открывает обычную локальную сессию backend.
       operationId: finishVkOAuth
       tags:
         - Auth
@@ -429,115 +423,115 @@ paths:
         - in: query
           name: code
           required: true
-          description: Р’СЂРµРјРµРЅРЅС‹Р№ РєРѕРґ Р°РІС‚РѕСЂРёР·Р°С†РёРё, РєРѕС‚РѕСЂС‹Р№ VK ID РІС‹РґР°С‘С‚ backend РїРѕСЃР»Рµ СѓСЃРїРµС€РЅРѕРіРѕ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ РІС…РѕРґР°.
+          description: Временный код авторизации, который VK ID выдаёт backend после успешного подтверждения входа.
           schema:
             type: string
         - in: query
           name: state
           required: true
-          description: Р—Р°С‰РёС‚РЅС‹Р№ РїР°СЂР°РјРµС‚СЂ, РєРѕС‚РѕСЂС‹Р№ РїРѕРјРѕРіР°РµС‚ СѓР±РµРґРёС‚СЊСЃСЏ, С‡С‚Рѕ callback РѕС‚РЅРѕСЃРёС‚СЃСЏ Рє РЅР°С€РµРјСѓ OAuth-Р·Р°РїСЂРѕСЃСѓ.
+          description: Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
           schema:
             type: string
       responses:
-        "200":
-          description: Р’С…РѕРґ С‡РµСЂРµР· VK Р·Р°РІРµСЂС€С‘РЅ, Р»РѕРєР°Р»СЊРЅР°СЏ СЃРµСЃСЃРёСЏ СЃРѕР·РґР°РЅР°
+        '200':
+          description: Вход через VK завершён, локальная сессия создана
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "400":
-          description: РџР°СЂР°РјРµС‚СЂС‹ `code` РёР»Рё `state` РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚, РёСЃС‚РµРєР»Рё РёР»Рё РЅРµ РїСЂРѕС€Р»Рё РїСЂРѕРІРµСЂРєСѓ
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Параметры `code` или `state` отсутствуют, истекли или не прошли проверку
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РІРµСЂС€РёС‚СЊ OAuth-flow РёР·-Р·Р° РІРЅСѓС‚СЂРµРЅРЅРµР№ РѕС€РёР±РєРё backend
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Не удалось завершить OAuth-flow из-за внутренней ошибки backend
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "501":
-          description: Р’С…РѕРґ С‡РµСЂРµР· VK РїРѕРєР° РЅРµ РЅР°СЃС‚СЂРѕРµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Вход через VK пока не настроен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/yandex/start:
     get:
-      summary: РќР°С‡Р°С‚СЊ РІС…РѕРґ С‡РµСЂРµР· РЇРЅРґРµРєСЃ
+      summary: Начать вход через Яндекс
       description: |
-        РџРµСЂРІС‹Р№ С€Р°Рі РІС…РѕРґР° С‡РµСЂРµР· РЇРЅРґРµРєСЃ ID.
+        Первый шаг входа через Яндекс ID.
 
-        Frontend РѕС‚РєСЂС‹РІР°РµС‚ СЌС‚РѕС‚ endpoint, РєРѕРіРґР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅР°Р¶РёРјР°РµС‚ РєРЅРѕРїРєСѓ
-        "Р’РѕР№С‚Рё С‡РµСЂРµР· РЇРЅРґРµРєСЃ". Backend РїРѕРґРіРѕС‚Р°РІР»РёРІР°РµС‚ OAuth-Р·Р°РїСЂРѕСЃ, СЃРѕС…СЂР°РЅСЏРµС‚
-        РѕРґРЅРѕСЂР°Р·РѕРІС‹Р№ `state` Рё РїРµСЂРµРЅР°РїСЂР°РІР»СЏРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° СЃС‚СЂР°РЅРёС†Сѓ РЇРЅРґРµРєСЃР°.
+        Frontend открывает этот endpoint, когда пользователь нажимает кнопку
+        "Войти через Яндекс". Backend подготавливает OAuth-запрос, сохраняет
+        одноразовый `state` и перенаправляет пользователя на страницу Яндекса.
       operationId: startYandexOAuth
       tags:
         - Auth
       responses:
-        "302":
-          description: Backend РїРµСЂРµРЅР°РїСЂР°РІРёР» РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° СЃС‚СЂР°РЅРёС†Сѓ РЇРЅРґРµРєСЃР° РґР»СЏ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ РІС…РѕРґР°
+        '302':
+          description: Backend перенаправил пользователя на страницу Яндекса для подтверждения входа
           headers:
             Location:
-              description: URL СЃС‚СЂР°РЅРёС†С‹ РЇРЅРґРµРєСЃР°, РєСѓРґР° РЅСѓР¶РЅРѕ РїРµСЂРµР№С‚Рё РґР»СЏ РїСЂРѕРґРѕР»Р¶РµРЅРёСЏ РІС…РѕРґР°.
+              description: URL страницы Яндекса, куда нужно перейти для продолжения входа.
               schema:
                 type: string
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
-        "500":
-          description: РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°С‡Р°С‚СЊ OAuth-flow РёР·-Р·Р° РІРЅСѓС‚СЂРµРЅРЅРµР№ РѕС€РёР±РєРё backend
+        '500':
+          description: Не удалось начать OAuth-flow из-за внутренней ошибки backend
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "501":
-          description: Р’С…РѕРґ С‡РµСЂРµР· РЇРЅРґРµРєСЃ РїРѕРєР° РЅРµ РЅР°СЃС‚СЂРѕРµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Вход через Яндекс пока не настроен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/yandex/callback:
     get:
-      summary: Р—Р°РІРµСЂС€РёС‚СЊ РІС…РѕРґ С‡РµСЂРµР· РЇРЅРґРµРєСЃ
+      summary: Завершить вход через Яндекс
       description: |
-        Р’С‚РѕСЂРѕР№ С€Р°Рі РІС…РѕРґР° С‡РµСЂРµР· РЇРЅРґРµРєСЃ ID.
+        Второй шаг входа через Яндекс ID.
 
-        РЎСЋРґР° РЇРЅРґРµРєСЃ РІРµСЂРЅС‘С‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕСЃР»Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ РІС…РѕРґР°.
-        Backend РїСЂРѕРІРµСЂСЏРµС‚ `state`, РїРѕР»СѓС‡Р°РµС‚ РїСЂРѕС„РёР»СЊ РЇРЅРґРµРєСЃ ID, РЅР°С…РѕРґРёС‚ РёР»Рё СЃРѕР·РґР°С‘С‚
-        Р»РѕРєР°Р»СЊРЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё Р·Р°С‚РµРј РѕС‚РєСЂС‹РІР°РµС‚ РѕР±С‹С‡РЅСѓСЋ Р»РѕРєР°Р»СЊРЅСѓСЋ СЃРµСЃСЃРёСЋ backend.
+        Сюда Яндекс вернёт пользователя после подтверждения входа.
+        Backend проверяет `state`, получает профиль Яндекс ID, находит или создаёт
+        локального пользователя и затем открывает обычную локальную сессию backend.
       operationId: finishYandexOAuth
       tags:
         - Auth
@@ -545,106 +539,106 @@ paths:
         - in: query
           name: code
           required: true
-          description: Р’СЂРµРјРµРЅРЅС‹Р№ РєРѕРґ Р°РІС‚РѕСЂРёР·Р°С†РёРё, РєРѕС‚РѕСЂС‹Р№ РЇРЅРґРµРєСЃ РІС‹РґР°С‘С‚ backend РїРѕСЃР»Рµ СѓСЃРїРµС€РЅРѕРіРѕ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ РІС…РѕРґР°.
+          description: Временный код авторизации, который Яндекс выдаёт backend после успешного подтверждения входа.
           schema:
             type: string
         - in: query
           name: state
           required: true
-          description: Р—Р°С‰РёС‚РЅС‹Р№ РїР°СЂР°РјРµС‚СЂ, РєРѕС‚РѕСЂС‹Р№ РїРѕРјРѕРіР°РµС‚ СѓР±РµРґРёС‚СЊСЃСЏ, С‡С‚Рѕ callback РѕС‚РЅРѕСЃРёС‚СЃСЏ Рє РЅР°С€РµРјСѓ OAuth-Р·Р°РїСЂРѕСЃСѓ.
+          description: Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
           schema:
             type: string
       responses:
-        "200":
-          description: Р’С…РѕРґ С‡РµСЂРµР· РЇРЅРґРµРєСЃ Р·Р°РІРµСЂС€С‘РЅ, Р»РѕРєР°Р»СЊРЅР°СЏ СЃРµСЃСЃРёСЏ СЃРѕР·РґР°РЅР°
+        '200':
+          description: Вход через Яндекс завершён, локальная сессия создана
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AuthResponse"
-        "400":
-          description: РџР°СЂР°РјРµС‚СЂС‹ `code` РёР»Рё `state` РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚, РёСЃС‚РµРєР»Рё РёР»Рё РЅРµ РїСЂРѕС€Р»Рё РїСЂРѕРІРµСЂРєСѓ
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Параметры `code` или `state` отсутствуют, истекли или не прошли проверку
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РІРµСЂС€РёС‚СЊ OAuth-flow РёР·-Р·Р° РІРЅСѓС‚СЂРµРЅРЅРµР№ РѕС€РёР±РєРё backend
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Не удалось завершить OAuth-flow из-за внутренней ошибки backend
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "501":
-          description: Р’С…РѕРґ С‡РµСЂРµР· РЇРЅРґРµРєСЃ РїРѕРєР° РЅРµ РЅР°СЃС‚СЂРѕРµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Вход через Яндекс пока не настроен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/projects:
     get:
-      summary: РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїСЂРѕРµРєС‚РѕРІ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
-      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Рµ РїСЂРѕРµРєС‚С‹ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ, РѕС‚СЃРѕСЂС‚РёСЂРѕРІР°РЅРЅС‹Рµ РїРѕ РґР°С‚Рµ РѕР±РЅРѕРІР»РµРЅРёСЏ.
+      summary: Получить список проектов текущего пользователя
+      description: Возвращает только активные проекты текущего пользователя, отсортированные по дате обновления.
       operationId: listProjects
       tags:
         - Projects
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: РЎРїРёСЃРѕРє РїСЂРѕРµРєС‚РѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        '200':
+          description: Список проектов пользователя
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProjectListResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ProjectListResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ СЃРїРёСЃРєР° РїСЂРѕРµРєС‚РѕРІ
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при загрузке списка проектов
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
     post:
-      summary: РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ РїСЂРѕРµРєС‚
-      description: РЎРѕР·РґР°С‘С‚ РЅРѕРІС‹Р№ РїСЂРѕРµРєС‚ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј `draft`.
+      summary: Создать новый проект
+      description: Создаёт новый проект текущего пользователя со статусом `draft`.
       operationId: createProject
       tags:
         - Projects
@@ -655,56 +649,56 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateProjectRequest"
+              $ref: '#/components/schemas/CreateProjectRequest'
       responses:
-        "201":
-          description: РџСЂРѕРµРєС‚ СѓСЃРїРµС€РЅРѕ СЃРѕР·РґР°РЅ
+        '201':
+          description: Проект успешно создан
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProjectResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РІС…РѕРґРЅС‹С… РґР°РЅРЅС‹С…
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          description: Ошибка валидации входных данных
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё РїСЂРѕРµРєС‚Р°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при создании проекта
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/projects/{id}:
     get:
-      summary: РџРѕР»СѓС‡РёС‚СЊ РїСЂРѕРµРєС‚ РїРѕ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂСѓ
-      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ Р°РєС‚РёРІРЅС‹Р№ РїСЂРѕРµРєС‚ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕ РµРіРѕ РёРґРµРЅС‚РёС„РёРєР°С‚РѕСЂСѓ.
+      summary: Получить проект по идентификатору
+      description: Возвращает активный проект текущего пользователя по его идентификатору.
       operationId: getProjectById
       tags:
         - Projects
@@ -714,58 +708,58 @@ paths:
         - in: path
           name: id
           required: true
-          description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїСЂРѕРµРєС‚Р°.
+          description: Идентификатор проекта.
           schema:
             type: string
             format: uuid
       responses:
-        "200":
-          description: РџСЂРѕРµРєС‚ РЅР°Р№РґРµРЅ
+        '200':
+          description: Проект найден
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProjectResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ProjectResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ РёР»Рё РЅРµ РїСЂРёРЅР°РґР»РµР¶РёС‚ С‚РµРєСѓС‰РµРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Проект не найден или не принадлежит текущему пользователю
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ РїСЂРѕРµРєС‚Р°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при загрузке проекта
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
     patch:
-      summary: Р§Р°СЃС‚РёС‡РЅРѕ РѕР±РЅРѕРІРёС‚СЊ РїСЂРѕРµРєС‚
-      description: РћР±РЅРѕРІР»СЏРµС‚ С‚РѕР»СЊРєРѕ С‚Рµ РїРѕР»СЏ РїСЂРѕРµРєС‚Р°, РєРѕС‚РѕСЂС‹Рµ Р±С‹Р»Рё РїРµСЂРµРґР°РЅС‹ РІ Р·Р°РїСЂРѕСЃРµ.
+      summary: Частично обновить проект
+      description: Обновляет только те поля проекта, которые были переданы в запросе.
       operationId: patchProject
       tags:
         - Projects
@@ -775,7 +769,7 @@ paths:
         - in: path
           name: id
           required: true
-          description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїСЂРѕРµРєС‚Р°.
+          description: Идентификатор проекта.
           schema:
             type: string
             format: uuid
@@ -784,66 +778,66 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PatchProjectRequest"
+              $ref: '#/components/schemas/PatchProjectRequest'
       responses:
-        "200":
-          description: РџСЂРѕРµРєС‚ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»С‘РЅ
+        '200':
+          description: Проект успешно обновлён
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProjectResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РІС…РѕРґРЅС‹С… РґР°РЅРЅС‹С…
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          description: Ошибка валидации входных данных
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ РёР»Рё РЅРµ РїСЂРёРЅР°РґР»РµР¶РёС‚ С‚РµРєСѓС‰РµРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Проект не найден или не принадлежит текущему пользователю
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РїСЂРѕРµРєС‚Р°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при обновлении проекта
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
     delete:
-      summary: РЈРґР°Р»РёС‚СЊ РїСЂРѕРµРєС‚
-      description: РњСЏРіРєРѕ СѓРґР°Р»СЏРµС‚ РїСЂРѕРµРєС‚ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ. РџРѕСЃР»Рµ СЌС‚РѕРіРѕ РїСЂРѕРµРєС‚ РёСЃС‡РµР·Р°РµС‚ РёР· СЃРїРёСЃРєРѕРІ Рё Р±РѕР»СЊС€Рµ РЅРµ РґРѕСЃС‚СѓРїРµРЅ РїРѕ API, РЅРѕ Р·Р°РїРёСЃСЊ РѕСЃС‚Р°С‘С‚СЃСЏ РІ СЃРёСЃС‚РµРјРµ РґР»СЏ РёСЃС‚РѕСЂРёРё Рё Р±СѓРґСѓС‰РёС… СЃРІСЏР·РµР№.
+      summary: Удалить проект
+      description: Мягко удаляет проект текущего пользователя. После этого проект исчезает из списков и больше не доступен по API, но запись остаётся в системе для истории и будущих связей.
       operationId: deleteProject
       tags:
         - Projects
@@ -853,110 +847,110 @@ paths:
         - in: path
           name: id
           required: true
-          description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ РїСЂРѕРµРєС‚Р°.
+          description: Идентификатор проекта.
           schema:
             type: string
             format: uuid
       responses:
-        "200":
-          description: РџСЂРѕРµРєС‚ СѓСЃРїРµС€РЅРѕ СѓРґР°Р»С‘РЅ
+        '200':
+          description: Проект успешно удалён
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/StatusResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: РџСЂРѕРµРєС‚ РЅРµ РЅР°Р№РґРµРЅ РёР»Рё РЅРµ РїСЂРёРЅР°РґР»РµР¶РёС‚ С‚РµРєСѓС‰РµРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Проект не найден или не принадлежит текущему пользователю
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СѓРґР°Р»РµРЅРёРё РїСЂРѕРµРєС‚Р°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при удалении проекта
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/dashboard:
     get:
-      summary: Р”Р°РЅРЅС‹Рµ РґР»СЏ РіР»Р°РІРЅРѕР№ СЃС‚СЂР°РЅРёС†С‹ РїСЂРёР»РѕР¶РµРЅРёСЏ
-      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃС‚Р°С‚РёСЃС‚РёРєСѓ, РїРѕСЃР»РµРґРЅРёРµ Рё РІСЃРµ РїСЂРѕРµРєС‚С‹ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ, Р° С‚Р°РєР¶Рµ CTA-Р±Р»РѕРє Р±С‹СЃС‚СЂРѕРіРѕ СЃС‚Р°СЂС‚Р°.
+      summary: Данные для главной страницы приложения
+      description: Возвращает статистику, последние и все проекты пользователя, а также CTA-блок быстрого старта.
       operationId: getDashboard
       tags:
         - Dashboard
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: Р”Р°РЅРЅС‹Рµ РґР°С€Р±РѕСЂРґР°
+        '200':
+          description: Данные дашборда
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DashboardResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃР±РѕСЂРєРµ РґР°С€Р±РѕСЂРґР°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при сборке дашборда
           headers:
             X-Request-ID:
-              description: РРґРµРЅС‚РёС„РёРєР°С‚РѕСЂ Р·Р°РїСЂРѕСЃР° РґР»СЏ РїРѕРёСЃРєР° РІ Р»РѕРіР°С….
+              description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/generate/config:
     get:
-      summary: РЎРїСЂР°РІРѕС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ РґР»СЏ СЃС‚СЂР°РЅРёС†С‹ РіРµРЅРµСЂР°С†РёРё
-      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ РєР°С‚Р°Р»РѕРі РјР°СЂРєРµС‚РїР»РµР№СЃРѕРІ, РІРёР·СѓР°Р»СЊРЅС‹С… СЃС‚РёР»РµР№, С‚РёРїРѕРІ РєР°СЂС‚РѕС‡РµРє Рё РґРѕРїСѓСЃС‚РёРјС‹С… РєРѕР»РёС‡РµСЃС‚РІ.
+      summary: Справочные данные для страницы генерации
+      description: Возвращает каталог маркетплейсов, визуальных стилей, типов карточек и допустимых количеств.
       operationId: getGenerateConfig
       tags:
         - Generation
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: Р”Р°РЅРЅС‹Рµ РґР»СЏ С„РѕСЂРјС‹ Р·Р°РїСѓСЃРєР° РіРµРЅРµСЂР°С†РёРё
+        '200':
+          description: Данные для формы запуска генерации
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -965,9 +959,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GenerateConfigResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/GenerateConfigResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -976,11 +970,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/uploads/images:
     post:
-      summary: Р—Р°РіСЂСѓР·РёС‚СЊ РёСЃС…РѕРґРЅРѕРµ РёР·РѕР±СЂР°Р¶РµРЅРёРµ РґР»СЏ РіРµРЅРµСЂР°С†РёРё
-      description: РџСЂРёРЅРёРјР°РµС‚ РѕРґРёРЅ image-С„Р°Р№Р» РІ multipart РїРѕР»Рµ `file` Рё РІРѕР·РІСЂР°С‰Р°РµС‚ `asset_id` РґР»СЏ СЃР»РµРґСѓСЋС‰РµРіРѕ С€Р°РіР°.
+      summary: Загрузить исходное изображение для генерации
+      description: Принимает один image-файл в multipart поле `file` и возвращает `asset_id` для следующего шага.
       operationId: uploadGenerationImage
       tags:
         - Generation
@@ -999,8 +993,8 @@ paths:
                   type: string
                   format: binary
       responses:
-        "201":
-          description: РСЃС…РѕРґРЅРѕРµ РёР·РѕР±СЂР°Р¶РµРЅРёРµ СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅРѕ
+        '201':
+          description: Исходное изображение успешно загружено
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1009,9 +1003,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UploadImageResponse"
-        "400":
-          description: multipart-Р·Р°РїСЂРѕСЃ РЅРµРєРѕСЂСЂРµРєС‚РµРЅ РёР»Рё С‚РёРї РёР·РѕР±СЂР°Р¶РµРЅРёСЏ РЅРµ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ
+                $ref: '#/components/schemas/UploadImageResponse'
+        '400':
+          description: multipart-запрос некорректен или тип изображения не поддерживается
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1020,9 +1014,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1031,9 +1025,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃРѕС…СЂР°РЅРµРЅРёРё С„Р°Р№Р»Р°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при сохранении файла
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1042,11 +1036,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/generations:
     post:
-      summary: Р—Р°РїСѓСЃС‚РёС‚СЊ РіРµРЅРµСЂР°С†РёСЋ РєР°СЂС‚РѕС‡РµРє
-      description: РЎРѕР·РґР°С‘С‚ РїСЂРѕРµРєС‚, Р·Р°РїРёСЃС‹РІР°РµС‚ РїР°СЂР°РјРµС‚СЂС‹ Р·Р°РїСѓСЃРєР° Рё СЃС‚Р°РІРёС‚ С„РѕРЅРѕРІСѓСЋ Р·Р°РґР°С‡Сѓ РіРµРЅРµСЂР°С†РёРё РІ РѕС‡РµСЂРµРґСЊ.
+      summary: Запустить генерацию карточек
+      description: Создаёт проект, записывает параметры запуска и ставит фоновую задачу генерации в очередь.
       operationId: createGeneration
       tags:
         - Generation
@@ -1057,10 +1051,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateGenerationRequest"
+              $ref: '#/components/schemas/CreateGenerationRequest'
       responses:
-        "202":
-          description: Р“РµРЅРµСЂР°С†РёСЏ РїРѕСЃС‚Р°РІР»РµРЅР° РІ РѕС‡РµСЂРµРґСЊ
+        '202':
+          description: Генерация поставлена в очередь
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1069,9 +1063,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateGenerationResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РїР°СЂР°РјРµС‚СЂРѕРІ РіРµРЅРµСЂР°С†РёРё
+                $ref: '#/components/schemas/CreateGenerationResponse'
+        '400':
+          description: Ошибка валидации параметров генерации
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1080,9 +1074,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1091,9 +1085,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: РСЃС…РѕРґРЅРѕРµ РёР·РѕР±СЂР°Р¶РµРЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Исходное изображение не найдено
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1102,8 +1096,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
           description: Текущий billing-лимит не позволяет запустить ещё одну генерацию
           headers:
             X-Request-ID:
@@ -1113,9 +1107,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё generation job
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при создании generation job
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1124,11 +1118,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/generations/{id}:
     get:
-      summary: РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ РіРµРЅРµСЂР°С†РёРё
-      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ С‚РµРєСѓС‰РёР№ progress generation job, Р° РїРѕСЃР»Рµ Р·Р°РІРµСЂС€РµРЅРёСЏ вЂ” СЃРїРёСЃРѕРє РіРѕС‚РѕРІС‹С… РєР°СЂС‚РѕС‡РµРє Рё СЃСЃС‹Р»РєСѓ РЅР° Р°СЂС…РёРІ.
+      summary: Получить статус генерации
+      description: Возвращает текущий progress generation job, а после завершения — список готовых карточек и ссылку на архив.
       operationId: getGenerationById
       tags:
         - Generation
@@ -1142,8 +1136,8 @@ paths:
             type: string
             format: uuid
       responses:
-        "200":
-          description: РўРµРєСѓС‰РµРµ СЃРѕСЃС‚РѕСЏРЅРёРµ РіРµРЅРµСЂР°С†РёРё
+        '200':
+          description: Текущее состояние генерации
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1152,9 +1146,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GenerationStatusResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/GenerationStatusResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1163,9 +1157,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Р“РµРЅРµСЂР°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Генерация не найдена
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1174,9 +1168,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ СЃС‚Р°С‚СѓСЃР° РіРµРЅРµСЂР°С†РёРё
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при загрузке статуса генерации
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1185,19 +1179,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings:
     get:
-      summary: Р”Р°РЅРЅС‹Рµ СЃС‚СЂР°РЅРёС†С‹ РЅР°СЃС‚СЂРѕРµРє
-      description: Р’РѕР·РІСЂР°С‰Р°РµС‚ РїСЂРѕС„РёР»СЊ, РґРµС„РѕР»С‚РЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё, СѓРІРµРґРѕРјР»РµРЅРёСЏ, Р°РєС‚РёРІРЅС‹Рµ СЃРµСЃСЃРёРё, РёРЅС‚РµРіСЂР°С†РёРё Рё API-РєР»СЋС‡.
+      summary: Данные страницы настроек
+      description: Возвращает профиль, дефолтные настройки, уведомления, активные сессии, интеграции и API-ключ.
       operationId: getSettings
       tags:
         - Settings
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: Р”Р°РЅРЅС‹Рµ РЅР°СЃС‚СЂРѕРµРє
+        '200':
+          description: Данные настроек
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1206,9 +1200,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SettingsResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/SettingsResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1217,9 +1211,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ РЅР°СЃС‚СЂРѕРµРє
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при загрузке настроек
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1228,10 +1222,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/profile:
     patch:
-      summary: РћР±РЅРѕРІРёС‚СЊ РїСЂРѕС„РёР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+      summary: Обновить профиль пользователя
       operationId: patchSettingsProfile
       tags:
         - Settings
@@ -1242,10 +1236,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateProfileRequest"
+              $ref: '#/components/schemas/UpdateProfileRequest'
       responses:
-        "200":
-          description: РџСЂРѕС„РёР»СЊ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»С‘РЅ
+        '200':
+          description: Профиль успешно обновлён
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1254,9 +1248,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SettingsProfile"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё
+                $ref: '#/components/schemas/SettingsProfile'
+        '400':
+          description: Ошибка валидации
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1265,9 +1259,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1276,9 +1270,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Email СѓР¶Рµ Р·Р°РЅСЏС‚
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email уже занят
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1287,9 +1281,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃРѕС…СЂР°РЅРµРЅРёРё РїСЂРѕС„РёР»СЏ
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при сохранении профиля
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1298,10 +1292,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/defaults:
     patch:
-      summary: РћР±РЅРѕРІРёС‚СЊ РґРµС„РѕР»С‚РЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё РіРµРЅРµСЂР°С†РёРё
+      summary: Обновить дефолтные настройки генерации
       operationId: patchSettingsDefaults
       tags:
         - Settings
@@ -1312,10 +1306,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateDefaultsRequest"
+              $ref: '#/components/schemas/UpdateDefaultsRequest'
       responses:
-        "200":
-          description: РќР°СЃС‚СЂРѕР№РєРё РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅС‹
+        '200':
+          description: Настройки по умолчанию успешно обновлены
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1324,9 +1318,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SettingsDefaults"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё
+                $ref: '#/components/schemas/SettingsDefaults'
+        '400':
+          description: Ошибка валидации
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1335,9 +1329,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1346,9 +1340,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃРѕС…СЂР°РЅРµРЅРёРё РЅР°СЃС‚СЂРѕРµРє
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при сохранении настроек
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1357,10 +1351,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/change-password:
     post:
-      summary: РЎРјРµРЅРёС‚СЊ РїР°СЂРѕР»СЊ
+      summary: Сменить пароль
       operationId: changeSettingsPassword
       tags:
         - Settings
@@ -1371,10 +1365,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangePasswordRequest"
+              $ref: '#/components/schemas/ChangePasswordRequest'
       responses:
-        "200":
-          description: РџР°СЂРѕР»СЊ РёР·РјРµРЅС‘РЅ, РѕСЃС‚Р°Р»СЊРЅС‹Рµ СЃРµСЃСЃРёРё РѕС‚РѕР·РІР°РЅС‹
+        '200':
+          description: Пароль изменён, остальные сессии отозваны
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1383,9 +1377,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РёР»Рё РЅРµРІРµСЂРЅС‹Р№ С‚РµРєСѓС‰РёР№ РїР°СЂРѕР»СЊ
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Ошибка валидации или неверный текущий пароль
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1394,9 +1388,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1405,9 +1399,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃРјРµРЅРµ РїР°СЂРѕР»СЏ
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при смене пароля
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1416,10 +1410,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/notifications:
     patch:
-      summary: РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё СѓРІРµРґРѕРјР»РµРЅРёР№
+      summary: Обновить настройки уведомлений
       operationId: patchSettingsNotifications
       tags:
         - Settings
@@ -1430,10 +1424,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateNotificationsRequest"
+              $ref: '#/components/schemas/UpdateNotificationsRequest'
       responses:
-        "200":
-          description: РќР°СЃС‚СЂРѕР№РєРё СѓРІРµРґРѕРјР»РµРЅРёР№ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅС‹
+        '200':
+          description: Настройки уведомлений успешно обновлены
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1442,9 +1436,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SettingsNotifications"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё
+                $ref: '#/components/schemas/SettingsNotifications'
+        '400':
+          description: Ошибка валидации
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1453,9 +1447,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1464,9 +1458,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СЃРѕС…СЂР°РЅРµРЅРёРё СѓРІРµРґРѕРјР»РµРЅРёР№
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при сохранении уведомлений
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1475,10 +1469,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/sessions/{id}:
     delete:
-      summary: РћС‚РѕР·РІР°С‚СЊ РѕРґРЅСѓ СЃРµСЃСЃРёСЋ
+      summary: Отозвать одну сессию
       operationId: deleteSettingsSession
       tags:
         - Settings
@@ -1492,8 +1486,8 @@ paths:
             type: string
             format: uuid
       responses:
-        "200":
-          description: РЎРµСЃСЃРёСЏ СѓСЃРїРµС€РЅРѕ РѕС‚РѕР·РІР°РЅР°
+        '200':
+          description: Сессия успешно отозвана
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1502,9 +1496,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "400":
-          description: РќРµР»СЊР·СЏ РѕС‚РѕР·РІР°С‚СЊ С‚РµРєСѓС‰СѓСЋ СЃРµСЃСЃРёСЋ РёР»Рё Р·Р°РїСЂРѕСЃ РЅРµРєРѕСЂСЂРµРєС‚РµРЅ
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Нельзя отозвать текущую сессию или запрос некорректен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1513,9 +1507,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1524,9 +1518,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: РЎРµСЃСЃРёСЏ РЅРµ РЅР°Р№РґРµРЅР°
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Сессия не найдена
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1535,9 +1529,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё РѕС‚Р·С‹РІРµ СЃРµСЃСЃРёРё
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при отзыве сессии
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1546,18 +1540,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/api-key/rotate:
     post:
-      summary: РџРµСЂРµРІС‹РїСѓСЃС‚РёС‚СЊ API-РєР»СЋС‡
+      summary: Перевыпустить API-ключ
       operationId: rotateSettingsApiKey
       tags:
         - Settings
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: РќРѕРІС‹Р№ API-РєР»СЋС‡ СѓСЃРїРµС€РЅРѕ СЃРѕР·РґР°РЅ
+        '200':
+          description: Новый API-ключ успешно создан
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1566,9 +1560,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RotateAPIKeyResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/RotateAPIKeyResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1577,9 +1571,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё РїРµСЂРµРІС‹РїСѓСЃРєРµ API-РєР»СЋС‡Р°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при перевыпуске API-ключа
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1588,18 +1582,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/export:
     post:
-      summary: РџРѕСЃС‚Р°РІРёС‚СЊ СЌРєСЃРїРѕСЂС‚ РґР°РЅРЅС‹С… Р°РєРєР°СѓРЅС‚Р° РІ РѕС‡РµСЂРµРґСЊ
+      summary: Поставить экспорт данных аккаунта в очередь
       operationId: postSettingsExport
       tags:
         - Settings
       security:
         - BearerAuth: []
       responses:
-        "200":
-          description: Р—Р°РґР°С‡Р° СЌРєСЃРїРѕСЂС‚Р° РїСЂРёРЅСЏС‚Р°
+        '200':
+          description: Задача экспорта принята
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1608,9 +1602,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ExportDataResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ExportDataResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1619,9 +1613,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё РїРѕСЃС‚Р°РЅРѕРІРєРµ СЌРєСЃРїРѕСЂС‚Р° РІ РѕС‡РµСЂРµРґСЊ
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при постановке экспорта в очередь
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1630,10 +1624,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/account:
     delete:
-      summary: РЈРґР°Р»РёС‚СЊ Р°РєРєР°СѓРЅС‚
+      summary: Удалить аккаунт
       operationId: deleteSettingsAccount
       tags:
         - Settings
@@ -1644,10 +1638,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DeleteAccountRequest"
+              $ref: '#/components/schemas/DeleteAccountRequest'
       responses:
-        "200":
-          description: РђРєРєР°СѓРЅС‚ СѓСЃРїРµС€РЅРѕ СѓРґР°Р»С‘РЅ
+        '200':
+          description: Аккаунт успешно удалён
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1656,9 +1650,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "400":
-          description: РќРµРІРµСЂРЅРѕРµ РїРѕРґС‚РІРµСЂР¶РґР°СЋС‰РµРµ СЃР»РѕРІРѕ
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Неверное подтверждающее слово
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1667,9 +1661,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1678,9 +1672,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё СѓРґР°Р»РµРЅРёРё Р°РєРєР°СѓРЅС‚Р°
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при удалении аккаунта
           headers:
             X-Request-ID:
               description: Request identifier for correlating logs.
@@ -1689,7 +1683,295 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/billing:
+    get:
+      summary: Получить данные billing-страницы
+      operationId: getBilling
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Текущая подписка, тарифы и разовые пакеты карточек
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при загрузке billing-данных
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/billing/checkout:
+    post:
+      summary: Создать checkout для тарифа
+      operationId: createBillingCheckout
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckoutRequest'
+      responses:
+        '202':
+          description: Checkout успешно создан
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateCheckoutResponse'
+        '400':
+          description: Ошибка валидации запроса
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Запрошенный тариф не найден
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Запрошенный тариф уже активен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Платёжный провайдер ещё не подключён
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/billing/addons:
+    post:
+      summary: Создать checkout для разового пакета
+      operationId: createBillingAddonCheckout
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseAddonRequest'
+      responses:
+        '202':
+          description: Checkout для пакета успешно создан
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseAddonResponse'
+        '400':
+          description: Ошибка валидации запроса
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Запрошенный пакет не найден
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Платёжный провайдер ещё не подключён
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/billing/cancel:
+    post:
+      summary: Отключить автопродление подписки
+      operationId: cancelBillingSubscription
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Автопродление успешно отключено
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelSubscriptionResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Нечего отменять или подписка уже на отмене
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при отмене подписки
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/billing/webhook:
+    post:
+      summary: Webhook-уведомление от ЮКасса
+      description: |
+        Принимает события payment.succeeded и payment.canceled от ЮКасса.
+        Подпись проверяется через заголовок YooKassa-Signature (HMAC-SHA256).
+        Endpoint не требует авторизации пользователя — он публичный, но защищён подписью.
+        ЮКасса повторяет уведомление при ответах, отличных от 2xx, поэтому обработка идемпотентна.
+      operationId: billingWebhook
+      tags:
+        - Billing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/YooKassaWebhookEvent'
+      responses:
+        '200':
+          description: Событие принято и обработано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Невалидное тело запроса или неизвестный тип события
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неверная подпись YooKassa-Signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при обработке события
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/public/blog:
     get:
       summary: Публичный список статей блога
@@ -1714,7 +1996,7 @@ paths:
             default: 12
           description: Размер страницы серверной пагинации.
       responses:
-        "200":
+        '200':
           description: Данные публичного списка статей
           headers:
             X-Request-ID:
@@ -1724,8 +2006,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BlogListResponse"
-        "400":
+                $ref: '#/components/schemas/BlogListResponse'
+        '400':
           description: Ошибка валидации query params
           headers:
             X-Request-ID:
@@ -1735,8 +2017,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
           description: Внутренняя ошибка при загрузке списка статей
           headers:
             X-Request-ID:
@@ -1746,7 +2028,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/public/blog/{slug}:
     get:
       summary: Публичная статья блога
@@ -1762,7 +2044,7 @@ paths:
             type: string
           description: Человекочитаемый slug статьи.
       responses:
-        "200":
+        '200':
           description: Данные одной опубликованной статьи
           headers:
             X-Request-ID:
@@ -1772,8 +2054,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/BlogPostResponse"
-        "404":
+                $ref: '#/components/schemas/BlogPostResponse'
+        '404':
           description: Опубликованная статья не найдена
           headers:
             X-Request-ID:
@@ -1783,8 +2065,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
           description: Внутренняя ошибка при загрузке статьи
           headers:
             X-Request-ID:
@@ -1794,303 +2076,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/billing:
-    get:
-      summary: РџРѕР»СѓС‡РёС‚СЊ РґР°РЅРЅС‹Рµ billing-СЃС‚СЂР°РЅРёС†С‹
-      operationId: getBilling
-      tags:
-        - Billing
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: РўРµРєСѓС‰Р°СЏ РїРѕРґРїРёСЃРєР°, С‚Р°СЂРёС„С‹ Рё СЂР°Р·РѕРІС‹Рµ РїР°РєРµС‚С‹ РєР°СЂС‚РѕС‡РµРє
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BillingResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ billing-РґР°РЅРЅС‹С…
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/billing/checkout:
-    post:
-      summary: РЎРѕР·РґР°С‚СЊ checkout РґР»СЏ С‚Р°СЂРёС„Р°
-      operationId: createBillingCheckout
-      tags:
-        - Billing
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateCheckoutRequest"
-      responses:
-        "202":
-          description: Checkout СѓСЃРїРµС€РЅРѕ СЃРѕР·РґР°РЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CreateCheckoutResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё Р·Р°РїСЂРѕСЃР°
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Р—Р°РїСЂРѕС€РµРЅРЅС‹Р№ С‚Р°СЂРёС„ РЅРµ РЅР°Р№РґРµРЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Р—Р°РїСЂРѕС€РµРЅРЅС‹Р№ С‚Р°СЂРёС„ СѓР¶Рµ Р°РєС‚РёРІРµРЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "501":
-          description: РџР»Р°С‚С‘Р¶РЅС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ РµС‰С‘ РЅРµ РїРѕРґРєР»СЋС‡С‘РЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/billing/addons:
-    post:
-      summary: РЎРѕР·РґР°С‚СЊ checkout РґР»СЏ СЂР°Р·РѕРІРѕРіРѕ РїР°РєРµС‚Р°
-      operationId: createBillingAddonCheckout
-      tags:
-        - Billing
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PurchaseAddonRequest"
-      responses:
-        "202":
-          description: Checkout РґР»СЏ РїР°РєРµС‚Р° СѓСЃРїРµС€РЅРѕ СЃРѕР·РґР°РЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PurchaseAddonResponse"
-        "400":
-          description: РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё Р·Р°РїСЂРѕСЃР°
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Р—Р°РїСЂРѕС€РµРЅРЅС‹Р№ РїР°РєРµС‚ РЅРµ РЅР°Р№РґРµРЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "501":
-          description: РџР»Р°С‚С‘Р¶РЅС‹Р№ РїСЂРѕРІР°Р№РґРµСЂ РµС‰С‘ РЅРµ РїРѕРґРєР»СЋС‡С‘РЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/billing/cancel:
-    post:
-      summary: РћС‚РєР»СЋС‡РёС‚СЊ Р°РІС‚РѕРїСЂРѕРґР»РµРЅРёРµ РїРѕРґРїРёСЃРєРё
-      operationId: cancelBillingSubscription
-      tags:
-        - Billing
-      security:
-        - BearerAuth: []
-      responses:
-        "200":
-          description: РђРІС‚РѕРїСЂРѕРґР»РµРЅРёРµ СѓСЃРїРµС€РЅРѕ РѕС‚РєР»СЋС‡РµРЅРѕ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CancelSubscriptionResponse"
-        "401":
-          description: РўРѕРєРµРЅ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, РёСЃС‚С‘Рє РёР»Рё РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: РќРµС‡РµРіРѕ РѕС‚РјРµРЅСЏС‚СЊ РёР»Рё РїРѕРґРїРёСЃРєР° СѓР¶Рµ РЅР° РѕС‚РјРµРЅРµ
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Р’РЅСѓС‚СЂРµРЅРЅСЏСЏ РѕС€РёР±РєР° РїСЂРё РѕС‚РјРµРЅРµ РїРѕРґРїРёСЃРєРё
-          headers:
-            X-Request-ID:
-              description: Request identifier for correlating logs.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/v1/billing/webhook:
-    post:
-      summary: Webhook-уведомление от ЮКасса
-      description: |
-        Принимает события payment.succeeded и payment.canceled от ЮКасса.
-        Подпись проверяется через заголовок YooKassa-Signature (HMAC-SHA256).
-        Endpoint не требует авторизации пользователя — он публичный, но защищён подписью.
-        ЮКасса повторяет уведомление при ответах, отличных от 2xx, поэтому обработка идемпотентна.
-      operationId: billingWebhook
-      tags:
-        - Billing
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/YooKassaWebhookEvent"
-      responses:
-        "200":
-          description: Событие принято и обработано
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/StatusResponse"
-        "400":
-          description: Невалидное тело запроса или неизвестный тип события
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Неверная подпись YooKassa-Signature
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Внутренняя ошибка при обработке события
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: opaque
-      description: "РџРµСЂРµРґР°РІР°Р№С‚Рµ С‚РѕРєРµРЅ РІ Р·Р°РіРѕР»РѕРІРєРµ Authorization: Bearer <token>."
+      description: 'Передавайте токен в заголовке Authorization: Bearer <token>.'
   schemas:
     HealthResponse:
       type: object
@@ -2103,30 +2096,6 @@ components:
             - ok
             - degraded
           example: ok
-    ForgotPasswordRequest:
-      type: object
-      required:
-        - email
-      properties:
-        email:
-          type: string
-          format: email
-          example: ivan@example.com
-    ResetPasswordRequest:
-      type: object
-      required:
-        - token
-        - password
-      properties:
-        token:
-          type: string
-          description: РћРґРЅРѕСЂР°Р·РѕРІС‹Р№ С‚РѕРєРµРЅ РёР· РїРёСЃСЊРјР° РґР»СЏ СЃР±СЂРѕСЃР° РїР°СЂРѕР»СЏ.
-          example: xK9mQ2rTv8nYpL3wZd5jF1cB6oE4sA7h
-        password:
-          type: string
-          format: password
-          description: РќРѕРІС‹Р№ РїР°СЂРѕР»СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.
-          example: novyy-nadezhnyy-parol-456
     StatusResponse:
       type: object
       required:
@@ -2134,110 +2103,43 @@ components:
       properties:
         status:
           type: string
-          description: Р РµР·СѓР»СЊС‚Р°С‚ РѕРїРµСЂР°С†РёРё.
+          description: Результат операции.
           enum:
             - accepted
             - password_changed
             - logged_out
             - deleted
           example: accepted
-    CreateProjectRequest:
+    ErrorResponse:
       type: object
       required:
-        - title
+        - code
+        - message
       properties:
-        title:
+        code:
           type: string
-          minLength: 1
-          maxLength: 200
-          example: РљСЂРѕСЃСЃРѕРІРєРё Nike Air Max
-        marketplace:
+          example: not_found
+        message:
           type: string
-          maxLength: 100
-          example: wildberries
-        product_name:
+          example: ресурс не найден
+        request_id:
           type: string
-          maxLength: 255
-          example: Nike Air Max 90
-        product_description:
-          type: string
-          maxLength: 5000
-          example: Р‘РµР»С‹Рµ РєСЂРѕСЃСЃРѕРІРєРё РґР»СЏ РїРѕРІСЃРµРґРЅРµРІРЅРѕР№ РЅРѕСЃРєРё
-    PatchProjectRequest:
-      type: object
-      description: Р”РѕСЃС‚Р°С‚РѕС‡РЅРѕ РїРµСЂРµРґР°С‚СЊ С‚РѕР»СЊРєРѕ С‚Рµ РїРѕР»СЏ, РєРѕС‚РѕСЂС‹Рµ РЅСѓР¶РЅРѕ РёР·РјРµРЅРёС‚СЊ.
-      minProperties: 1
-      properties:
-        title:
-          type: string
-          minLength: 1
-          maxLength: 200
-          example: РћР±РЅРѕРІР»С‘РЅРЅРѕРµ РЅР°Р·РІР°РЅРёРµ РїСЂРѕРµРєС‚Р°
-        marketplace:
-          type: string
-          maxLength: 100
-          example: ozon
-        product_name:
-          type: string
-          maxLength: 255
-          example: Nike Air Max 90 Premium
-        product_description:
-          type: string
-          maxLength: 5000
-          example: РќРѕРІРѕРµ РѕРїРёСЃР°РЅРёРµ С‚РѕРІР°СЂР° РґР»СЏ РєР°СЂС‚РѕС‡РєРё
-    Project:
-      type: object
-      required:
-        - id
-        - title
-        - status
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        title:
-          type: string
-          example: РљСЂРѕСЃСЃРѕРІРєРё Nike Air Max
-        marketplace:
-          type: string
-          example: wildberries
-        product_name:
-          type: string
-          example: Nike Air Max 90
-        product_description:
-          type: string
-          example: Р‘РµР»С‹Рµ РєСЂРѕСЃСЃРѕРІРєРё РґР»СЏ РїРѕРІСЃРµРґРЅРµРІРЅРѕР№ РЅРѕСЃРєРё
-        status:
-          type: string
-          enum:
-            - draft
-            - active
-            - archived
-          example: draft
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    ProjectResponse:
-      type: object
-      required:
-        - project
-      properties:
-        project:
-          $ref: "#/components/schemas/Project"
-    ProjectListResponse:
-      type: object
-      required:
-        - projects
-      properties:
-        projects:
+          example: 01HZY3GQK0M5YAWQ2N6R8T9P1S
+        details:
           type: array
           items:
-            $ref: "#/components/schemas/Project"
+            $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      type: object
+      required:
+        - message
+      properties:
+        field:
+          type: string
+          example: email
+        message:
+          type: string
+          example: поле обязательно
     RegisterRequest:
       type: object
       required:
@@ -2246,7 +2148,7 @@ components:
       properties:
         name:
           type: string
-          example: РРІР°РЅ
+          example: Иван
         email:
           type: string
           format: email
@@ -2282,10 +2184,10 @@ components:
           example: 123456789
         first_name:
           type: string
-          example: РРІР°РЅ
+          example: Иван
         last_name:
           type: string
-          example: РРІР°РЅРѕРІ
+          example: Иванов
         username:
           type: string
           example: ivanov
@@ -2300,6 +2202,30 @@ components:
         hash:
           type: string
           example: 7d3f6f8d3df0f70e18b1aabf6b8d2d11fdc4d4ab6f8d9c0d1c2b3a4f5e6d7c8b
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: ivan@example.com
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - password
+      properties:
+        token:
+          type: string
+          description: Одноразовый токен из письма для сброса пароля.
+          example: xK9mQ2rTv8nYpL3wZd5jF1cB6oE4sA7h
+        password:
+          type: string
+          format: password
+          description: Новый пароль пользователя.
+          example: novyy-nadezhnyy-parol-456
     AuthUser:
       type: object
       required:
@@ -2310,7 +2236,7 @@ components:
           format: uuid
         name:
           type: string
-          example: РРІР°РЅ
+          example: Иван
         email:
           type: string
           format: email
@@ -2339,46 +2265,113 @@ components:
         - session
       properties:
         user:
-          $ref: "#/components/schemas/AuthUser"
+          $ref: '#/components/schemas/AuthUser'
         session:
-          $ref: "#/components/schemas/AuthSession"
+          $ref: '#/components/schemas/AuthSession'
     CurrentUserResponse:
       type: object
       required:
         - user
       properties:
         user:
-          $ref: "#/components/schemas/AuthUser"
-    ErrorResponse:
+          $ref: '#/components/schemas/AuthUser'
+    CreateProjectRequest:
       type: object
       required:
-        - code
-        - message
+        - title
       properties:
-        code:
+        title:
           type: string
-          example: not_found
-        message:
+          minLength: 1
+          maxLength: 200
+          example: Кроссовки Nike Air Max
+        marketplace:
           type: string
-          example: СЂРµСЃСѓСЂСЃ РЅРµ РЅР°Р№РґРµРЅ
-        request_id:
+          maxLength: 100
+          example: wildberries
+        product_name:
           type: string
-          example: 01HZY3GQK0M5YAWQ2N6R8T9P1S
-        details:
+          maxLength: 255
+          example: Nike Air Max 90
+        product_description:
+          type: string
+          maxLength: 5000
+          example: Белые кроссовки для повседневной носки
+    PatchProjectRequest:
+      type: object
+      description: Достаточно передать только те поля, которые нужно изменить.
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Обновлённое название проекта
+        marketplace:
+          type: string
+          maxLength: 100
+          example: ozon
+        product_name:
+          type: string
+          maxLength: 255
+          example: Nike Air Max 90 Premium
+        product_description:
+          type: string
+          maxLength: 5000
+          example: Новое описание товара для карточки
+    Project:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Кроссовки Nike Air Max
+        marketplace:
+          type: string
+          example: wildberries
+        product_name:
+          type: string
+          example: Nike Air Max 90
+        product_description:
+          type: string
+          example: Белые кроссовки для повседневной носки
+        status:
+          type: string
+          enum:
+            - draft
+            - active
+            - archived
+          example: draft
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProjectResponse:
+      type: object
+      required:
+        - project
+      properties:
+        project:
+          $ref: '#/components/schemas/Project'
+    ProjectListResponse:
+      type: object
+      required:
+        - projects
+      properties:
+        projects:
           type: array
           items:
-            $ref: "#/components/schemas/ErrorDetail"
-    ErrorDetail:
-      type: object
-      required:
-        - message
-      properties:
-        field:
-          type: string
-          example: email
-        message:
-          type: string
-          example: РїРѕР»Рµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ
+            $ref: '#/components/schemas/Project'
     DashboardProject:
       type: object
       required:
@@ -2392,7 +2385,7 @@ components:
           format: uuid
         title:
           type: string
-          example: РљСЂРѕСЃСЃРѕРІРєРё Nike Air Max
+          example: Кроссовки Nike Air Max
         card_count:
           type: integer
           example: 6
@@ -2423,13 +2416,13 @@ components:
           example: total_projects
         label:
           type: string
-          example: Р’СЃРµРіРѕ РїСЂРѕРµРєС‚РѕРІ
+          example: Всего проектов
         value:
           type: string
-          example: "12"
+          example: '12'
         description:
           type: string
-          example: РїСЂРѕРµРєС‚РѕРІ СЃРѕР·РґР°РЅРѕ
+          example: проектов создано
         accent_text:
           type: string
         progress:
@@ -2448,10 +2441,10 @@ components:
       properties:
         title:
           type: string
-          example: РЎРѕР·РґР°Р№С‚Рµ РїРµСЂРІС‹Р№ РїСЂРѕРµРєС‚
+          example: Создайте первый проект
         description:
           type: string
-          example: Р—Р°РіСЂСѓР·РёС‚Рµ С„РѕС‚Рѕ С‚РѕРІР°СЂР° вЂ” РјС‹ СЃРіРµРЅРµСЂРёСЂСѓРµРј РєР°СЂС‚РѕС‡РєРё РґР»СЏ РјР°СЂРєРµС‚РїР»РµР№СЃР°
+          example: Загрузите фото товара — мы сгенерируем карточки для маркетплейса
         canonical_path:
           type: string
           example: /app/generate
@@ -2466,17 +2459,17 @@ components:
         stats:
           type: array
           items:
-            $ref: "#/components/schemas/DashboardStat"
+            $ref: '#/components/schemas/DashboardStat'
         recent_projects:
           type: array
           items:
-            $ref: "#/components/schemas/DashboardProject"
+            $ref: '#/components/schemas/DashboardProject'
         all_projects:
           type: array
           items:
-            $ref: "#/components/schemas/DashboardProject"
+            $ref: '#/components/schemas/DashboardProject'
         quick_start:
-          $ref: "#/components/schemas/DashboardQuickStart"
+          $ref: '#/components/schemas/DashboardQuickStart'
     GenerateConfigResponse:
       type: object
       required:
@@ -2488,15 +2481,15 @@ components:
         marketplaces:
           type: array
           items:
-            $ref: "#/components/schemas/GenerateMarketplace"
+            $ref: '#/components/schemas/GenerateMarketplace'
         styles:
           type: array
           items:
-            $ref: "#/components/schemas/GenerateStyle"
+            $ref: '#/components/schemas/GenerateStyle'
         card_types:
           type: array
           items:
-            $ref: "#/components/schemas/GenerateCardType"
+            $ref: '#/components/schemas/GenerateCardType'
         card_count_options:
           type: array
           items:
@@ -2524,7 +2517,7 @@ components:
           example: clean_catalog
         label:
           type: string
-          example: Р§РёСЃС‚С‹Р№ РєР°С‚Р°Р»РѕРі
+          example: Чистый каталог
     GenerateCardType:
       type: object
       required:
@@ -2536,7 +2529,7 @@ components:
           example: cover
         label:
           type: string
-          example: РћР±Р»РѕР¶РєР°
+          example: Обложка
         default_selected:
           type: boolean
           example: true
@@ -2565,7 +2558,7 @@ components:
         project_name:
           type: string
           maxLength: 200
-          example: РљР°СЂС‚РѕС‡РєРё РґР»СЏ Р»РµС‚РЅРµР№ РєРѕР»Р»РµРєС†РёРё
+          example: Карточки для летней коллекции
         marketplace_id:
           type: string
           example: wildberries
@@ -2577,7 +2570,10 @@ components:
           minItems: 1
           items:
             type: string
-          example: [cover, benefits, details]
+          example:
+            - cover
+            - benefits
+            - details
         card_count:
           type: integer
           example: 5
@@ -2631,7 +2627,7 @@ components:
         result_cards:
           type: array
           items:
-            $ref: "#/components/schemas/GeneratedCard"
+            $ref: '#/components/schemas/GeneratedCard'
     GeneratedCard:
       type: object
       required:
@@ -2661,15 +2657,15 @@ components:
         - addons
       properties:
         current_subscription:
-          $ref: "#/components/schemas/BillingSubscription"
+          $ref: '#/components/schemas/BillingSubscription'
         plans:
           type: array
           items:
-            $ref: "#/components/schemas/BillingPlan"
+            $ref: '#/components/schemas/BillingPlan'
         addons:
           type: array
           items:
-            $ref: "#/components/schemas/BillingAddon"
+            $ref: '#/components/schemas/BillingAddon'
     BillingSubscription:
       type: object
       required:
@@ -2683,7 +2679,7 @@ components:
           example: pro
         plan_name:
           type: string
-          example: РџСЂРѕС„Рё
+          example: Профи
         renews_at:
           type: string
           format: date-time
@@ -2694,7 +2690,7 @@ components:
           type: boolean
           example: true
         usage:
-          $ref: "#/components/schemas/BillingUsage"
+          $ref: '#/components/schemas/BillingUsage'
     BillingUsage:
       type: object
       required:
@@ -2721,7 +2717,7 @@ components:
           example: pro
         name:
           type: string
-          example: РџСЂРѕС„Рё
+          example: Профи
         monthly_price:
           type: integer
           example: 1490
@@ -2734,7 +2730,7 @@ components:
         features:
           type: array
           items:
-            $ref: "#/components/schemas/BillingPlanFeature"
+            $ref: '#/components/schemas/BillingPlanFeature'
         current:
           type: boolean
         popular:
@@ -2747,7 +2743,7 @@ components:
       properties:
         label:
           type: string
-          example: Р’СЃРµ СЃС‚РёР»Рё РіРµРЅРµСЂР°С†РёРё
+          example: Все стили генерации
         enabled:
           type: boolean
           example: true
@@ -2764,10 +2760,10 @@ components:
           example: cards_100
         title:
           type: string
-          example: 100 РєР°СЂС‚РѕС‡РµРє
+          example: 100 карточек
         description:
           type: string
-          example: Р Р°Р·РѕРІС‹Р№ РїР°РєРµС‚ РґР»СЏ СЃСЂРѕС‡РЅРѕРіРѕ РѕР±СЉС‘РјР°.
+          example: Разовый пакет для срочного объёма.
         price:
           type: integer
           example: 490
@@ -2822,6 +2818,71 @@ components:
           enum:
             - scheduled_cancel
           example: scheduled_cancel
+    YooKassaWebhookEvent:
+      type: object
+      required:
+        - type
+        - object
+      properties:
+        type:
+          type: string
+          enum:
+            - payment.succeeded
+            - payment.canceled
+          example: payment.succeeded
+        object:
+          $ref: '#/components/schemas/YooKassaPaymentObject'
+    YooKassaPaymentObject:
+      type: object
+      required:
+        - id
+        - status
+        - amount
+        - metadata
+      properties:
+        id:
+          type: string
+          example: 2a4e4c49-000f-5000-a000-1e1ce5e3b4c4
+        status:
+          type: string
+          enum:
+            - succeeded
+            - canceled
+          example: succeeded
+        amount:
+          type: object
+          properties:
+            value:
+              type: string
+              example: '1490.00'
+            currency:
+              type: string
+              example: RUB
+        captured_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          properties:
+            user_id:
+              type: string
+              example: 550e8400-e29b-41d4-a716-446655440000
+            plan_code:
+              type: string
+              example: pro
+            addon_code:
+              type: string
+              example: cards_100
+            period:
+              type: string
+              enum:
+                - monthly
+                - yearly
+            type:
+              type: string
+              enum:
+                - subscription
+                - addon
     SettingsResponse:
       type: object
       required:
@@ -2833,21 +2894,21 @@ components:
         - api_key
       properties:
         profile:
-          $ref: "#/components/schemas/SettingsProfile"
+          $ref: '#/components/schemas/SettingsProfile'
         defaults:
-          $ref: "#/components/schemas/SettingsDefaults"
+          $ref: '#/components/schemas/SettingsDefaults'
         notifications:
-          $ref: "#/components/schemas/SettingsNotifications"
+          $ref: '#/components/schemas/SettingsNotifications'
         sessions:
           type: array
           items:
-            $ref: "#/components/schemas/SettingsSession"
+            $ref: '#/components/schemas/SettingsSession'
         integrations:
           type: array
           items:
-            $ref: "#/components/schemas/SettingsIntegration"
+            $ref: '#/components/schemas/SettingsIntegration'
         api_key:
-          $ref: "#/components/schemas/SettingsAPIKey"
+          $ref: '#/components/schemas/SettingsAPIKey'
     SettingsProfile:
       type: object
       required:
@@ -2863,7 +2924,7 @@ components:
           example: ivan@example.com
         phone:
           type: string
-          example: "+7 999 123-45-67"
+          example: +7 999 123-45-67
         company:
           type: string
           example: Kartochki LLC
@@ -2897,7 +2958,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/UpdateNotificationItem"
+            $ref: '#/components/schemas/UpdateNotificationItem'
     SettingsSession:
       type: object
       required:
@@ -2966,7 +3027,7 @@ components:
           example: ivan@example.com
         phone:
           type: string
-          example: "+7 999 123-45-67"
+          example: +7 999 123-45-67
         company:
           type: string
           example: Kartochki LLC
@@ -3013,7 +3074,7 @@ components:
           type: array
           minItems: 1
           items:
-            $ref: "#/components/schemas/UpdateNotificationItem"
+            $ref: '#/components/schemas/UpdateNotificationItem'
     UpdateNotificationItem:
       type: object
       required:
@@ -3065,25 +3126,25 @@ components:
         - pagination
       properties:
         featured_post:
-          $ref: "#/components/schemas/FeaturedBlogPost"
+          $ref: '#/components/schemas/FeaturedBlogPost'
         posts:
           type: array
           items:
-            $ref: "#/components/schemas/BlogListItem"
+            $ref: '#/components/schemas/BlogListItem'
         categories:
           type: array
           items:
-            $ref: "#/components/schemas/BlogCategory"
+            $ref: '#/components/schemas/BlogCategory'
         popular_posts:
           type: array
           items:
-            $ref: "#/components/schemas/BlogSidebarPost"
+            $ref: '#/components/schemas/BlogSidebarPost'
         tags:
           type: array
           items:
-            $ref: "#/components/schemas/BlogTag"
+            $ref: '#/components/schemas/BlogTag'
         pagination:
-          $ref: "#/components/schemas/BlogPagination"
+          $ref: '#/components/schemas/BlogPagination'
     FeaturedBlogPost:
       type: object
       required:
@@ -3212,15 +3273,15 @@ components:
         - related_posts
       properties:
         post:
-          $ref: "#/components/schemas/BlogPostDetail"
+          $ref: '#/components/schemas/BlogPostDetail'
         article_sections:
           type: array
           items:
-            $ref: "#/components/schemas/BlogArticleSection"
+            $ref: '#/components/schemas/BlogArticleSection'
         related_posts:
           type: array
           items:
-            $ref: "#/components/schemas/RelatedBlogPost"
+            $ref: '#/components/schemas/RelatedBlogPost'
     BlogPostDetail:
       type: object
       required:
@@ -3265,7 +3326,7 @@ components:
         tags:
           type: array
           items:
-            $ref: "#/components/schemas/BlogTag"
+            $ref: '#/components/schemas/BlogTag'
     BlogArticleSection:
       type: object
       required:
@@ -3286,7 +3347,7 @@ components:
           maximum: 6
           example: 2
         kind:
-          $ref: "#/components/schemas/BlogSectionKind"
+          $ref: '#/components/schemas/BlogSectionKind'
         body:
           type: string
         list:
@@ -3294,17 +3355,17 @@ components:
           items:
             type: string
         table:
-          $ref: "#/components/schemas/BlogSectionTable"
+          $ref: '#/components/schemas/BlogSectionTable'
         callout:
-          $ref: "#/components/schemas/BlogSectionCallout"
+          $ref: '#/components/schemas/BlogSectionCallout'
         cards:
           type: array
           items:
-            $ref: "#/components/schemas/BlogSectionCard"
+            $ref: '#/components/schemas/BlogSectionCard'
         steps:
           type: array
           items:
-            $ref: "#/components/schemas/BlogSectionStep"
+            $ref: '#/components/schemas/BlogSectionStep'
     BlogSectionKind:
       type: string
       enum:
@@ -3366,7 +3427,7 @@ components:
         meta:
           type: array
           items:
-            $ref: "#/components/schemas/BlogSectionCardMetaRow"
+            $ref: '#/components/schemas/BlogSectionCardMetaRow'
     BlogSectionCardMetaRow:
       type: object
       required:
@@ -3407,69 +3468,3 @@ components:
         canonical_path:
           type: string
           example: /blog/infografika-dlya-ozon-conversion
-
-    YooKassaWebhookEvent:
-      type: object
-      required:
-        - type
-        - object
-      properties:
-        type:
-          type: string
-          enum:
-            - payment.succeeded
-            - payment.canceled
-          example: payment.succeeded
-        object:
-          $ref: "#/components/schemas/YooKassaPaymentObject"
-    YooKassaPaymentObject:
-      type: object
-      required:
-        - id
-        - status
-        - amount
-        - metadata
-      properties:
-        id:
-          type: string
-          example: 2a4e4c49-000f-5000-a000-1e1ce5e3b4c4
-        status:
-          type: string
-          enum:
-            - succeeded
-            - canceled
-          example: succeeded
-        amount:
-          type: object
-          properties:
-            value:
-              type: string
-              example: "1490.00"
-            currency:
-              type: string
-              example: RUB
-        captured_at:
-          type: string
-          format: date-time
-        metadata:
-          type: object
-          properties:
-            user_id:
-              type: string
-              example: 550e8400-e29b-41d4-a716-446655440000
-            plan_code:
-              type: string
-              example: pro
-            addon_code:
-              type: string
-              example: cards_100
-            period:
-              type: string
-              enum:
-                - monthly
-                - yearly
-            type:
-              type: string
-              enum:
-                - subscription
-                - addon

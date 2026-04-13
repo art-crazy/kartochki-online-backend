@@ -1,0 +1,49 @@
+paths:
+  /health/live:
+    get:
+      summary: Проверка, что HTTP-процесс запущен
+      operationId: getLiveHealth
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Сервис запущен и отвечает на HTTP-запросы
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/HealthResponse"
+
+  /health/ready:
+    get:
+      summary: Проверка готовности зависимостей
+      operationId: getReadyHealth
+      tags:
+        - Health
+      responses:
+        "200":
+          description: База данных и остальные обязательные зависимости доступны
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/HealthResponse"
+        "503":
+          description: Одна или несколько обязательных зависимостей недоступны
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/HealthResponse"

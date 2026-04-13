@@ -59,15 +59,29 @@ make sqlc
 make migrate-up
 make migrate-down
 make migrate-version
+make bundle    # собрать api/openapi/openapi.yaml из src/
+make generate  # сгенерировать Go-типы в api/gen/openapi.gen.go
 ```
 
 `migrate-*` используют `POSTGRES_DSN` из env или значение по умолчанию из `Makefile`.
 
 ## OpenAPI
 
-Спека лежит в `api/openapi/openapi.yaml`.
+Спека хранится в виде многофайловой структуры и бандлится в единый файл:
 
-Во время работы API она отдаётся по:
+```
+api/openapi/src/          ← исходники (редактировать здесь)
+api/openapi/openapi.yaml  ← сбандленный файл (коммитить)
+api/gen/openapi.gen.go    ← сгенерированные Go-типы (коммитить)
+```
+
+После изменений в `src/` нужно пересобрать и перегенерировать:
+
+```bash
+make bundle && make generate
+```
+
+Во время работы API спека отдаётся по:
 
 - `GET /openapi/openapi.yaml`
 

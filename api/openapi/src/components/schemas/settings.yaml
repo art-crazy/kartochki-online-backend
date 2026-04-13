@@ -1,0 +1,248 @@
+schemas:
+  SettingsProfile:
+    type: object
+    required:
+      - name
+      - email
+    properties:
+      name:
+        type: string
+        example: Ivan
+      email:
+        type: string
+        format: email
+        example: ivan@example.com
+      phone:
+        type: string
+        example: "+7 999 123-45-67"
+      company:
+        type: string
+        example: Kartochki LLC
+
+  SettingsDefaults:
+    type: object
+    required:
+      - marketplace_id
+      - cards_per_generation
+      - format
+    properties:
+      marketplace_id:
+        type: string
+        example: wildberries
+      cards_per_generation:
+        type: integer
+        minimum: 1
+        maximum: 50
+        example: 10
+      format:
+        type: string
+        enum:
+          - png
+          - jpg
+          - webp
+        example: png
+
+  UpdateNotificationItem:
+    type: object
+    required:
+      - key
+      - enabled
+    properties:
+      key:
+        type: string
+        example: generation_ready
+      enabled:
+        type: boolean
+
+  SettingsNotifications:
+    type: object
+    required:
+      - items
+    properties:
+      items:
+        type: array
+        items:
+          $ref: "#/schemas/UpdateNotificationItem"
+
+  SettingsSession:
+    type: object
+    required:
+      - id
+      - device
+      - platform
+      - is_current
+      - can_revoke
+    properties:
+      id:
+        type: string
+        format: uuid
+      device:
+        type: string
+        example: Chrome browser
+      platform:
+        type: string
+        example: macOS
+      location:
+        type: string
+        example: 203.0.113.20
+      is_current:
+        type: boolean
+      can_revoke:
+        type: boolean
+
+  SettingsIntegration:
+    type: object
+    required:
+      - provider
+      - connected
+    properties:
+      id:
+        type: string
+        format: uuid
+      provider:
+        type: string
+        example: yandex
+      account_email:
+        type: string
+        format: email
+      connected:
+        type: boolean
+
+  SettingsAPIKey:
+    type: object
+    required:
+      - can_rotate
+    properties:
+      masked_value:
+        type: string
+        example: ko_l********************************P0Q2
+      can_rotate:
+        type: boolean
+        example: true
+
+  SettingsResponse:
+    type: object
+    required:
+      - profile
+      - defaults
+      - notifications
+      - sessions
+      - integrations
+      - api_key
+    properties:
+      profile:
+        $ref: "#/schemas/SettingsProfile"
+      defaults:
+        $ref: "#/schemas/SettingsDefaults"
+      notifications:
+        $ref: "#/schemas/SettingsNotifications"
+      sessions:
+        type: array
+        items:
+          $ref: "#/schemas/SettingsSession"
+      integrations:
+        type: array
+        items:
+          $ref: "#/schemas/SettingsIntegration"
+      api_key:
+        $ref: "#/schemas/SettingsAPIKey"
+
+  UpdateProfileRequest:
+    type: object
+    required:
+      - name
+      - email
+    properties:
+      name:
+        type: string
+        example: Ivan
+      email:
+        type: string
+        format: email
+        example: ivan@example.com
+      phone:
+        type: string
+        example: "+7 999 123-45-67"
+      company:
+        type: string
+        example: Kartochki LLC
+
+  UpdateDefaultsRequest:
+    type: object
+    required:
+      - marketplace_id
+      - cards_per_generation
+      - format
+    properties:
+      marketplace_id:
+        type: string
+        example: wildberries
+      cards_per_generation:
+        type: integer
+        minimum: 1
+        maximum: 50
+        example: 10
+      format:
+        type: string
+        enum:
+          - png
+          - jpg
+          - webp
+        example: png
+
+  ChangePasswordRequest:
+    type: object
+    required:
+      - current_password
+      - new_password
+    properties:
+      current_password:
+        type: string
+        format: password
+      new_password:
+        type: string
+        format: password
+
+  UpdateNotificationsRequest:
+    type: object
+    required:
+      - items
+    properties:
+      items:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/schemas/UpdateNotificationItem"
+
+  RotateAPIKeyResponse:
+    type: object
+    required:
+      - masked_value
+      - plain_value
+    properties:
+      masked_value:
+        type: string
+        example: ko_l********************************P0Q2
+      plain_value:
+        type: string
+        example: ko_live_7fD2D1Xnq6C7xBskjPq6WQ6OHvOjQJE9P0Q
+
+  ExportDataResponse:
+    type: object
+    required:
+      - status
+    properties:
+      status:
+        type: string
+        enum:
+          - accepted
+        example: accepted
+
+  DeleteAccountRequest:
+    type: object
+    required:
+      - confirm_word
+    properties:
+      confirm_word:
+        type: string
+        example: DELETE

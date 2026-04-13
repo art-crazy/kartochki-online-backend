@@ -9,9 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 
-	"kartochki-online-backend/internal/auth"
-	"kartochki-online-backend/internal/http/authctx"
-	"kartochki-online-backend/internal/http/contracts"
+	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/http/requestctx"
 	"kartochki-online-backend/internal/http/response"
 	"kartochki-online-backend/internal/projects"
@@ -42,12 +40,12 @@ func NewProjectsHandler(projectService projectService, logger zerolog.Logger) Pr
 
 // Create создаёт новый проект для текущего пользователя.
 func (h ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
 
-	var req contracts.CreateProjectRequest
+	var req openapi.CreateProjectRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -61,9 +59,9 @@ func (h ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	project, err := h.projectService.Create(r.Context(), projects.CreateInput{
 		UserID:             user.ID,
 		Title:              req.Title,
-		Marketplace:        req.Marketplace,
-		ProductName:        req.ProductName,
-		ProductDescription: req.ProductDescription,
+		Marketplace:        stringOrEmpty(req.Marketplace),
+		ProductName:        stringOrEmpty(req.ProductName),
+		ProductDescription: stringOrEmpty(req.ProductDescription),
 	})
 	if err != nil {
 		if writeProjectDomainError(w, r, err) {
@@ -76,12 +74,12 @@ func (h ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusCreated, contracts.ProjectResponse{Project: toProjectContract(project)})
+	response.WriteJSON(w, r, http.StatusCreated, openapi.ProjectResponse{Project: toProjectContract(project)})
 }
 
 // List возвращает все активные проекты текущего пользователя.
 func (h ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
@@ -94,12 +92,12 @@ func (h ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.ProjectListResponse{Projects: toProjectContracts(list)})
+	response.WriteJSON(w, r, http.StatusOK, openapi.ProjectListResponse{Projects: toProjectContracts(list)})
 }
 
 // Get возвращает один активный проект текущего пользователя.
 func (h ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
@@ -118,17 +116,17 @@ func (h ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.ProjectResponse{Project: toProjectContract(project)})
+	response.WriteJSON(w, r, http.StatusOK, openapi.ProjectResponse{Project: toProjectContract(project)})
 }
 
 // Patch частично обновляет проект текущего пользователя.
 func (h ProjectsHandler) Patch(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
 
-	var req contracts.PatchProjectRequest
+	var req openapi.PatchProjectRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -161,12 +159,12 @@ func (h ProjectsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.ProjectResponse{Project: toProjectContract(project)})
+	response.WriteJSON(w, r, http.StatusOK, openapi.ProjectResponse{Project: toProjectContract(project)})
 }
 
 // Delete мягко удаляет проект текущего пользователя.
 func (h ProjectsHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
@@ -184,18 +182,18 @@ func (h ProjectsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "deleted"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusDeleted})
 }
 
-func validateCreateProjectRequest(req contracts.CreateProjectRequest) []contracts.ErrorDetail {
-	return validateProjectFields(req.Title, req.Marketplace, req.ProductName, req.ProductDescription, true)
+func validateCreateProjectRequest(req openapi.CreateProjectRequest) []openapi.ErrorDetail {
+	return validateProjectFields(req.Title, stringOrEmpty(req.Marketplace), stringOrEmpty(req.ProductName), stringOrEmpty(req.ProductDescription), true)
 }
 
-func validatePatchProjectRequest(req contracts.PatchProjectRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validatePatchProjectRequest(req openapi.PatchProjectRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
 	if req.Title == nil && req.Marketplace == nil && req.ProductName == nil && req.ProductDescription == nil {
-		details = append(details, contracts.ErrorDetail{Message: "at least one field must be provided"})
+		details = append(details, openapi.ErrorDetail{Message: "at least one field must be provided"})
 		return details
 	}
 
@@ -222,28 +220,28 @@ func validatePatchProjectRequest(req contracts.PatchProjectRequest) []contracts.
 
 // validateProjectFields повторяет transport-валидацию до вызова сервиса,
 // чтобы клиент сразу получил понятную ошибку по полю, а не общий отказ домена.
-func validateProjectFields(title string, marketplace string, productName string, productDescription string, titleRequired bool) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateProjectFields(title string, marketplace string, productName string, productDescription string, titleRequired bool) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
 	trimmedTitle := strings.TrimSpace(title)
 	if titleRequired && trimmedTitle == "" {
-		details = append(details, contracts.ErrorDetail{Field: "title", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("title"), Message: "field is required"})
 	}
 	if title != "" && trimmedTitle == "" {
-		details = append(details, contracts.ErrorDetail{Field: "title", Message: "must not be empty"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("title"), Message: "must not be empty"})
 	}
 	if len(trimmedTitle) > projects.MaxProjectTitleLength {
-		details = append(details, contracts.ErrorDetail{Field: "title", Message: "must be at most 200 characters"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("title"), Message: "must be at most 200 characters"})
 	}
 
 	if len(strings.TrimSpace(marketplace)) > projects.MaxMarketplaceLength {
-		details = append(details, contracts.ErrorDetail{Field: "marketplace", Message: "must be at most 100 characters"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("marketplace"), Message: "must be at most 100 characters"})
 	}
 	if len(strings.TrimSpace(productName)) > projects.MaxProjectProductNameLength {
-		details = append(details, contracts.ErrorDetail{Field: "product_name", Message: "must be at most 255 characters"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("product_name"), Message: "must be at most 255 characters"})
 	}
 	if len(strings.TrimSpace(productDescription)) > projects.MaxProjectDescriptionLength {
-		details = append(details, contracts.ErrorDetail{Field: "product_description", Message: "must be at most 5000 characters"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("product_description"), Message: "must be at most 5000 characters"})
 	}
 
 	return details
@@ -258,7 +256,7 @@ func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) 
 			http.StatusBadRequest,
 			"validation_error",
 			"request validation failed",
-			contracts.ErrorDetail{Field: "title", Message: "field is required"},
+			openapi.ErrorDetail{Field: strPtr("title"), Message: "field is required"},
 		)
 		return true
 	case errors.Is(err, projects.ErrTitleTooLong):
@@ -268,7 +266,7 @@ func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) 
 			http.StatusBadRequest,
 			"validation_error",
 			"request validation failed",
-			contracts.ErrorDetail{Field: "title", Message: "must be at most 200 characters"},
+			openapi.ErrorDetail{Field: strPtr("title"), Message: "must be at most 200 characters"},
 		)
 		return true
 	case errors.Is(err, projects.ErrMarketplaceTooLong):
@@ -278,7 +276,7 @@ func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) 
 			http.StatusBadRequest,
 			"validation_error",
 			"request validation failed",
-			contracts.ErrorDetail{Field: "marketplace", Message: "must be at most 100 characters"},
+			openapi.ErrorDetail{Field: strPtr("marketplace"), Message: "must be at most 100 characters"},
 		)
 		return true
 	case errors.Is(err, projects.ErrProductNameTooLong):
@@ -288,7 +286,7 @@ func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) 
 			http.StatusBadRequest,
 			"validation_error",
 			"request validation failed",
-			contracts.ErrorDetail{Field: "product_name", Message: "must be at most 255 characters"},
+			openapi.ErrorDetail{Field: strPtr("product_name"), Message: "must be at most 255 characters"},
 		)
 		return true
 	case errors.Is(err, projects.ErrProductDescriptionTooLong):
@@ -298,7 +296,7 @@ func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) 
 			http.StatusBadRequest,
 			"validation_error",
 			"request validation failed",
-			contracts.ErrorDetail{Field: "product_description", Message: "must be at most 5000 characters"},
+			openapi.ErrorDetail{Field: strPtr("product_description"), Message: "must be at most 5000 characters"},
 		)
 		return true
 	default:
@@ -306,39 +304,34 @@ func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) 
 	}
 }
 
-func toProjectContract(project projects.Project) contracts.Project {
-	return contracts.Project{
-		ID:                 project.ID,
-		Title:              project.Title,
-		Marketplace:        project.Marketplace,
-		ProductName:        project.ProductName,
-		ProductDescription: project.ProductDescription,
-		Status:             project.Status,
-		CreatedAt:          project.CreatedAt,
-		UpdatedAt:          project.UpdatedAt,
+// toProjectContract конвертирует доменный projects.Project в openapi.Project для HTTP-ответа.
+func toProjectContract(project projects.Project) openapi.Project {
+	p := openapi.Project{
+		Id:        mustParseUUID(project.ID),
+		Title:     project.Title,
+		Status:    openapi.ProjectStatus(project.Status),
+		CreatedAt: project.CreatedAt,
+		UpdatedAt: project.UpdatedAt,
 	}
+	if project.Marketplace != "" {
+		p.Marketplace = &project.Marketplace
+	}
+	if project.ProductName != "" {
+		p.ProductName = &project.ProductName
+	}
+	if project.ProductDescription != "" {
+		p.ProductDescription = &project.ProductDescription
+	}
+	return p
 }
 
-func toProjectContracts(list []projects.Project) []contracts.Project {
-	result := make([]contracts.Project, len(list))
+func toProjectContracts(list []projects.Project) []openapi.Project {
+	result := make([]openapi.Project, len(list))
 	for i, project := range list {
 		result[i] = toProjectContract(project)
 	}
 
 	return result
-}
-
-// currentUser возвращает пользователя из auth middleware.
-// Если middleware по какой-то причине не положил пользователя в context, endpoint
-// отвечает так же, как и остальные защищённые маршруты проекта.
-func (h ProjectsHandler) currentUser(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
-	user, ok := authctx.User(r.Context())
-	if !ok {
-		response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "authorization token is invalid")
-		return auth.User{}, false
-	}
-
-	return user, true
 }
 
 // requestLogger возвращает request-scoped logger, чтобы ошибки handler уже содержали request_id и путь.

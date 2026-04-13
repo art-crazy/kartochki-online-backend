@@ -1,0 +1,293 @@
+paths:
+  /api/v1/billing:
+    get:
+      summary: Получить данные billing-страницы
+      operationId: getBilling
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Текущая подписка, тарифы и разовые пакеты карточек
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/billing.yaml#/schemas/BillingResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке billing-данных
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/billing/checkout:
+    post:
+      summary: Создать checkout для тарифа
+      operationId: createBillingCheckout
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/billing.yaml#/schemas/CreateCheckoutRequest"
+      responses:
+        "202":
+          description: Checkout успешно создан
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/billing.yaml#/schemas/CreateCheckoutResponse"
+        "400":
+          description: Ошибка валидации запроса
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "404":
+          description: Запрошенный тариф не найден
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Запрошенный тариф уже активен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Платёжный провайдер ещё не подключён
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/billing/addons:
+    post:
+      summary: Создать checkout для разового пакета
+      operationId: createBillingAddonCheckout
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/billing.yaml#/schemas/PurchaseAddonRequest"
+      responses:
+        "202":
+          description: Checkout для пакета успешно создан
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/billing.yaml#/schemas/PurchaseAddonResponse"
+        "400":
+          description: Ошибка валидации запроса
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "404":
+          description: Запрошенный пакет не найден
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Платёжный провайдер ещё не подключён
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/billing/cancel:
+    post:
+      summary: Отключить автопродление подписки
+      operationId: cancelBillingSubscription
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Автопродление успешно отключено
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/billing.yaml#/schemas/CancelSubscriptionResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Нечего отменять или подписка уже на отмене
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при отмене подписки
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/billing/webhook:
+    post:
+      summary: Webhook-уведомление от ЮКасса
+      description: |
+        Принимает события payment.succeeded и payment.canceled от ЮКасса.
+        Подпись проверяется через заголовок YooKassa-Signature (HMAC-SHA256).
+        Endpoint не требует авторизации пользователя — он публичный, но защищён подписью.
+        ЮКасса повторяет уведомление при ответах, отличных от 2xx, поэтому обработка идемпотентна.
+      operationId: billingWebhook
+      tags:
+        - Billing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/billing.yaml#/schemas/YooKassaWebhookEvent"
+      responses:
+        "200":
+          description: Событие принято и обработано
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/StatusResponse"
+        "400":
+          description: Невалидное тело запроса или неизвестный тип события
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: Неверная подпись YooKassa-Signature
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при обработке события
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"

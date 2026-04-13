@@ -1,0 +1,547 @@
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Регистрация по email и паролю
+      description: Создаёт нового пользователя и сразу открывает первую сессию.
+      operationId: registerAuthUser
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Пользователь создан и сразу авторизован
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Ошибка валидации входных данных
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Пользователь с таким email уже существует
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/login:
+    post:
+      summary: Вход по email и паролю
+      description: Проверяет учётные данные и создаёт новую пользовательскую сессию.
+      operationId: loginAuthUser
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Пользователь успешно авторизован
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Ошибка валидации входных данных
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: Неверный email или пароль
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/telegram/login:
+    post:
+      summary: Вход через Telegram
+      description: |
+        Завершает вход через Telegram Login Widget.
+
+        Frontend сначала показывает официальный Telegram Login Widget. После успешного входа
+        Telegram возвращает набор подписанных полей: `id`, `first_name`, `last_name`,
+        `username`, `photo_url`, `auth_date`, `hash`.
+
+        Frontend должен отправить эти поля на backend без изменений. Backend проверяет подпись
+        по токену Telegram-бота, убеждается что данные ещё не устарели, а затем находит
+        или создаёт локального пользователя и открывает обычную локальную сессию.
+
+        У Telegram может не быть email. Поэтому в ответе поле `user.email` может отсутствовать.
+      operationId: loginWithTelegram
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/TelegramLoginRequest"
+      responses:
+        "200":
+          description: Вход через Telegram завершён, локальная сессия создана
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Подписанные данные Telegram отсутствуют, испорчены или устарели
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через Telegram пока не настроен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/logout:
+    post:
+      summary: Выход из текущей сессии
+      description: Отзывает текущий Bearer-токен и завершает активную сессию.
+      operationId: logoutAuthUser
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Текущая сессия завершена
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/StatusResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/me:
+    get:
+      summary: Получить текущего пользователя
+      description: Возвращает данные пользователя из текущей авторизованной сессии.
+      operationId: getCurrentUser
+      tags:
+        - Auth
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Данные текущего пользователя
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/CurrentUserResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/forgot-password:
+    post:
+      summary: Запросить сброс пароля
+      description: |
+        Отправляет письмо со ссылкой для сброса пароля на указанный email.
+
+        Ответ всегда `200` независимо от того, найден пользователь или нет.
+        Это сделано намеренно, чтобы не раскрывать факт существования аккаунта по email.
+
+        Все предыдущие активные токены сброса для этого пользователя инвалидируются —
+        в каждый момент времени действует только один токен.
+      operationId: forgotPassword
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Запрос принят. Если аккаунт найден — письмо будет отправлено.
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/StatusResponse"
+        "400":
+          description: Ошибка валидации входных данных
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/reset-password:
+    post:
+      summary: Установить новый пароль по токену из письма
+      description: |
+        Проверяет одноразовый токен из письма и устанавливает новый пароль.
+
+        Токен действителен однократно и только в течение срока жизни, заданного на backend.
+        После использования токен помечается и повторный запрос с тем же токеном вернёт ошибку.
+      operationId: resetPassword
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Пароль успешно изменён
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/StatusResponse"
+        "400":
+          description: Токен недействителен, истёк или уже был использован; либо пароль не прошёл валидацию
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/vk/start:
+    get:
+      summary: Начать вход через VK
+      description: |
+        Первый шаг входа через VK ID.
+
+        Frontend открывает этот endpoint, когда пользователь нажимает кнопку
+        "Войти через VK". Backend подготавливает OAuth-запрос, сохраняет
+        одноразовый `state` и перенаправляет пользователя на страницу VK ID.
+
+        Этот endpoint не логинит пользователя сам по себе.
+        Его задача только начать внешний OAuth-flow и отправить пользователя к провайдеру.
+      operationId: startVkOAuth
+      tags:
+        - Auth
+      responses:
+        "302":
+          description: Backend перенаправил пользователя на страницу VK ID для подтверждения входа
+          headers:
+            Location:
+              description: URL страницы VK ID, куда нужно перейти для продолжения входа.
+              schema:
+                type: string
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+        "500":
+          description: Не удалось начать OAuth-flow из-за внутренней ошибки backend
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через VK пока не настроен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/vk/callback:
+    get:
+      summary: Завершить вход через VK
+      description: |
+        Второй шаг входа через VK ID.
+
+        Сюда VK ID вернёт пользователя после подтверждения входа.
+        Обычно frontend не вызывает этот endpoint вручную.
+
+        Backend проверяет `state`, получает профиль VK ID, находит или создаёт
+        локального пользователя и затем открывает обычную локальную сессию backend.
+      operationId: finishVkOAuth
+      tags:
+        - Auth
+      parameters:
+        - in: query
+          name: code
+          required: true
+          description: Временный код авторизации, который VK ID выдаёт backend после успешного подтверждения входа.
+          schema:
+            type: string
+        - in: query
+          name: state
+          required: true
+          description: Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Вход через VK завершён, локальная сессия создана
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Параметры `code` или `state` отсутствуют, истекли или не прошли проверку
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Не удалось завершить OAuth-flow из-за внутренней ошибки backend
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через VK пока не настроен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/yandex/start:
+    get:
+      summary: Начать вход через Яндекс
+      description: |
+        Первый шаг входа через Яндекс ID.
+
+        Frontend открывает этот endpoint, когда пользователь нажимает кнопку
+        "Войти через Яндекс". Backend подготавливает OAuth-запрос, сохраняет
+        одноразовый `state` и перенаправляет пользователя на страницу Яндекса.
+      operationId: startYandexOAuth
+      tags:
+        - Auth
+      responses:
+        "302":
+          description: Backend перенаправил пользователя на страницу Яндекса для подтверждения входа
+          headers:
+            Location:
+              description: URL страницы Яндекса, куда нужно перейти для продолжения входа.
+              schema:
+                type: string
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+        "500":
+          description: Не удалось начать OAuth-flow из-за внутренней ошибки backend
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через Яндекс пока не настроен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/yandex/callback:
+    get:
+      summary: Завершить вход через Яндекс
+      description: |
+        Второй шаг входа через Яндекс ID.
+
+        Сюда Яндекс вернёт пользователя после подтверждения входа.
+        Backend проверяет `state`, получает профиль Яндекс ID, находит или создаёт
+        локального пользователя и затем открывает обычную локальную сессию backend.
+      operationId: finishYandexOAuth
+      tags:
+        - Auth
+      parameters:
+        - in: query
+          name: code
+          required: true
+          description: Временный код авторизации, который Яндекс выдаёт backend после успешного подтверждения входа.
+          schema:
+            type: string
+        - in: query
+          name: state
+          required: true
+          description: Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Вход через Яндекс завершён, локальная сессия создана
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Параметры `code` или `state` отсутствуют, истекли или не прошли проверку
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Не удалось завершить OAuth-flow из-за внутренней ошибки backend
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через Яндекс пока не настроен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"

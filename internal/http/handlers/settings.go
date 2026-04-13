@@ -5,15 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/mail"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/auth"
 	"kartochki-online-backend/internal/http/authctx"
-	"kartochki-online-backend/internal/http/contracts"
 	"kartochki-online-backend/internal/http/requestctx"
 	"kartochki-online-backend/internal/http/response"
 	"kartochki-online-backend/internal/settings"
@@ -67,7 +67,7 @@ func (h SettingsHandler) PatchProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req contracts.UpdateProfileRequest
+	var req openapi.UpdateProfileRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -80,17 +80,17 @@ func (h SettingsHandler) PatchProfile(w http.ResponseWriter, r *http.Request) {
 
 	profile, err := h.settingsService.UpdateProfile(r.Context(), user.ID, settings.UpdateProfileInput{
 		Name:    req.Name,
-		Email:   req.Email,
-		Phone:   req.Phone,
-		Company: req.Company,
+		Email:   string(req.Email),
+		Phone:   stringOrEmpty(req.Phone),
+		Company: stringOrEmpty(req.Company),
 	})
 	if err != nil {
 		switch {
 		case errors.Is(err, settings.ErrEmailTaken):
 			response.WriteError(w, r, http.StatusConflict, "email_taken", "email is already registered")
 		case errors.Is(err, settings.ErrNameRequired):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "name",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("name"),
 				Message: "field is required",
 			})
 		default:
@@ -99,12 +99,18 @@ func (h SettingsHandler) PatchProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.SettingsProfile{
-		Name:    profile.Name,
-		Email:   profile.Email,
-		Phone:   profile.Phone,
-		Company: profile.Company,
-	})
+	email := openapi_types.Email(profile.Email)
+	profileResp := openapi.SettingsProfile{
+		Name:  profile.Name,
+		Email: email,
+	}
+	if profile.Phone != "" {
+		profileResp.Phone = &profile.Phone
+	}
+	if profile.Company != "" {
+		profileResp.Company = &profile.Company
+	}
+	response.WriteJSON(w, r, http.StatusOK, profileResp)
 }
 
 // PatchDefaults обновляет дефолтные параметры генерации.
@@ -114,7 +120,7 @@ func (h SettingsHandler) PatchDefaults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req contracts.UpdateDefaultsRequest
+	var req openapi.UpdateDefaultsRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -126,20 +132,20 @@ func (h SettingsHandler) PatchDefaults(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defaults, err := h.settingsService.UpdateDefaults(r.Context(), user.ID, settings.UpdateDefaultsInput{
-		MarketplaceID:      req.MarketplaceID,
+		MarketplaceID:      req.MarketplaceId,
 		CardsPerGeneration: req.CardsPerGeneration,
-		Format:             req.Format,
+		Format:             string(req.Format),
 	})
 	if err != nil {
 		switch {
 		case errors.Is(err, settings.ErrCardsPerGenerationOutOfRange):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "cards_per_generation",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("cards_per_generation"),
 				Message: "must be between 1 and 50",
 			})
 		case errors.Is(err, settings.ErrInvalidImageFormat):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "format",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("format"),
 				Message: "must be one of: png, jpg, webp",
 			})
 		default:
@@ -148,10 +154,10 @@ func (h SettingsHandler) PatchDefaults(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.SettingsDefaults{
-		MarketplaceID:      defaults.MarketplaceID,
+	response.WriteJSON(w, r, http.StatusOK, openapi.SettingsDefaults{
+		MarketplaceId:      defaults.MarketplaceID,
 		CardsPerGeneration: defaults.CardsPerGeneration,
-		Format:             defaults.Format,
+		Format:             openapi.SettingsDefaultsFormat(defaults.Format),
 	})
 }
 
@@ -162,7 +168,7 @@ func (h SettingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req contracts.ChangePasswordRequest
+	var req openapi.ChangePasswordRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -178,8 +184,8 @@ func (h SettingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, settings.ErrCurrentPasswordInvalid):
 			response.WriteError(w, r, http.StatusBadRequest, "invalid_current_password", "current password is invalid")
 		case errors.Is(err, auth.ErrPasswordTooShort):
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "new_password",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("new_password"),
 				Message: fmt.Sprintf("must be at least %d characters", h.settingsService.PasswordMinLength()),
 			})
 		default:
@@ -188,7 +194,7 @@ func (h SettingsHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "password_changed"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusPasswordChanged})
 }
 
 // PatchNotifications сохраняет переключатели уведомлений.
@@ -198,7 +204,7 @@ func (h SettingsHandler) PatchNotifications(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var req contracts.UpdateNotificationsRequest
+	var req openapi.UpdateNotificationsRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -220,8 +226,8 @@ func (h SettingsHandler) PatchNotifications(w http.ResponseWriter, r *http.Reque
 	updated, err := h.settingsService.UpdateNotifications(r.Context(), user.ID, items)
 	if err != nil {
 		if errors.Is(err, settings.ErrUnknownNotificationKey) {
-			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-				Field:   "items",
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("items"),
 				Message: "contains unknown notification key",
 			})
 			return
@@ -231,7 +237,7 @@ func (h SettingsHandler) PatchNotifications(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.SettingsNotifications{Items: toNotificationContracts(updated)})
+	response.WriteJSON(w, r, http.StatusOK, openapi.SettingsNotifications{Items: toNotificationContracts(updated)})
 }
 
 // DeleteSession отзывает одну не-текущую сессию пользователя.
@@ -259,7 +265,7 @@ func (h SettingsHandler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "deleted"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusDeleted})
 }
 
 // RotateAPIKey перевыпускает API-ключ и отдаёт новый секрет один раз.
@@ -275,7 +281,7 @@ func (h SettingsHandler) RotateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.RotateAPIKeyResponse{
+	response.WriteJSON(w, r, http.StatusOK, openapi.RotateAPIKeyResponse{
 		MaskedValue: key.MaskedValue,
 		PlainValue:  key.PlainValue,
 	})
@@ -293,7 +299,7 @@ func (h SettingsHandler) ExportData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.ExportDataResponse{Status: "accepted"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.ExportDataResponse{Status: openapi.ExportDataResponseStatusAccepted})
 }
 
 // DeleteAccount удаляет аккаунт после явного подтверждения.
@@ -303,15 +309,15 @@ func (h SettingsHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req contracts.DeleteAccountRequest
+	var req openapi.DeleteAccountRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
 
 	if strings.TrimSpace(req.ConfirmWord) == "" {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-			Field:   "confirm_word",
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+			Field:   strPtr("confirm_word"),
 			Message: "field is required",
 		})
 		return
@@ -327,7 +333,7 @@ func (h SettingsHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.StatusResponse{Status: "deleted"})
+	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusDeleted})
 }
 
 func (h SettingsHandler) currentAuth(w http.ResponseWriter, r *http.Request) (auth.User, string, bool) {
@@ -357,33 +363,44 @@ func (h SettingsHandler) writeSettingsError(w http.ResponseWriter, r *http.Reque
 	response.WriteError(w, r, http.StatusInternalServerError, "internal_error", publicMessage)
 }
 
-func toSettingsResponse(payload settings.Settings) contracts.SettingsResponse {
-	return contracts.SettingsResponse{
-		Profile: contracts.SettingsProfile{
-			Name:    payload.Profile.Name,
-			Email:   payload.Profile.Email,
-			Phone:   payload.Profile.Phone,
-			Company: payload.Profile.Company,
-		},
-		Defaults: contracts.SettingsDefaults{
-			MarketplaceID:      payload.Defaults.MarketplaceID,
+func toSettingsResponse(payload settings.Settings) openapi.SettingsResponse {
+	email := openapi_types.Email(payload.Profile.Email)
+	profile := openapi.SettingsProfile{
+		Name:  payload.Profile.Name,
+		Email: email,
+	}
+	if payload.Profile.Phone != "" {
+		profile.Phone = &payload.Profile.Phone
+	}
+	if payload.Profile.Company != "" {
+		profile.Company = &payload.Profile.Company
+	}
+
+	apiKey := openapi.SettingsAPIKey{
+		CanRotate: payload.APIKey.CanRotate,
+	}
+	if payload.APIKey.MaskedValue != "" {
+		apiKey.MaskedValue = &payload.APIKey.MaskedValue
+	}
+
+	return openapi.SettingsResponse{
+		Profile: profile,
+		Defaults: openapi.SettingsDefaults{
+			MarketplaceId:      payload.Defaults.MarketplaceID,
 			CardsPerGeneration: payload.Defaults.CardsPerGeneration,
-			Format:             payload.Defaults.Format,
+			Format:             openapi.SettingsDefaultsFormat(payload.Defaults.Format),
 		},
-		Notifications: contracts.SettingsNotifications{Items: toNotificationContracts(payload.Notifications)},
+		Notifications: openapi.SettingsNotifications{Items: toNotificationContracts(payload.Notifications)},
 		Sessions:      toSettingsSessionContracts(payload.Sessions),
 		Integrations:  toSettingsIntegrationContracts(payload.Integrations),
-		APIKey: contracts.SettingsAPIKey{
-			MaskedValue: payload.APIKey.MaskedValue,
-			CanRotate:   payload.APIKey.CanRotate,
-		},
+		ApiKey:        apiKey,
 	}
 }
 
-func toNotificationContracts(items []settings.NotificationItem) []contracts.UpdateNotificationItem {
-	result := make([]contracts.UpdateNotificationItem, len(items))
+func toNotificationContracts(items []settings.NotificationItem) []openapi.UpdateNotificationItem {
+	result := make([]openapi.UpdateNotificationItem, len(items))
 	for i, item := range items {
-		result[i] = contracts.UpdateNotificationItem{
+		result[i] = openapi.UpdateNotificationItem{
 			Key:     item.Key,
 			Enabled: item.Enabled,
 		}
@@ -392,77 +409,88 @@ func toNotificationContracts(items []settings.NotificationItem) []contracts.Upda
 	return result
 }
 
-func toSettingsSessionContracts(items []settings.Session) []contracts.SettingsSession {
-	result := make([]contracts.SettingsSession, len(items))
+func toSettingsSessionContracts(items []settings.Session) []openapi.SettingsSession {
+	result := make([]openapi.SettingsSession, len(items))
 	for i, item := range items {
-		result[i] = contracts.SettingsSession{
-			ID:        item.ID,
+		s := openapi.SettingsSession{
+			Id:        mustParseUUID(item.ID),
 			Device:    item.Device,
 			Platform:  item.Platform,
-			Location:  item.Location,
 			IsCurrent: item.IsCurrent,
 			CanRevoke: item.CanRevoke,
 		}
-	}
-
-	return result
-}
-
-func toSettingsIntegrationContracts(items []settings.Integration) []contracts.SettingsIntegration {
-	result := make([]contracts.SettingsIntegration, len(items))
-	for i, item := range items {
-		result[i] = contracts.SettingsIntegration{
-			ID:           item.ID,
-			Provider:     item.Provider,
-			AccountEmail: item.AccountEmail,
-			Connected:    item.Connected,
+		if item.Location != "" {
+			s.Location = &item.Location
 		}
+		result[i] = s
 	}
 
 	return result
 }
 
-func validateUpdateProfileRequest(req contracts.UpdateProfileRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func toSettingsIntegrationContracts(items []settings.Integration) []openapi.SettingsIntegration {
+	result := make([]openapi.SettingsIntegration, len(items))
+	for i, item := range items {
+		s := openapi.SettingsIntegration{
+			Provider:  item.Provider,
+			Connected: item.Connected,
+		}
+		// ID и AccountEmail в интеграции опциональны — не подключённые провайдеры могут не иметь ID.
+		if item.ID != "" {
+			id := mustParseUUID(item.ID)
+			s.Id = &id
+		}
+		if item.AccountEmail != "" {
+			email := openapi_types.Email(item.AccountEmail)
+			s.AccountEmail = &email
+		}
+		result[i] = s
+	}
+
+	return result
+}
+
+func validateUpdateProfileRequest(req openapi.UpdateProfileRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.Name) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "name", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("name"), Message: "field is required"})
 	}
-	if email := strings.TrimSpace(req.Email); email != "" && !isValidSettingsEmail(email) {
-		details = append(details, contracts.ErrorDetail{Field: "email", Message: "must be a valid email"})
+	if email := strings.TrimSpace(string(req.Email)); email != "" && !isValidEmail(email) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "must be a valid email"})
 	}
 
 	return details
 }
 
-func validateUpdateDefaultsRequest(req contracts.UpdateDefaultsRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateUpdateDefaultsRequest(req openapi.UpdateDefaultsRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
 	if req.CardsPerGeneration < 1 || req.CardsPerGeneration > 50 {
-		details = append(details, contracts.ErrorDetail{Field: "cards_per_generation", Message: "must be between 1 and 50"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("cards_per_generation"), Message: "must be between 1 and 50"})
 	}
 
-	format := strings.TrimSpace(strings.ToLower(req.Format))
+	format := strings.TrimSpace(strings.ToLower(string(req.Format)))
 	if format == "" {
-		details = append(details, contracts.ErrorDetail{Field: "format", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("format"), Message: "field is required"})
 	} else if format != "png" && format != "jpg" && format != "webp" {
-		details = append(details, contracts.ErrorDetail{Field: "format", Message: "must be one of: png, jpg, webp"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("format"), Message: "must be one of: png, jpg, webp"})
 	}
 
 	return details
 }
 
-func validateChangePasswordRequest(req contracts.ChangePasswordRequest, passwordMinLength int) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateChangePasswordRequest(req openapi.ChangePasswordRequest, passwordMinLength int) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.CurrentPassword) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "current_password", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("current_password"), Message: "field is required"})
 	}
 	if strings.TrimSpace(req.NewPassword) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "new_password", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("new_password"), Message: "field is required"})
 	} else if len(req.NewPassword) < passwordMinLength {
-		details = append(details, contracts.ErrorDetail{
-			Field:   "new_password",
+		details = append(details, openapi.ErrorDetail{
+			Field:   strPtr("new_password"),
 			Message: fmt.Sprintf("must be at least %d characters", passwordMinLength),
 		})
 	}
@@ -470,11 +498,11 @@ func validateChangePasswordRequest(req contracts.ChangePasswordRequest, password
 	return details
 }
 
-func validateUpdateNotificationsRequest(req contracts.UpdateNotificationsRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateUpdateNotificationsRequest(req openapi.UpdateNotificationsRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
 	if len(req.Items) == 0 {
-		details = append(details, contracts.ErrorDetail{Field: "items", Message: "must contain at least one item"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("items"), Message: "must contain at least one item"})
 		return details
 	}
 
@@ -482,11 +510,11 @@ func validateUpdateNotificationsRequest(req contracts.UpdateNotificationsRequest
 	for _, item := range req.Items {
 		key := strings.TrimSpace(item.Key)
 		if key == "" {
-			details = append(details, contracts.ErrorDetail{Field: "items.key", Message: "field is required"})
+			details = append(details, openapi.ErrorDetail{Field: strPtr("items.key"), Message: "field is required"})
 			continue
 		}
 		if _, ok := seen[key]; ok {
-			details = append(details, contracts.ErrorDetail{Field: "items.key", Message: "must be unique"})
+			details = append(details, openapi.ErrorDetail{Field: strPtr("items.key"), Message: "must be unique"})
 			continue
 		}
 		seen[key] = struct{}{}
@@ -495,11 +523,3 @@ func validateUpdateNotificationsRequest(req contracts.UpdateNotificationsRequest
 	return details
 }
 
-func isValidSettingsEmail(value string) bool {
-	parsed, err := mail.ParseAddress(value)
-	if err != nil {
-		return false
-	}
-
-	return parsed.Address == value
-}

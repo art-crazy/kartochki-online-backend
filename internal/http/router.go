@@ -75,32 +75,43 @@ func NewRouter(
 			authRouter.Get("/yandex/callback", authHandler.YandexCallback)
 		})
 
-		api.With(authMiddleware.RequireUser).Get("/me", authHandler.Me)
-		api.With(authMiddleware.RequireUser).Get("/dashboard", dashboardHandler.Get)
-		api.With(authMiddleware.RequireUser).Get("/projects", projectsHandler.List)
-		api.With(authMiddleware.RequireUser).Post("/projects", projectsHandler.Create)
-		api.With(authMiddleware.RequireUser).Get("/projects/{id}", projectsHandler.Get)
-		api.With(authMiddleware.RequireUser).Patch("/projects/{id}", projectsHandler.Patch)
-		api.With(authMiddleware.RequireUser).Delete("/projects/{id}", projectsHandler.Delete)
-		api.With(authMiddleware.RequireUser).Get("/generate/config", generationHandler.GetConfig)
-		api.With(authMiddleware.RequireUser).Post("/uploads/images", generationHandler.UploadImage)
-		api.With(authMiddleware.RequireUser).Post("/generations", generationHandler.CreateGeneration)
-		api.With(authMiddleware.RequireUser).Get("/generations/{id}", generationHandler.GetGenerationStatus)
-		api.With(authMiddleware.RequireUser).Get("/billing", billingHandler.Get)
-		api.With(authMiddleware.RequireUser).Post("/billing/checkout", billingHandler.CreateCheckout)
-		api.With(authMiddleware.RequireUser).Post("/billing/addons", billingHandler.PurchaseAddon)
-		api.With(authMiddleware.RequireUser).Post("/billing/cancel", billingHandler.CancelSubscription)
+		// Все маршруты внутри этой группы требуют авторизации через Bearer-токен.
+		api.Group(func(protected chi.Router) {
+			protected.Use(authMiddleware.RequireUser)
+
+			protected.Get("/me", authHandler.Me)
+			protected.Get("/dashboard", dashboardHandler.Get)
+
+			protected.Get("/projects", projectsHandler.List)
+			protected.Post("/projects", projectsHandler.Create)
+			protected.Get("/projects/{id}", projectsHandler.Get)
+			protected.Patch("/projects/{id}", projectsHandler.Patch)
+			protected.Delete("/projects/{id}", projectsHandler.Delete)
+
+			protected.Get("/generate/config", generationHandler.GetConfig)
+			protected.Post("/uploads/images", generationHandler.UploadImage)
+			protected.Post("/generations", generationHandler.CreateGeneration)
+			protected.Get("/generations/{id}", generationHandler.GetGenerationStatus)
+
+			protected.Get("/billing", billingHandler.Get)
+			protected.Post("/billing/checkout", billingHandler.CreateCheckout)
+			protected.Post("/billing/addons", billingHandler.PurchaseAddon)
+			protected.Post("/billing/cancel", billingHandler.CancelSubscription)
+
+			protected.Get("/settings", settingsHandler.Get)
+			protected.Patch("/settings/profile", settingsHandler.PatchProfile)
+			protected.Patch("/settings/defaults", settingsHandler.PatchDefaults)
+			protected.Post("/settings/change-password", settingsHandler.ChangePassword)
+			protected.Patch("/settings/notifications", settingsHandler.PatchNotifications)
+			protected.Delete("/settings/sessions/{id}", settingsHandler.DeleteSession)
+			protected.Post("/settings/api-key/rotate", settingsHandler.RotateAPIKey)
+			protected.Post("/settings/export", settingsHandler.ExportData)
+			protected.Delete("/settings/account", settingsHandler.DeleteAccount)
+		})
+
 		// Webhook не требует авторизации пользователя — подпись проверяется внутри handler.
 		api.Post("/billing/webhook", billingWebhookHandler.Handle)
-		api.With(authMiddleware.RequireUser).Get("/settings", settingsHandler.Get)
-		api.With(authMiddleware.RequireUser).Patch("/settings/profile", settingsHandler.PatchProfile)
-		api.With(authMiddleware.RequireUser).Patch("/settings/defaults", settingsHandler.PatchDefaults)
-		api.With(authMiddleware.RequireUser).Post("/settings/change-password", settingsHandler.ChangePassword)
-		api.With(authMiddleware.RequireUser).Patch("/settings/notifications", settingsHandler.PatchNotifications)
-		api.With(authMiddleware.RequireUser).Delete("/settings/sessions/{id}", settingsHandler.DeleteSession)
-		api.With(authMiddleware.RequireUser).Post("/settings/api-key/rotate", settingsHandler.RotateAPIKey)
-		api.With(authMiddleware.RequireUser).Post("/settings/export", settingsHandler.ExportData)
-		api.With(authMiddleware.RequireUser).Delete("/settings/account", settingsHandler.DeleteAccount)
+
 		api.Route("/public", func(publicRouter chi.Router) {
 			publicRouter.Get("/blog", blogHandler.List)
 			publicRouter.Get("/blog/{slug}", blogHandler.GetBySlug)

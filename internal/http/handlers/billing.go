@@ -8,10 +8,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"kartochki-online-backend/internal/auth"
+	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/billing"
-	"kartochki-online-backend/internal/http/authctx"
-	"kartochki-online-backend/internal/http/contracts"
 	"kartochki-online-backend/internal/http/requestctx"
 	"kartochki-online-backend/internal/http/response"
 )
@@ -40,7 +38,7 @@ func NewBillingHandler(service billingService, logger zerolog.Logger) BillingHan
 
 // Get возвращает агрегированный billing-ответ для страницы `/app/billing`.
 func (h BillingHandler) Get(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
@@ -56,12 +54,12 @@ func (h BillingHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // CreateCheckout создаёт checkout для смены тарифа.
 func (h BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
 
-	var req contracts.CreateCheckoutRequest
+	var req openapi.CreateCheckoutRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -74,7 +72,7 @@ func (h BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.CreateCheckout(r.Context(), billing.CheckoutInput{
 		UserID: user.ID,
-		PlanID: req.PlanID,
+		PlanID: req.PlanId,
 		Period: billing.PlanPeriod(req.Period),
 	})
 	if err != nil {
@@ -82,19 +80,19 @@ func (h BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusAccepted, contracts.CreateCheckoutResponse{
-		CheckoutURL: result.CheckoutURL,
+	response.WriteJSON(w, r, http.StatusAccepted, openapi.CreateCheckoutResponse{
+		CheckoutUrl: result.CheckoutURL,
 	})
 }
 
 // PurchaseAddon создаёт checkout для разового пакета карточек.
 func (h BillingHandler) PurchaseAddon(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
 
-	var req contracts.PurchaseAddonRequest
+	var req openapi.PurchaseAddonRequest
 	if err := decodeJSON(r, &req); err != nil {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
@@ -107,21 +105,21 @@ func (h BillingHandler) PurchaseAddon(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.PurchaseAddon(r.Context(), billing.PurchaseAddonInput{
 		UserID:  user.ID,
-		AddonID: req.AddonID,
+		AddonID: req.AddonId,
 	})
 	if err != nil {
 		h.writeBillingError(w, r, err, "failed to create addon checkout")
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusAccepted, contracts.PurchaseAddonResponse{
-		CheckoutURL: result.CheckoutURL,
+	response.WriteJSON(w, r, http.StatusAccepted, openapi.PurchaseAddonResponse{
+		CheckoutUrl: result.CheckoutURL,
 	})
 }
 
 // CancelSubscription отключает автопродление платной подписки.
 func (h BillingHandler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
-	user, ok := h.currentUser(w, r)
+	user, ok := currentUserFromCtx(w, r)
 	if !ok {
 		return
 	}
@@ -131,41 +129,41 @@ func (h BillingHandler) CancelSubscription(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	response.WriteJSON(w, r, http.StatusOK, contracts.CancelSubscriptionResponse{
-		Status: "scheduled_cancel",
+	response.WriteJSON(w, r, http.StatusOK, openapi.CancelSubscriptionResponse{
+		Status: openapi.ScheduledCancel,
 	})
 }
 
-func validateCreateCheckoutRequest(req contracts.CreateCheckoutRequest) []contracts.ErrorDetail {
-	var details []contracts.ErrorDetail
+func validateCreateCheckoutRequest(req openapi.CreateCheckoutRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
 
-	if strings.TrimSpace(req.PlanID) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "plan_id", Message: "field is required"})
+	if strings.TrimSpace(req.PlanId) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("plan_id"), Message: "field is required"})
 	}
 	if strings.TrimSpace(string(req.Period)) == "" {
-		details = append(details, contracts.ErrorDetail{Field: "period", Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("period"), Message: "field is required"})
 	}
 
 	return details
 }
 
-func validatePurchaseAddonRequest(req contracts.PurchaseAddonRequest) []contracts.ErrorDetail {
-	if strings.TrimSpace(req.AddonID) == "" {
-		return []contracts.ErrorDetail{{Field: "addon_id", Message: "field is required"}}
+func validatePurchaseAddonRequest(req openapi.PurchaseAddonRequest) []openapi.ErrorDetail {
+	if strings.TrimSpace(req.AddonId) == "" {
+		return []openapi.ErrorDetail{{Field: strPtr("addon_id"), Message: "field is required"}}
 	}
 
 	return nil
 }
 
-func toBillingResponse(payload billing.Billing) contracts.BillingResponse {
-	return contracts.BillingResponse{
-		CurrentSubscription: contracts.BillingSubscription{
-			PlanID:           payload.CurrentSubscription.PlanID,
+func toBillingResponse(payload billing.Billing) openapi.BillingResponse {
+	return openapi.BillingResponse{
+		CurrentSubscription: openapi.BillingSubscription{
+			PlanId:           payload.CurrentSubscription.PlanID,
 			PlanName:         payload.CurrentSubscription.PlanName,
 			RenewsAt:         payload.CurrentSubscription.RenewsAt,
 			CancelsAt:        payload.CurrentSubscription.CancelsAt,
 			HasPaymentMethod: payload.CurrentSubscription.HasPaymentMethod,
-			Usage: contracts.BillingUsage{
+			Usage: openapi.BillingUsage{
 				Value: payload.CurrentSubscription.Usage.Value,
 				Max:   payload.CurrentSubscription.Usage.Max,
 			},
@@ -175,28 +173,35 @@ func toBillingResponse(payload billing.Billing) contracts.BillingResponse {
 	}
 }
 
-func toBillingPlans(items []billing.Plan) []contracts.BillingPlan {
-	result := make([]contracts.BillingPlan, len(items))
+func toBillingPlans(items []billing.Plan) []openapi.BillingPlan {
+	result := make([]openapi.BillingPlan, len(items))
 	for i, item := range items {
-		result[i] = contracts.BillingPlan{
-			ID:                 item.ID,
-			Name:               item.Name,
-			MonthlyPrice:       item.MonthlyPrice,
-			YearlyMonthlyPrice: item.YearlyMonthlyPrice,
-			CardsPerMonth:      item.CardsPerMonth,
-			Features:           toBillingPlanFeatures(item.Features),
-			Current:            item.Current,
-			Popular:            item.Popular,
+		plan := openapi.BillingPlan{
+			Id:            item.ID,
+			Name:          item.Name,
+			MonthlyPrice:  item.MonthlyPrice,
+			CardsPerMonth: item.CardsPerMonth,
+			Features:      toBillingPlanFeatures(item.Features),
 		}
+		if item.YearlyMonthlyPrice > 0 {
+			plan.YearlyMonthlyPrice = &item.YearlyMonthlyPrice
+		}
+		if item.Current {
+			plan.Current = &item.Current
+		}
+		if item.Popular {
+			plan.Popular = &item.Popular
+		}
+		result[i] = plan
 	}
 
 	return result
 }
 
-func toBillingPlanFeatures(items []billing.PlanFeature) []contracts.BillingPlanFeature {
-	result := make([]contracts.BillingPlanFeature, len(items))
+func toBillingPlanFeatures(items []billing.PlanFeature) []openapi.BillingPlanFeature {
+	result := make([]openapi.BillingPlanFeature, len(items))
 	for i, item := range items {
-		result[i] = contracts.BillingPlanFeature{
+		result[i] = openapi.BillingPlanFeature{
 			Label:   item.Label,
 			Enabled: item.Enabled,
 		}
@@ -205,11 +210,11 @@ func toBillingPlanFeatures(items []billing.PlanFeature) []contracts.BillingPlanF
 	return result
 }
 
-func toBillingAddons(items []billing.Addon) []contracts.BillingAddon {
-	result := make([]contracts.BillingAddon, len(items))
+func toBillingAddons(items []billing.Addon) []openapi.BillingAddon {
+	result := make([]openapi.BillingAddon, len(items))
 	for i, item := range items {
-		result[i] = contracts.BillingAddon{
-			ID:          item.ID,
+		result[i] = openapi.BillingAddon{
+			Id:          item.ID,
 			Title:       item.Title,
 			Description: item.Description,
 			Price:       item.Price,
@@ -217,16 +222,6 @@ func toBillingAddons(items []billing.Addon) []contracts.BillingAddon {
 	}
 
 	return result
-}
-
-func (h BillingHandler) currentUser(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
-	user, ok := authctx.User(r.Context())
-	if !ok {
-		response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "authorization token is invalid")
-		return auth.User{}, false
-	}
-
-	return user, true
 }
 
 func (h BillingHandler) writeBillingError(w http.ResponseWriter, r *http.Request, err error, fallbackMessage string) {
@@ -238,8 +233,8 @@ func (h BillingHandler) writeBillingError(w http.ResponseWriter, r *http.Request
 	case errors.Is(err, billing.ErrAddonNotFound):
 		response.WriteError(w, r, http.StatusNotFound, "addon_not_found", "billing addon not found")
 	case errors.Is(err, billing.ErrInvalidPlanPeriod):
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", contracts.ErrorDetail{
-			Field:   "period",
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+			Field:   strPtr("period"),
 			Message: "unsupported billing period",
 		})
 	case errors.Is(err, billing.ErrPlanAlreadyActive):

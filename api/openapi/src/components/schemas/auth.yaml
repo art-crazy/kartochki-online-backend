@@ -1,0 +1,144 @@
+schemas:
+  RegisterRequest:
+    type: object
+    required:
+      - email
+      - password
+    properties:
+      name:
+        type: string
+        example: Иван
+      email:
+        type: string
+        format: email
+        example: ivan@example.com
+      password:
+        type: string
+        format: password
+        example: nadezhnyy-parol-123
+
+  LoginRequest:
+    type: object
+    required:
+      - email
+      - password
+    properties:
+      email:
+        type: string
+        format: email
+        example: ivan@example.com
+      password:
+        type: string
+        format: password
+        example: nadezhnyy-parol-123
+
+  TelegramLoginRequest:
+    type: object
+    required:
+      - id
+      - auth_date
+      - hash
+    properties:
+      id:
+        type: integer
+        format: int64
+        example: 123456789
+      first_name:
+        type: string
+        example: Иван
+      last_name:
+        type: string
+        example: Иванов
+      username:
+        type: string
+        example: ivanov
+      photo_url:
+        type: string
+        format: uri
+        example: https://t.me/i/userpic/320/example.jpg
+      auth_date:
+        type: integer
+        format: int64
+        example: 1712500000
+      hash:
+        type: string
+        example: 7d3f6f8d3df0f70e18b1aabf6b8d2d11fdc4d4ab6f8d9c0d1c2b3a4f5e6d7c8b
+
+  ForgotPasswordRequest:
+    type: object
+    required:
+      - email
+    properties:
+      email:
+        type: string
+        format: email
+        example: ivan@example.com
+
+  ResetPasswordRequest:
+    type: object
+    required:
+      - token
+      - password
+    properties:
+      token:
+        type: string
+        description: Одноразовый токен из письма для сброса пароля.
+        example: xK9mQ2rTv8nYpL3wZd5jF1cB6oE4sA7h
+      password:
+        type: string
+        format: password
+        description: Новый пароль пользователя.
+        example: novyy-nadezhnyy-parol-456
+
+  AuthUser:
+    type: object
+    required:
+      - id
+    properties:
+      id:
+        type: string
+        format: uuid
+      name:
+        type: string
+        example: Иван
+      email:
+        type: string
+        format: email
+        nullable: true
+        example: ivan@example.com
+
+  AuthSession:
+    type: object
+    required:
+      - access_token
+      - token_type
+      - expires_at
+    properties:
+      access_token:
+        type: string
+        example: 7fD2D1Xnq6C7xBskjPq6WQ6OHvOjQJE9P0Q-7m4w1RU
+      token_type:
+        type: string
+        example: Bearer
+      expires_at:
+        type: string
+        format: date-time
+
+  AuthResponse:
+    type: object
+    required:
+      - user
+      - session
+    properties:
+      user:
+        $ref: "#/schemas/AuthUser"
+      session:
+        $ref: "#/schemas/AuthSession"
+
+  CurrentUserResponse:
+    type: object
+    required:
+      - user
+    properties:
+      user:
+        $ref: "#/schemas/AuthUser"

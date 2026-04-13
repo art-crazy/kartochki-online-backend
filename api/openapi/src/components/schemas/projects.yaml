@@ -1,0 +1,102 @@
+schemas:
+  CreateProjectRequest:
+    type: object
+    required:
+      - title
+    properties:
+      title:
+        type: string
+        minLength: 1
+        maxLength: 200
+        example: Кроссовки Nike Air Max
+      marketplace:
+        type: string
+        maxLength: 100
+        example: wildberries
+      product_name:
+        type: string
+        maxLength: 255
+        example: Nike Air Max 90
+      product_description:
+        type: string
+        maxLength: 5000
+        example: Белые кроссовки для повседневной носки
+
+  PatchProjectRequest:
+    type: object
+    description: Достаточно передать только те поля, которые нужно изменить.
+    minProperties: 1
+    properties:
+      title:
+        type: string
+        minLength: 1
+        maxLength: 200
+        example: Обновлённое название проекта
+      marketplace:
+        type: string
+        maxLength: 100
+        example: ozon
+      product_name:
+        type: string
+        maxLength: 255
+        example: Nike Air Max 90 Premium
+      product_description:
+        type: string
+        maxLength: 5000
+        example: Новое описание товара для карточки
+
+  Project:
+    type: object
+    required:
+      - id
+      - title
+      - status
+      - created_at
+      - updated_at
+    properties:
+      id:
+        type: string
+        format: uuid
+      title:
+        type: string
+        example: Кроссовки Nike Air Max
+      marketplace:
+        type: string
+        example: wildberries
+      product_name:
+        type: string
+        example: Nike Air Max 90
+      product_description:
+        type: string
+        example: Белые кроссовки для повседневной носки
+      status:
+        type: string
+        enum:
+          - draft
+          - active
+          - archived
+        example: draft
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+
+  ProjectResponse:
+    type: object
+    required:
+      - project
+    properties:
+      project:
+        $ref: "#/schemas/Project"
+
+  ProjectListResponse:
+    type: object
+    required:
+      - projects
+    properties:
+      projects:
+        type: array
+        items:
+          $ref: "#/schemas/Project"

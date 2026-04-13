@@ -1,0 +1,59 @@
+schemas:
+  HealthResponse:
+    type: object
+    required:
+      - status
+    properties:
+      status:
+        type: string
+        enum:
+          - ok
+          - degraded
+        example: ok
+
+  StatusResponse:
+    type: object
+    required:
+      - status
+    properties:
+      status:
+        type: string
+        description: Результат операции.
+        enum:
+          - accepted
+          - password_changed
+          - logged_out
+          - deleted
+        example: accepted
+
+  ErrorResponse:
+    type: object
+    required:
+      - code
+      - message
+    properties:
+      code:
+        type: string
+        example: not_found
+      message:
+        type: string
+        example: ресурс не найден
+      request_id:
+        type: string
+        example: 01HZY3GQK0M5YAWQ2N6R8T9P1S
+      details:
+        type: array
+        items:
+          $ref: "#/schemas/ErrorDetail"
+
+  ErrorDetail:
+    type: object
+    required:
+      - message
+    properties:
+      field:
+        type: string
+        example: email
+      message:
+        type: string
+        example: поле обязательно
