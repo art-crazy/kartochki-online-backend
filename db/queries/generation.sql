@@ -27,6 +27,7 @@ insert into generations (
     marketplace_id,
     style_id,
     card_count,
+    model_id,
     status,
     current_step,
     progress_percent
@@ -39,6 +40,7 @@ values (
     @marketplace_id,
     @style_id,
     @card_count,
+    @model_id,
     'queued',
     'queued',
     0

@@ -23,4 +23,6 @@ var (
 	ErrImageTypeNotSupported = errors.New("generation image type is not supported")
 	// ErrQuotaExceeded означает, что новый запуск генерации не помещается в текущий billing-лимит.
 	ErrQuotaExceeded = errors.New("generation quota exceeded")
+	// ErrInvalidModel означает, что model_id не входит в поддерживаемый каталог моделей.
+	ErrInvalidModel = errors.New("generation model is invalid")
 )

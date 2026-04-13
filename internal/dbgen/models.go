@@ -135,6 +135,7 @@ type Generation struct {
 	FinishedAt      pgtype.Timestamptz
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	ModelID         string
 }
 
 // Выбранные типы карточек внутри конкретного запуска генерации.

@@ -348,11 +348,16 @@ and `/api/v1/generations/*` surface.
 
 It owns:
 
-- generation page config
+- generation page config (marketplaces, styles, card types, card count options, AI model catalog)
 - source image upload orchestration
 - creation of generation jobs and linked projects
 - polling-ready generation status reads
 - coordination with Asynq worker and local artifact storage
+- AI image generation via the `ImageGenerator` interface
+
+The `ImageGenerator` interface is defined in `internal/generation` and implemented in `internal/platform/routerai`. Wiring lives in `internal/app` via `routerAIAdapter` — the same adapter pattern used for `authEmailWorker` and `yookassaCheckoutAdapter`.
+
+When `ROUTERAI_API_KEY` is not set, `generation.NewService` receives `nil` and substitutes a `noopImageGenerator` that returns an error, causing the generation job to fail visibly rather than silently produce empty files.
 
 `internal/blog` is now used for the public `/api/v1/public/blog` and `/api/v1/public/blog/{slug}` surface.
 
@@ -379,6 +384,13 @@ The `CheckoutProvider` interface is defined in `internal/billing` and implemente
 - payment creation for subscriptions and addons
 - HMAC-SHA256 webhook signature verification
 - deterministic idempotency keys (SHA256 of input params + year-month) to prevent duplicate payments on retry while allowing new payments in subsequent periods
+
+`internal/platform/routerai` implements the RouterAI image generation API:
+
+- sends requests to `/api/v1/chat/completions` with `modalities: ["image", "text"]`
+- decodes the base64 PNG from `choices[0].message.images[0].image_url.url`
+- model is passed per-request (not stored on the client) so the user can choose a model per generation
+- configured via `ROUTERAI_API_KEY`, `ROUTERAI_ENDPOINT`, `ROUTERAI_TIMEOUT`
 
 ### Webhook handler pattern
 

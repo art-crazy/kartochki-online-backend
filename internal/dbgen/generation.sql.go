@@ -139,6 +139,7 @@ insert into generations (
     marketplace_id,
     style_id,
     card_count,
+    model_id,
     status,
     current_step,
     progress_percent
@@ -151,11 +152,12 @@ values (
     $5,
     $6,
     $7,
+    $8,
     'queued',
     'queued',
     0
 )
-returning id, user_id, project_id, source_asset_id, marketplace_id, style_id, card_count, status, current_step, progress_percent, error_message, archive_asset_id, started_at, finished_at, created_at, updated_at
+returning id, user_id, project_id, source_asset_id, marketplace_id, style_id, card_count, status, current_step, progress_percent, error_message, archive_asset_id, started_at, finished_at, created_at, updated_at, model_id
 `
 
 type CreateGenerationParams struct {
@@ -166,6 +168,7 @@ type CreateGenerationParams struct {
 	MarketplaceID string
 	StyleID       string
 	CardCount     int32
+	ModelID       string
 }
 
 func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationParams) (Generation, error) {
@@ -177,6 +180,7 @@ func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationPara
 		arg.MarketplaceID,
 		arg.StyleID,
 		arg.CardCount,
+		arg.ModelID,
 	)
 	var i Generation
 	err := row.Scan(
@@ -196,6 +200,7 @@ func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationPara
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ModelID,
 	)
 	return i, err
 }
@@ -245,7 +250,7 @@ func (q *Queries) GetAssetByID(ctx context.Context, id uuid.UUID) (Asset, error)
 }
 
 const getGenerationByID = `-- name: GetGenerationByID :one
-select id, user_id, project_id, source_asset_id, marketplace_id, style_id, card_count, status, current_step, progress_percent, error_message, archive_asset_id, started_at, finished_at, created_at, updated_at from generations
+select id, user_id, project_id, source_asset_id, marketplace_id, style_id, card_count, status, current_step, progress_percent, error_message, archive_asset_id, started_at, finished_at, created_at, updated_at, model_id from generations
 where id = $1
 `
 
@@ -269,6 +274,7 @@ func (q *Queries) GetGenerationByID(ctx context.Context, id uuid.UUID) (Generati
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ModelID,
 	)
 	return i, err
 }
@@ -303,7 +309,7 @@ func (q *Queries) GetUserAssetByID(ctx context.Context, arg GetUserAssetByIDPara
 
 const getUserGenerationByID = `-- name: GetUserGenerationByID :one
 select
-    g.id, g.user_id, g.project_id, g.source_asset_id, g.marketplace_id, g.style_id, g.card_count, g.status, g.current_step, g.progress_percent, g.error_message, g.archive_asset_id, g.started_at, g.finished_at, g.created_at, g.updated_at,
+    g.id, g.user_id, g.project_id, g.source_asset_id, g.marketplace_id, g.style_id, g.card_count, g.status, g.current_step, g.progress_percent, g.error_message, g.archive_asset_id, g.started_at, g.finished_at, g.created_at, g.updated_at, g.model_id,
     coalesce(archive.storage_key, '') as archive_storage_key
 from generations g
 left join assets archive on archive.id = g.archive_asset_id
@@ -333,6 +339,7 @@ type GetUserGenerationByIDRow struct {
 	FinishedAt        pgtype.Timestamptz
 	CreatedAt         pgtype.Timestamptz
 	UpdatedAt         pgtype.Timestamptz
+	ModelID           string
 	ArchiveStorageKey string
 }
 
@@ -356,6 +363,7 @@ func (q *Queries) GetUserGenerationByID(ctx context.Context, arg GetUserGenerati
 		&i.FinishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ModelID,
 		&i.ArchiveStorageKey,
 	)
 	return i, err

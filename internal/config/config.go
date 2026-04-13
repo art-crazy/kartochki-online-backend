@@ -21,6 +21,16 @@ type Config struct {
 	Storage  StorageConfig
 	Email    EmailConfig
 	YooKassa YooKassaConfig
+	RouterAI RouterAIConfig
+}
+
+// RouterAIConfig хранит параметры для интеграции с RouterAI API.
+// При пустом APIKey приложение использует noopImageGenerator: генерация будет падать в failed.
+// Модель не хранится здесь — пользователь выбирает её при каждой генерации.
+type RouterAIConfig struct {
+	APIKey   string
+	Endpoint string
+	Timeout  time.Duration
 }
 
 // YooKassaConfig хранит параметры для интеграции с платёжной системой ЮКасса.
@@ -200,6 +210,11 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	routerAITimeout, err := getDuration("ROUTERAI_TIMEOUT", 120*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		App: AppConfig{
 			Name:        getEnv("APP_NAME", "kartochki-online-backend"),
@@ -243,6 +258,11 @@ func loadFromEnv() (Config, error) {
 			SecretKey:     getEnv("YOOKASSA_SECRET_KEY", ""),
 			WebhookSecret: getEnv("YOOKASSA_WEBHOOK_SECRET", ""),
 			ReturnURL:     getEnv("YOOKASSA_RETURN_URL", "http://localhost:3000/app/billing"),
+		},
+		RouterAI: RouterAIConfig{
+			APIKey:   getEnv("ROUTERAI_API_KEY", ""),
+			Endpoint: getEnv("ROUTERAI_ENDPOINT", "https://routerai.ru/api/v1"),
+			Timeout:  routerAITimeout,
 		},
 		Auth: AuthConfig{
 			SessionTTL:            sessionTTL,

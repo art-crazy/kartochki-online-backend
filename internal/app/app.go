@@ -22,6 +22,7 @@ import (
 	"kartochki-online-backend/internal/platform/email"
 	"kartochki-online-backend/internal/platform/postgres"
 	"kartochki-online-backend/internal/platform/redis"
+	"kartochki-online-backend/internal/platform/routerai"
 	"kartochki-online-backend/internal/platform/storage"
 	"kartochki-online-backend/internal/platform/yookassa"
 	"kartochki-online-backend/internal/projects"
@@ -33,6 +34,22 @@ import (
 var _ jobs.SendPasswordResetEmailHandler = authEmailWorker{}
 var _ billing.CheckoutProvider = yookassaCheckoutAdapter{}
 var _ handlers.WebhookSignatureVerifier = (*yookassa.Client)(nil)
+var _ generation.ImageGenerator = routerAIAdapter{}
+
+// routerAIAdapter оборачивает routerai.Client и реализует generation.ImageGenerator.
+// Живёт в app-пакете, чтобы generation и routerai не зависели друг от друга.
+type routerAIAdapter struct {
+	client *routerai.Client
+}
+
+// GenerateImage делегирует вызов routerai.Client, конвертируя доменный тип входных данных.
+func (a routerAIAdapter) GenerateImage(ctx context.Context, input generation.ImageGenerateInput) ([]byte, error) {
+	return a.client.GenerateImage(ctx, routerai.GenerateImageInput{
+		Prompt:      input.Prompt,
+		AspectRatio: input.AspectRatio,
+		ModelID:     input.ModelID,
+	})
+}
 
 // yookassaCheckoutAdapter оборачивает yookassa.Client и реализует billing.CheckoutProvider.
 // Живёт в app-пакете, чтобы ни billing, ни yookassa не зависели друг от друга.
@@ -184,12 +201,22 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		webhookVerifier = yk
 	}
 	billingService := billing.NewService(db.Pool, queries, billingProvider)
+
+	// Если ROUTERAI_API_KEY задан — используем реальный генератор изображений.
+	// Иначе передаём nil: generation.NewService подставит noopImageGenerator,
+	// который возвращает ошибку, и генерация будет явно падать в статус failed.
+	var imageGen generation.ImageGenerator
+	if cfg.RouterAI.APIKey != "" {
+		imageGen = routerAIAdapter{client: routerai.New(cfg.RouterAI)}
+	}
+
 	generationService := generation.NewService(
 		db.Pool,
 		queries,
 		asynqClient,
 		storageClient,
 		generationBillingLimits{billing: billingService},
+		imageGen,
 	)
 	settingsService := settings.NewService(db.Pool, queries, asynqClient, authService.PasswordMinLength())
 	dashboardHandler := handlers.NewDashboardHandler(projectService, logger)

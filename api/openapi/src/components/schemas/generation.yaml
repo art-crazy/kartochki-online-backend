@@ -1,4 +1,26 @@
 schemas:
+  GenerateModel:
+    type: object
+    required:
+      - id
+      - label
+      - description
+      - price_per_image
+    properties:
+      id:
+        type: string
+        example: google/gemini-2.5-flash-image
+      label:
+        type: string
+        example: Gemini 2.5 Flash
+      description:
+        type: string
+        example: Быстро и дёшево. Хорошо для прототипирования и большого количества карточек.
+      price_per_image:
+        type: integer
+        description: Стоимость одного изображения в копейках. Умножьте на card_count для итоговой цены.
+        example: 5
+
   GenerateMarketplace:
     type: object
     required:
@@ -48,6 +70,7 @@ schemas:
       - styles
       - card_types
       - card_count_options
+      - models
     properties:
       marketplaces:
         type: array
@@ -65,6 +88,11 @@ schemas:
         type: array
         items:
           type: integer
+      models:
+        type: array
+        description: Доступные AI-модели. Первая — выбор по умолчанию. price_per_image × card_count = итоговая стоимость.
+        items:
+          $ref: "#/schemas/GenerateModel"
 
   UploadImageResponse:
     type: object
@@ -111,6 +139,10 @@ schemas:
       source_asset_id:
         type: string
         format: uuid
+      model_id:
+        type: string
+        description: Идентификатор AI-модели из каталога /generate/config. Если не указан, используется первая модель по умолчанию.
+        example: google/gemini-2.5-flash-image
 
   CreateGenerationResponse:
     type: object

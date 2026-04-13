@@ -329,9 +329,12 @@ type CreateCheckoutResponse struct {
 
 // CreateGenerationRequest defines model for CreateGenerationRequest.
 type CreateGenerationRequest struct {
-	CardCount     int                `json:"card_count"`
-	CardTypeIds   []string           `json:"card_type_ids"`
-	MarketplaceId string             `json:"marketplace_id"`
+	CardCount     int      `json:"card_count"`
+	CardTypeIds   []string `json:"card_type_ids"`
+	MarketplaceId string   `json:"marketplace_id"`
+
+	// ModelId Идентификатор AI-модели из каталога /generate/config. Если не указан, используется первая модель по умолчанию.
+	ModelId       *string            `json:"model_id,omitempty"`
 	ProjectName   *string            `json:"project_name,omitempty"`
 	SourceAssetId openapi_types.UUID `json:"source_asset_id"`
 	StyleId       string             `json:"style_id"`
@@ -452,13 +455,26 @@ type GenerateConfigResponse struct {
 	CardCountOptions []int                 `json:"card_count_options"`
 	CardTypes        []GenerateCardType    `json:"card_types"`
 	Marketplaces     []GenerateMarketplace `json:"marketplaces"`
-	Styles           []GenerateStyle       `json:"styles"`
+
+	// Models Доступные AI-модели. Первая — выбор по умолчанию. price_per_image × card_count = итоговая стоимость.
+	Models []GenerateModel `json:"models"`
+	Styles []GenerateStyle `json:"styles"`
 }
 
 // GenerateMarketplace defines model for GenerateMarketplace.
 type GenerateMarketplace struct {
 	Id    string `json:"id"`
 	Label string `json:"label"`
+}
+
+// GenerateModel defines model for GenerateModel.
+type GenerateModel struct {
+	Description string `json:"description"`
+	Id          string `json:"id"`
+	Label       string `json:"label"`
+
+	// PricePerImage Стоимость одного изображения в копейках. Умножьте на card_count для итоговой цены.
+	PricePerImage int `json:"price_per_image"`
 }
 
 // GenerateStyle defines model for GenerateStyle.

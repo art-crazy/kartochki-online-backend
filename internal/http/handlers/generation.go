@@ -53,6 +53,7 @@ func (h GenerationHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		Styles:           toGenerateStyles(cfg.Styles),
 		CardTypes:        toGenerateCardTypes(cfg.CardTypes),
 		CardCountOptions: cfg.CardCountOptions,
+		Models:           toGenerateModels(cfg.Models),
 	})
 }
 
@@ -133,6 +134,7 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 		CardTypeIDs:   req.CardTypeIds,
 		CardCount:     req.CardCount,
 		SourceAssetID: req.SourceAssetId.String(),
+		ModelID:       stringOrEmpty(req.ModelId),
 	})
 	if err != nil {
 		switch {
@@ -162,6 +164,11 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
 				Field:   strPtr("project_name"),
 				Message: "must be at most 200 characters",
+			})
+		case errors.Is(err, generation.ErrInvalidModel):
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("model_id"),
+				Message: "unknown model",
 			})
 		case errors.Is(err, generation.ErrQuotaExceeded):
 			response.WriteError(w, r, http.StatusConflict, "generation_quota_exceeded", "generation quota is exceeded")
@@ -250,6 +257,19 @@ func toGenerateStyles(items []generation.CatalogOption) []openapi.GenerateStyle 
 		}
 	}
 
+	return result
+}
+
+func toGenerateModels(items []generation.ModelOption) []openapi.GenerateModel {
+	result := make([]openapi.GenerateModel, len(items))
+	for i, item := range items {
+		result[i] = openapi.GenerateModel{
+			Id:            item.ID,
+			Label:         item.Label,
+			Description:   item.Description,
+			PricePerImage: item.PricePerImage,
+		}
+	}
 	return result
 }
 

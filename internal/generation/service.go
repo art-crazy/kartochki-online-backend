@@ -18,36 +18,86 @@ import (
 	"kartochki-online-backend/internal/projects"
 )
 
+// ImageGenerateInput описывает параметры одной карточки, которую нужно сгенерировать.
+type ImageGenerateInput struct {
+	// Prompt — текстовое описание желаемого изображения.
+	Prompt string
+	// AspectRatio — соотношение сторон в формате "W:H", например "3:4".
+	AspectRatio string
+	// ModelID — идентификатор модели в RouterAI, например "google/gemini-2.5-flash-image".
+	ModelID string
+}
+
+// ImageGenerator — контракт для любого провайдера генерации изображений.
+// Реализует internal/platform/routerai.Client; при отсутствии ключа используется noopImageGenerator.
+type ImageGenerator interface {
+	GenerateImage(ctx context.Context, input ImageGenerateInput) ([]byte, error)
+}
+
 const (
 	defaultProjectTitle = "Новый проект"
 )
 
 var (
-	generateMarketplaces = []CatalogOption{
-		{ID: "wildberries", Label: "Wildberries"},
-		{ID: "ozon", Label: "Ozon"},
-		{ID: "yandex_market", Label: "Яндекс Маркет"},
+	// generateMarketplaces хранит маркетплейсы вместе с aspect ratio и частью промпта.
+	// AspectRatio используется воркером при генерации — добавление маркетплейса не требует правок в других местах.
+	generateMarketplaces = []marketplaceOption{
+		{CatalogOption: CatalogOption{ID: "wildberries", Label: "Wildberries", PromptPart: "Wildberries"}, AspectRatio: "3:4"},
+		{CatalogOption: CatalogOption{ID: "ozon", Label: "Ozon", PromptPart: "Ozon"}, AspectRatio: "3:4"},
+		{CatalogOption: CatalogOption{ID: "yandex_market", Label: "Яндекс Маркет", PromptPart: "Yandex Market"}, AspectRatio: "1:1"},
 	}
 	generateStyles = []CatalogOption{
-		{ID: "clean_catalog", Label: "Чистый каталог"},
-		{ID: "accent_offer", Label: "Акцент на выгоде"},
-		{ID: "premium_brand", Label: "Премиальный бренд"},
+		{ID: "clean_catalog", Label: "Чистый каталог", PromptPart: "clean catalog, white background, minimal"},
+		{ID: "accent_offer", Label: "Акцент на выгоде", PromptPart: "accent on offer and benefits, vibrant, attention-grabbing"},
+		{ID: "premium_brand", Label: "Премиальный бренд", PromptPart: "premium brand, luxury, elegant, sophisticated"},
 	}
 	generateCardTypes = []CardTypeOption{
-		{ID: "cover", Label: "Обложка", DefaultSelected: true},
-		{ID: "benefits", Label: "Преимущества", DefaultSelected: true},
-		{ID: "details", Label: "Детали", DefaultSelected: true},
-		{ID: "usage", Label: "Сценарий использования"},
-		{ID: "dimensions", Label: "Размеры"},
-		{ID: "composition", Label: "Состав"},
+		{ID: "cover", Label: "Обложка", DefaultSelected: true, PromptPart: "main product cover shot, hero image"},
+		{ID: "benefits", Label: "Преимущества", DefaultSelected: true, PromptPart: "product benefits and key features highlighted"},
+		{ID: "details", Label: "Детали", DefaultSelected: true, PromptPart: "product details and close-up view"},
+		{ID: "usage", Label: "Сценарий использования", PromptPart: "product in use, lifestyle scenario"},
+		{ID: "dimensions", Label: "Размеры", PromptPart: "product dimensions and measurements diagram"},
+		{ID: "composition", Label: "Состав", PromptPart: "product composition and materials"},
 	}
 	generateCardCountOptions = []int{3, 5, 7, 10}
+
+	// generateModels — список AI-моделей, доступных для выбора при генерации.
+	// PricePerImage — стоимость одного изображения в копейках (целое число, без float).
+	// Эти цены ориентировочны и должны отражать реальную стоимость у провайдера RouterAI.
+	// Первая модель в списке считается выбором по умолчанию.
+	generateModels = []ModelOption{
+		{
+			ID:            "google/gemini-2.5-flash-image",
+			Label:         "Gemini 2.5 Flash",
+			Description:   "Быстро и дёшево. Хорошо для прототипирования и большого количества карточек.",
+			PricePerImage: 5,
+		},
+		{
+			ID:            "google/gemini-3-pro-image-preview",
+			Label:         "Gemini 3 Pro",
+			Description:   "Высокое качество изображений, детальная проработка. Оптимален для финального результата.",
+			PricePerImage: 25,
+		},
+		{
+			ID:            "black-forest-labs/flux.2-pro",
+			Label:         "FLUX.2 Pro",
+			Description:   "Фотореалистичные изображения. Лучший выбор для товаров с реалистичной фотографией.",
+			PricePerImage: 40,
+		},
+		{
+			ID:            "openai/gpt-5-image-mini",
+			Label:         "GPT-5 Image Mini",
+			Description:   "Хорошее соотношение цены и качества от OpenAI.",
+			PricePerImage: 15,
+		},
+	}
 )
 
 // CatalogOption описывает один доступный вариант из каталога generation-конфига.
 type CatalogOption struct {
-	ID    string
-	Label string
+	ID         string
+	Label      string
+	PromptPart string // часть промпта для AI; не передаётся на фронтенд
 }
 
 // CardTypeOption описывает один тип карточки для страницы генерации.
@@ -55,6 +105,24 @@ type CardTypeOption struct {
 	ID              string
 	Label           string
 	DefaultSelected bool
+	PromptPart      string // часть промпта для AI; не передаётся на фронтенд
+}
+
+// marketplaceOption расширяет CatalogOption полем AspectRatio для воркера генерации.
+// Хранится внутри пакета — на фронтенд уходит только CatalogOption.
+type marketplaceOption struct {
+	CatalogOption
+	AspectRatio string
+}
+
+// ModelOption описывает одну AI-модель, доступную для выбора пользователем.
+// PricePerImage — стоимость одного изображения в копейках.
+// Фронтенд умножает её на CardCount, чтобы показать итоговую стоимость до запуска генерации.
+type ModelOption struct {
+	ID            string
+	Label         string
+	Description   string
+	PricePerImage int
 }
 
 // Config описывает справочные данные для страницы `/app/generate`.
@@ -63,6 +131,7 @@ type Config struct {
 	Styles           []CatalogOption
 	CardTypes        []CardTypeOption
 	CardCountOptions []int
+	Models           []ModelOption
 }
 
 // UploadedImage описывает исходное изображение, которое frontend прислал через upload endpoint.
@@ -87,6 +156,9 @@ type CreateInput struct {
 	CardTypeIDs   []string
 	CardCount     int
 	SourceAssetID string
+	// ModelID — идентификатор AI-модели из каталога generateModels.
+	// Если пустой, используется первая модель из каталога.
+	ModelID string
 }
 
 // CreatedGeneration описывает результат постановки генерации в очередь.
@@ -116,16 +188,16 @@ type Status struct {
 
 // Service управляет generation-сценарием поверх sqlc, storage и очереди фоновых задач.
 type Service struct {
-	pool       *pgxpool.Pool
-	queries    *dbgen.Queries
-	jobsClient *jobs.Client
-	storage    generationStorage
-	limits     generationLimits
+	pool           *pgxpool.Pool
+	queries        *dbgen.Queries
+	jobsClient     *jobs.Client
+	storage        generationStorage
+	limits         generationLimits
+	imageGenerator ImageGenerator
 }
 
 type generationStorage interface {
 	Save(ctx context.Context, storageKey string, body []byte) (storage.SavedFile, error)
-	Copy(ctx context.Context, sourceKey string, targetKey string) (storage.SavedFile, error)
 	CreateZIP(ctx context.Context, targetKey string, files []storage.ArchiveFile) (storage.SavedFile, error)
 	Delete(ctx context.Context, storageKey string) error
 	PublicURL(storageKey string) string
@@ -136,23 +208,30 @@ type generationLimits interface {
 }
 
 // NewService создаёт сервис generation и связывает БД с локальным storage и очередью.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, jobsClient *jobs.Client, storage generationStorage, limits generationLimits) *Service {
+// imageGenerator может быть nil — тогда используется noopImageGenerator, который возвращает ошибку.
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, jobsClient *jobs.Client, storage generationStorage, limits generationLimits, imageGenerator ImageGenerator) *Service {
+	gen := imageGenerator
+	if gen == nil {
+		gen = noopImageGenerator{}
+	}
 	return &Service{
-		pool:       pool,
-		queries:    queries,
-		jobsClient: jobsClient,
-		storage:    storage,
-		limits:     limits,
+		pool:           pool,
+		queries:        queries,
+		jobsClient:     jobsClient,
+		storage:        storage,
+		limits:         limits,
+		imageGenerator: gen,
 	}
 }
 
 // GetConfig возвращает каталог вариантов для страницы `/app/generate`.
 func (s *Service) GetConfig(_ context.Context) Config {
 	return Config{
-		Marketplaces:     cloneCatalogOptions(generateMarketplaces),
+		Marketplaces:     marketplacesToCatalog(generateMarketplaces),
 		Styles:           cloneCatalogOptions(generateStyles),
 		CardTypes:        cloneCardTypeOptions(generateCardTypes),
 		CardCountOptions: append([]int(nil), generateCardCountOptions...),
+		Models:           cloneModelOptions(generateModels),
 	}
 }
 
@@ -239,6 +318,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreatedGenerat
 		MarketplaceID: normalized.MarketplaceID,
 		StyleID:       normalized.StyleID,
 		CardCount:     int32(normalized.CardCount),
+		ModelID:       normalized.ModelID,
 	})
 	if err != nil {
 		return CreatedGeneration{}, fmt.Errorf("create generation row: %w", err)
@@ -431,11 +511,6 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 		return fmt.Errorf("get generation for processing: %w", err)
 	}
 
-	sourceAsset, err := s.queries.GetAssetByID(ctx, generationRow.SourceAssetID)
-	if err != nil {
-		return fmt.Errorf("get source asset for processing: %w", err)
-	}
-
 	cardTypes, err := s.queries.ListGenerationCardTypes(ctx, generationID)
 	if err != nil {
 		return fmt.Errorf("list generation card types: %w", err)
@@ -453,28 +528,38 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 	}
 
 	archiveFiles := make([]storage.ArchiveFile, 0, generationRow.CardCount)
-	ext := extensionFromFilenameOrMime(sourceAsset.OriginalFilename, sourceAsset.MimeType)
+	aspectRatio := marketplaceAspectRatio(generationRow.MarketplaceID)
 	for i := 0; i < int(generationRow.CardCount); i++ {
 		cardType := cardTypes[i%len(cardTypes)]
-		targetKey := filepath.ToSlash(filepath.Join(
-			"generated",
-			generationID.String(),
-			fmt.Sprintf("%02d-%s%s", i+1, sanitizeFileSegment(cardType.CardTypeID), ext),
-		))
 
-		savedFile, err := s.storage.Copy(ctx, sourceAsset.StorageKey, targetKey)
+		// Генерируем изображение через AI-провайдер.
+		// Промпт составляется по параметрам генерации: маркетплейс, стиль, тип карточки.
+		prompt := buildCardPrompt(generationRow.MarketplaceID, generationRow.StyleID, cardType.CardTypeID)
+		imgBytes, err := s.imageGenerator.GenerateImage(ctx, ImageGenerateInput{
+			Prompt:      prompt,
+			AspectRatio: aspectRatio,
+			ModelID:     generationRow.ModelID,
+		})
 		if err != nil {
-			return fmt.Errorf("copy generated card file: %w", err)
+			return fmt.Errorf("generate card image (step %d, type %s): %w", i+1, cardType.CardTypeID, err)
+		}
+
+		fileName := fmt.Sprintf("%02d-%s.png", i+1, sanitizeFileSegment(cardType.CardTypeID))
+		targetKey := filepath.ToSlash(filepath.Join("generated", generationID.String(), fileName))
+
+		savedFile, err := s.storage.Save(ctx, targetKey, imgBytes)
+		if err != nil {
+			return fmt.Errorf("save generated card image: %w", err)
 		}
 
 		cardAssetID := uuid.New()
-		if err := s.persistGeneratedCard(ctx, cardAssetID, generationRow, cardType.CardTypeID, int32(i), sourceAsset, savedFile); err != nil {
+		if err := s.persistGeneratedCard(ctx, cardAssetID, generationRow, cardType.CardTypeID, int32(i), savedFile); err != nil {
 			_ = s.storage.Delete(ctx, savedFile.StorageKey)
 			return err
 		}
 
 		archiveFiles = append(archiveFiles, storage.ArchiveFile{
-			Name:       fmt.Sprintf("%02d-%s%s", i+1, sanitizeFileSegment(cardType.CardTypeID), ext),
+			Name:       fileName,
 			StorageKey: savedFile.StorageKey,
 		})
 
@@ -532,6 +617,7 @@ type normalizedCreateInput struct {
 	CardTypeIDs    []string
 	CardCount      int
 	SourceFileName string
+	ModelID        string
 }
 
 func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (uuid.UUID, uuid.UUID, normalizedCreateInput, error) {
@@ -546,7 +632,7 @@ func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (u
 	}
 
 	marketplaceID := strings.TrimSpace(input.MarketplaceID)
-	if !containsCatalogID(generateMarketplaces, marketplaceID) {
+	if !containsMarketplaceID(generateMarketplaces, marketplaceID) {
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrInvalidMarketplace
 	}
 
@@ -576,6 +662,14 @@ func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (u
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrInvalidCardType
 	}
 
+	// Если модель не задана — берём первую из каталога (дешёвую по умолчанию).
+	modelID := strings.TrimSpace(input.ModelID)
+	if modelID == "" {
+		modelID = generateModels[0].ID
+	} else if !containsModelID(generateModels, modelID) {
+		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrInvalidModel
+	}
+
 	projectName := strings.TrimSpace(input.ProjectName)
 	if len(projectName) > projects.MaxProjectTitleLength {
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrProjectNameTooLong
@@ -602,6 +696,7 @@ func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (u
 		CardTypeIDs:    cardTypeIDs,
 		CardCount:      input.CardCount,
 		SourceFileName: sourceAsset.OriginalFilename,
+		ModelID:        modelID,
 	}, nil
 }
 
@@ -611,7 +706,6 @@ func (s *Service) persistGeneratedCard(
 	generationRow dbgen.Generation,
 	cardTypeID string,
 	position int32,
-	sourceAsset dbgen.Asset,
 	savedFile storage.SavedFile,
 ) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -627,8 +721,9 @@ func (s *Service) persistGeneratedCard(
 		Kind:             "generated_card",
 		StorageKey:       savedFile.StorageKey,
 		OriginalFilename: filepath.Base(savedFile.StorageKey),
-		MimeType:         sourceAsset.MimeType,
-		SizeBytes:        savedFile.SizeBytes,
+		// RouterAI всегда возвращает PNG независимо от формата исходника.
+		MimeType:  "image/png",
+		SizeBytes: savedFile.SizeBytes,
 	}); err != nil {
 		return fmt.Errorf("create generated asset: %w", err)
 	}
@@ -701,14 +796,6 @@ func normalizeImageType(fileName string, contentType string) (string, string, er
 	}
 }
 
-func extensionFromFilenameOrMime(fileName string, mimeType string) string {
-	ext, _, err := normalizeImageType(fileName, mimeType)
-	if err == nil {
-		return ext
-	}
-	return ".png"
-}
-
 func sanitizeFileSegment(value string) string {
 	value = strings.TrimSpace(strings.ToLower(value))
 	replacer := strings.NewReplacer(" ", "-", "/", "-", "\\", "-", "_", "-")
@@ -717,6 +804,23 @@ func sanitizeFileSegment(value string) string {
 		return "card"
 	}
 	return value
+}
+
+func containsMarketplaceID(items []marketplaceOption, target string) bool {
+	for _, item := range items {
+		if item.ID == target {
+			return true
+		}
+	}
+	return false
+}
+
+func marketplacesToCatalog(items []marketplaceOption) []CatalogOption {
+	result := make([]CatalogOption, len(items))
+	for i, item := range items {
+		result[i] = item.CatalogOption
+	}
+	return result
 }
 
 func containsCatalogID(items []CatalogOption, target string) bool {
@@ -746,12 +850,87 @@ func containsInt(items []int, target int) bool {
 	return false
 }
 
+func containsModelID(items []ModelOption, target string) bool {
+	for _, item := range items {
+		if item.ID == target {
+			return true
+		}
+	}
+	return false
+}
+
 func cloneCatalogOptions(items []CatalogOption) []CatalogOption {
 	return append([]CatalogOption(nil), items...)
 }
 
 func cloneCardTypeOptions(items []CardTypeOption) []CardTypeOption {
 	return append([]CardTypeOption(nil), items...)
+}
+
+func cloneModelOptions(items []ModelOption) []ModelOption {
+	return append([]ModelOption(nil), items...)
+}
+
+// buildCardPrompt составляет промпт для генерации одной карточки маркетплейса.
+// Данные для промпта берутся напрямую из каталогов, поэтому добавление новых вариантов
+// требует правок только в одном месте — в объявлении generateMarketplaces / generateStyles / generateCardTypes.
+// Описание на английском — модели генерации изображений лучше понимают английские промпты.
+func buildCardPrompt(marketplaceID, styleID, cardTypeID string) string {
+	marketplace := findMarketplacePromptPart(generateMarketplaces, marketplaceID, "marketplace")
+	style := findCatalogPromptPart(generateStyles, styleID, "clean and professional")
+	cardType := findCardTypePromptPart(generateCardTypes, cardTypeID, "product image")
+
+	return fmt.Sprintf(
+		"Create a professional product card image for %s marketplace. Style: %s. Card type: %s. "+
+			"High quality, clean background, suitable for e-commerce listing. No text overlays.",
+		marketplace, style, cardType,
+	)
+}
+
+// marketplaceAspectRatio возвращает рекомендуемое соотношение сторон карточки для маркетплейса.
+// Значение берётся из каталога generateMarketplaces — менять нужно только там.
+func marketplaceAspectRatio(marketplaceID string) string {
+	for _, m := range generateMarketplaces {
+		if m.ID == marketplaceID {
+			return m.AspectRatio
+		}
+	}
+	return "3:4"
+}
+
+func findMarketplacePromptPart(items []marketplaceOption, id, fallback string) string {
+	for _, item := range items {
+		if item.ID == id {
+			return item.PromptPart
+		}
+	}
+	return fallback
+}
+
+func findCatalogPromptPart(items []CatalogOption, id, fallback string) string {
+	for _, item := range items {
+		if item.ID == id {
+			return item.PromptPart
+		}
+	}
+	return fallback
+}
+
+func findCardTypePromptPart(items []CardTypeOption, id, fallback string) string {
+	for _, item := range items {
+		if item.ID == id {
+			return item.PromptPart
+		}
+	}
+	return fallback
+}
+
+// noopImageGenerator используется когда ROUTERAI_API_KEY не задан.
+// Возвращает ошибку, чтобы генерация явно падала в failed, а не молча создавала пустые файлы.
+type noopImageGenerator struct{}
+
+func (noopImageGenerator) GenerateImage(_ context.Context, _ ImageGenerateInput) ([]byte, error) {
+	return nil, fmt.Errorf("image generator is not configured (ROUTERAI_API_KEY is not set)")
 }
 
 func trimErrorMessage(err error) string {
