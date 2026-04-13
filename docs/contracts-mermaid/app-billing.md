@@ -23,3 +23,16 @@ flowchart LR
     A2 --> T5["payments"]
     A3 --> T5
 ```
+
+# Webhook от платёжного провайдера: Provider -> API -> DB tables
+
+```mermaid
+flowchart LR
+    PR["YooKassa (провайдер)"] --> A1["POST /api/v1/billing/webhook"]
+
+    A1 --> D1["payment.succeeded"]
+    A1 --> D2["payment.canceled"]
+
+    A1 --> T1["payments"]
+    A1 --> T2["subscriptions"]
+```
