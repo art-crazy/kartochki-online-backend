@@ -1,4 +1,66 @@
 paths:
+  /api/v1/auth/yandex/token:
+    post:
+      summary: Войти через Яндекс по access token
+      description: |
+        Альтернативный вход через Яндекс ID, когда frontend использует официальный виджет.
+
+        Frontend получает `access_token` через postMessage и отправляет его на backend.
+        Backend проверяет токен через userinfo, находит или создаёт пользователя и открывает локальную сессию.
+      operationId: loginWithYandexToken
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/YandexTokenRequest"
+      responses:
+        "200":
+          description: Вход через Яндекс завершён, локальная сессия создана
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Токен отсутствует, некорректен или истёк
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Не удалось завершить вход из-за внутренней ошибки backend
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через Яндекс пока не настроен
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
   /api/v1/auth/register:
     post:
       summary: Регистрация по email и паролю

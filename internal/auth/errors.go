@@ -28,6 +28,9 @@ var (
 	// ErrOAuthEmailMissing возвращается, когда провайдер не вернул email, нужный для локального пользователя.
 	ErrOAuthEmailMissing = errors.New("oauth email is missing")
 
+	// ErrOAuthTokenInvalid возвращается, когда access token от OAuth-провайдера неверен или уже истёк.
+	ErrOAuthTokenInvalid = errors.New("oauth access token is invalid")
+
 	// ErrTelegramAuthNotConfigured возвращается, когда backend ещё не получил токен Telegram-бота.
 	ErrTelegramAuthNotConfigured = errors.New("telegram auth is not configured")
 

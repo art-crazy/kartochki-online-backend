@@ -19,6 +19,10 @@ type AuthHandler struct {
 	authService *auth.Service
 }
 
+type yandexTokenRequest struct {
+	AccessToken string `json:"access_token"`
+}
+
 // NewAuthHandler создаёт обработчик auth endpoint.
 func NewAuthHandler(authService *auth.Service) AuthHandler {
 	return AuthHandler{authService: authService}
@@ -305,6 +309,37 @@ func (h AuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
+// YandexToken завершает вход по access token от виджета Яндекс ID и создаёт локальную сессию backend.
+func (h AuthHandler) YandexToken(w http.ResponseWriter, r *http.Request) {
+	var req yandexTokenRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		return
+	}
+
+	if details := validateYandexTokenRequest(req); len(details) > 0 {
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		return
+	}
+
+	result, err := h.authService.LoginWithYandexToken(r.Context(), req.AccessToken, sessionMetadataFromRequest(r))
+	if err != nil {
+		switch {
+		case errors.Is(err, auth.ErrOAuthNotConfigured):
+			response.WriteError(w, r, http.StatusNotImplemented, "oauth_not_configured", "yandex oauth is not configured yet")
+		case errors.Is(err, auth.ErrOAuthTokenInvalid):
+			response.WriteError(w, r, http.StatusBadRequest, "invalid_oauth_token", "yandex access token is invalid or expired")
+		case errors.Is(err, auth.ErrOAuthEmailMissing):
+			response.WriteError(w, r, http.StatusBadRequest, "oauth_email_missing", "yandex account did not provide email")
+		default:
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to login with yandex token")
+		}
+		return
+	}
+
+	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
+}
+
 func validateRegisterRequest(req openapi.RegisterRequest, passwordMinLength int) []openapi.ErrorDetail {
 	var details []openapi.ErrorDetail
 
@@ -394,6 +429,16 @@ func validateTelegramLoginRequest(req openapi.TelegramLoginRequest) []openapi.Er
 	return details
 }
 
+func validateYandexTokenRequest(req yandexTokenRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
+
+	if strings.TrimSpace(req.AccessToken) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("access_token"), Message: "field is required"})
+	}
+
+	return details
+}
+
 // toAuthResponse конвертирует доменный AuthResult в openapi.AuthResponse для HTTP-ответа.
 func toAuthResponse(result auth.AuthResult) openapi.AuthResponse {
 	return openapi.AuthResponse{
@@ -421,4 +466,3 @@ func authUserToAPI(user auth.User) openapi.AuthUser {
 
 	return apiUser
 }
-

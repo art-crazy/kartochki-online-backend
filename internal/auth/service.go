@@ -329,6 +329,24 @@ func (s *Service) FinishYandexOAuth(ctx context.Context, code string, state stri
 	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName, metadata)
 }
 
+// LoginWithYandexToken принимает access token от виджета Яндекс ID и создаёт локальную сессию backend.
+func (s *Service) LoginWithYandexToken(ctx context.Context, accessToken string, metadata SessionMetadata) (AuthResult, error) {
+	if !s.yandexTokenConfigured() {
+		return AuthResult{}, ErrOAuthNotConfigured
+	}
+
+	profile, err := fetchYandexOAuthProfileByToken(ctx, strings.TrimSpace(accessToken))
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if profile.DefaultEmail == "" {
+		return AuthResult{}, ErrOAuthEmailMissing
+	}
+
+	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName, metadata)
+}
+
 // LoginWithTelegram проверяет подпись Telegram Login Widget и открывает локальную сессию.
 func (s *Service) LoginWithTelegram(ctx context.Context, data TelegramLoginData, metadata SessionMetadata) (AuthResult, error) {
 	if !s.telegramAuthConfigured() {
@@ -534,6 +552,11 @@ func (s *Service) providerConfigured(provider OAuthProviderConfig) bool {
 		isRedirectURLConfigured(provider.RedirectURL)
 }
 
+func (s *Service) yandexTokenConfigured() bool {
+	// Для виджета достаточно client_id, redirect_url и client_secret не используются.
+	return strings.TrimSpace(s.yandexOAuth.ClientID) != ""
+}
+
 func (s *Service) telegramAuthConfigured() bool {
 	return strings.TrimSpace(s.telegramAuth.BotToken) != ""
 }
@@ -665,5 +688,3 @@ func isUniqueViolation(err error) bool {
 
 	return pgErr.Code == "23505"
 }
-
-

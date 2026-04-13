@@ -79,6 +79,7 @@ func NewRouter(
 			authRouter.Get("/vk/callback", authHandler.VKCallback)
 			authRouter.Get("/yandex/start", authHandler.YandexStart)
 			authRouter.Get("/yandex/callback", authHandler.YandexCallback)
+			authRouter.Post("/yandex/token", authHandler.YandexToken)
 		})
 
 		// Все маршруты внутри этой группы требуют авторизации через Bearer-токен.

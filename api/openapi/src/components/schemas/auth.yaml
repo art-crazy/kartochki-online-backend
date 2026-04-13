@@ -90,6 +90,16 @@ schemas:
         description: Новый пароль пользователя.
         example: novyy-nadezhnyy-parol-456
 
+  YandexTokenRequest:
+    type: object
+    required:
+      - access_token
+    properties:
+      access_token:
+        type: string
+        description: Access token, полученный от виджета Яндекс ID.
+        example: y0_AgAAAAAExampleAccessToken
+
   AuthUser:
     type: object
     required:
