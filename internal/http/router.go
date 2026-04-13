@@ -18,6 +18,7 @@ import (
 // NewRouter собирает HTTP-маршруты и middleware для публичного API и служебных endpoint.
 func NewRouter(
 	cfg config.HTTPConfig,
+	rateLimitCfg config.RateLimitConfig,
 	logger zerolog.Logger,
 	healthHandler handlers.HealthHandler,
 	authHandler handlers.AuthHandler,
@@ -34,6 +35,7 @@ func NewRouter(
 ) stdhttp.Handler {
 	router := chi.NewRouter()
 	authMiddleware := newAuthMiddleware(authService)
+	authRateLimiter := newRateLimiter(rateLimitCfg)
 
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
@@ -62,7 +64,11 @@ func NewRouter(
 	router.Handle(storagePublicPath+"/*", stdhttp.StripPrefix(storagePublicPath+"/", stdhttp.FileServer(stdhttp.FS(os.DirFS(storageRootDir)))))
 
 	router.Route("/api/v1", func(api chi.Router) {
+		// Rate limiting применяется только к auth-эндпоинтам: они доступны без токена
+		// и являются основной целью brute force и credential stuffing атак.
 		api.Route("/auth", func(authRouter chi.Router) {
+			authRouter.Use(authRateLimiter.Middleware())
+
 			authRouter.Post("/register", authHandler.Register)
 			authRouter.Post("/login", authHandler.Login)
 			authRouter.Post("/telegram/login", authHandler.TelegramLogin)

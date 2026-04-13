@@ -12,16 +12,28 @@ import (
 
 // Config объединяет конфигурацию всех подсистем приложения.
 type Config struct {
-	App      AppConfig
-	HTTP     HTTPConfig
-	Postgres PostgresConfig
-	Redis    RedisConfig
-	Asynq    AsynqConfig
-	Auth     AuthConfig
-	Storage  StorageConfig
-	Email    EmailConfig
-	YooKassa YooKassaConfig
-	RouterAI RouterAIConfig
+	App           AppConfig
+	HTTP          HTTPConfig
+	Postgres      PostgresConfig
+	Redis         RedisConfig
+	Asynq         AsynqConfig
+	Auth          AuthConfig
+	Storage       StorageConfig
+	Email         EmailConfig
+	YooKassa      YooKassaConfig
+	RouterAI      RouterAIConfig
+	AuthRateLimit RateLimitConfig
+}
+
+// RateLimitConfig описывает параметры ограничителя запросов (token bucket per IP).
+// Применяется к публичным auth-эндпоинтам для защиты от brute force и спама.
+type RateLimitConfig struct {
+	// RPS — разрешённое число запросов в секунду с одного IP.
+	RPS float64
+	// Burst — максимальный пиковый всплеск запросов (ёмкость бакета).
+	Burst int
+	// CleanupTTL — через какое время неактивный IP удаляется из памяти.
+	CleanupTTL time.Duration
 }
 
 // RouterAIConfig хранит параметры для интеграции с RouterAI API.
@@ -215,6 +227,21 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	authRateLimitBurst, err := getInt("AUTH_RATE_LIMIT_BURST", 10)
+	if err != nil {
+		return Config{}, err
+	}
+
+	authRateLimitCleanupTTL, err := getDuration("AUTH_RATE_LIMIT_CLEANUP_TTL", 10*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+
+	authRateLimitRPS, err := getFloat("AUTH_RATE_LIMIT_RPS", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		App: AppConfig{
 			Name:        getEnv("APP_NAME", "kartochki-online-backend"),
@@ -286,6 +313,11 @@ func loadFromEnv() (Config, error) {
 				AuthMaxAge: telegramAuthMaxAge,
 			},
 		},
+		AuthRateLimit: RateLimitConfig{
+			RPS:        authRateLimitRPS,
+			Burst:      authRateLimitBurst,
+			CleanupTTL: authRateLimitCleanupTTL,
+		},
 	}
 
 	if err := validate(cfg); err != nil {
@@ -312,6 +344,20 @@ func getInt(key string, fallback int) (int, error) {
 	parsed, err := strconv.Atoi(value)
 	if err != nil {
 		return 0, fmt.Errorf("parse %s as int: %w", key, err)
+	}
+
+	return parsed, nil
+}
+
+func getFloat(key string, fallback float64) (float64, error) {
+	value, ok := os.LookupEnv(key)
+	if !ok || value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s as float: %w", key, err)
 	}
 
 	return parsed, nil
@@ -428,6 +474,18 @@ func validate(cfg Config) error {
 
 	if cfg.Auth.TelegramAuth.AuthMaxAge <= 0 {
 		return fmt.Errorf("AUTH_TELEGRAM_AUTH_MAX_AGE must be greater than zero")
+	}
+
+	if cfg.AuthRateLimit.RPS <= 0 {
+		return fmt.Errorf("AUTH_RATE_LIMIT_RPS must be greater than zero")
+	}
+
+	if cfg.AuthRateLimit.Burst <= 0 {
+		return fmt.Errorf("AUTH_RATE_LIMIT_BURST must be greater than zero")
+	}
+
+	if cfg.AuthRateLimit.CleanupTTL <= 0 {
+		return fmt.Errorf("AUTH_RATE_LIMIT_CLEANUP_TTL must be greater than zero")
 	}
 
 	// Валидируем Email только если SMTP включён — при пустом Host используется NoopSender.

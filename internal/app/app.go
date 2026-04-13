@@ -234,6 +234,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 
 	router := httptransport.NewRouter(
 		cfg.HTTP,
+		cfg.AuthRateLimit,
 		logger,
 		healthHandler,
 		authHandler,
