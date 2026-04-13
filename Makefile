@@ -34,6 +34,10 @@ tidy:
 build:
 	go build ./...
 
+.PHONY: check-file-lines
+check-file-lines:
+	go run ./tools/check-file-lines
+
 .PHONY: sqlc
 sqlc:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) generate

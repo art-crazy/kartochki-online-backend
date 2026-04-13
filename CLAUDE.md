@@ -20,6 +20,7 @@ Build and maintain the backend for `kartochki.online`.
 - Use explicit SQL and `sqlc` for typed query generation.
 - Use Asynq for retryable background work.
 - Avoid hidden abstractions that make request flow harder to trace.
+- Keep handwritten files at 300 lines or less; split files by responsibility when they grow beyond that limit.
 - Write code comments and documentation in simple Russian for a developer who is learning Go.
 - Every new exported package member should have a Russian Go doc comment.
 - Add short Russian comments around non-obvious logic, side effects, retries, SQL intent, and integration behavior.

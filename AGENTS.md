@@ -92,6 +92,7 @@ This repository contains the backend for `kartochki.online`, a SaaS product for 
 - Treat `api/openapi/openapi.yaml` as the external contract source of truth.
 - Keep HTTP transport, domain logic, persistence, and background jobs separated.
 - Prefer explicit packages over generic shared helpers.
+- Keep handwritten files at 300 lines or less. If a file grows beyond 300 lines, decompose it by responsibility before adding more logic.
 - Avoid hidden magic and code generation that obscures business rules, except where it gives clear mechanical value such as `sqlc`.
 - Use background jobs for long-running and retryable work instead of stretching request/response handlers.
 
@@ -158,6 +159,7 @@ Do not prematurely introduce separate services for these domains. Keep them modu
 
 - `go mod tidy`
 - `go run ./cmd/api`
+- `make check-file-lines`
 - `docker compose up -d`
 - `docker compose down`
 
@@ -168,4 +170,5 @@ Do not prematurely introduce separate services for these domains. Keep them modu
 3. Put orchestration in use-case or service packages, not in transport or repository code.
 4. Update `api/openapi/openapi.yaml` for public API changes.
 5. Add or update simple Russian comments when changing code so the patch remains understandable to a Go beginner.
-6. Update `docs/architecture.md` when package boundaries or backend conventions change.
+6. Before finishing, run `make check-file-lines` when code or contract files changed. Existing entries in `.line-limit-ignore` are temporary decomposition debt, not examples to copy.
+7. Update `docs/architecture.md` when package boundaries or backend conventions change.

@@ -1,0 +1,22 @@
+# Текущий baseline для файлов больше 300 строк.
+# Новые большие файлы не добавляйте сюда без отдельного решения о декомпозиции.
+api/openapi/src/components/schemas/blog.yaml
+api/openapi/src/paths/auth.yaml
+api/openapi/src/paths/projects.yaml
+api/openapi/src/paths/settings.yaml
+db/queries/billing.sql
+docs/architecture.md
+docs/database.dbml
+docs/database.sql
+internal/auth/service.go
+internal/billing/service.go
+internal/blog/service.go
+internal/config/config.go
+internal/generation/service.go
+internal/http/handlers/auth.go
+internal/http/handlers/blog.go
+internal/http/handlers/generation.go
+internal/http/handlers/projects.go
+internal/http/handlers/settings.go
+internal/projects/service.go
+internal/settings/service.go

@@ -149,6 +149,14 @@ That means:
 
 This is the right default because the product domain is still evolving. Splitting into services too early would increase operational cost and slow down refactors.
 
+### File size limit
+
+Handwritten files should stay at 300 lines or less.
+
+When a file grows beyond this limit, split it by responsibility instead of adding more branches, helpers, or unrelated behavior to the same file. Good split points are transport mapping, validation, use-case orchestration, provider adapters, repository queries, and background job handlers.
+
+Generated files and bundled artifacts are exempt from this rule because they are not edited by hand. Existing handwritten files listed in `.line-limit-ignore` are temporary decomposition debt. When touching one of them, prefer extracting a focused file and removing the path from the baseline.
+
 ## Request and Execution Model
 
 ### Synchronous path
