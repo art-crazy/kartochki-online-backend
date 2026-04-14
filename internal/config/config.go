@@ -61,6 +61,12 @@ type AppConfig struct {
 	FrontendURL string
 }
 
+// IsProduction возвращает true, если приложение запущено в production-окружении.
+// Используется для включения флагов безопасности, например Secure на куках.
+func (c AppConfig) IsProduction() bool {
+	return c.Env == "production"
+}
+
 // EmailConfig хранит настройки SMTP-отправителя писем.
 // При пустом Host приложение использует NoopSender (только логирование).
 type EmailConfig struct {
@@ -81,6 +87,8 @@ type HTTPConfig struct {
 	WriteTimeout    time.Duration
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
+	// CORSAllowedOrigin — конкретный origin фронтенда (без wildcard), нужен для credentials: true.
+	CORSAllowedOrigin string
 }
 
 // PostgresConfig хранит настройки подключения к PostgreSQL.
@@ -249,13 +257,14 @@ func loadFromEnv() (Config, error) {
 			FrontendURL: getEnv("FRONTEND_URL", "http://localhost:3000"),
 		},
 		HTTP: HTTPConfig{
-			Host:            getEnv("HTTP_HOST", "0.0.0.0"),
-			Port:            getEnv("HTTP_PORT", "8080"),
-			RequestTimeout:  requestTimeout,
-			ReadTimeout:     readTimeout,
-			WriteTimeout:    writeTimeout,
-			IdleTimeout:     idleTimeout,
-			ShutdownTimeout: shutdownTimeout,
+			Host:              getEnv("HTTP_HOST", "0.0.0.0"),
+			Port:              getEnv("HTTP_PORT", "8080"),
+			RequestTimeout:    requestTimeout,
+			ReadTimeout:       readTimeout,
+			WriteTimeout:      writeTimeout,
+			IdleTimeout:       idleTimeout,
+			ShutdownTimeout:   shutdownTimeout,
+			CORSAllowedOrigin: getEnv("CORS_ALLOWED_ORIGIN", "http://localhost:3000"),
 		},
 		Postgres: PostgresConfig{
 			DSN: getEnv("POSTGRES_DSN", "postgres://postgres:postgres@localhost:5432/kartochki_online?sslmode=disable"),

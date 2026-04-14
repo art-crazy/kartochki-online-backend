@@ -43,6 +43,7 @@ func NewRouter(
 	router.Use(middleware.Timeout(cfg.RequestTimeout))
 	router.Use(requestctx.WithLogger(logger))
 	router.Use(requestLogger(logger))
+	router.Use(corsMiddleware(cfg.CORSAllowedOrigin))
 
 	// Единый fallback нужен заранее, чтобы фронтенд не зависел от разных форматов ошибок.
 	router.NotFound(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {

@@ -16,7 +16,8 @@ import (
 
 // AuthHandler обслуживает публичные auth-сценарии и маршруты текущего пользователя.
 type AuthHandler struct {
-	authService *auth.Service
+	authService  *auth.Service
+	secureCookie bool // true в production: кука отправляется только по HTTPS
 }
 
 type yandexTokenRequest struct {
@@ -24,8 +25,9 @@ type yandexTokenRequest struct {
 }
 
 // NewAuthHandler создаёт обработчик auth endpoint.
-func NewAuthHandler(authService *auth.Service) AuthHandler {
-	return AuthHandler{authService: authService}
+// secureCookie должен быть true в production-окружении.
+func NewAuthHandler(authService *auth.Service, secureCookie bool) AuthHandler {
+	return AuthHandler{authService: authService, secureCookie: secureCookie}
 }
 
 // Register создаёт пользователя и сразу логинит его в первую сессию.
@@ -68,6 +70,7 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusCreated, toAuthResponse(result))
 }
 
@@ -98,6 +101,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -137,6 +141,7 @@ func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -158,6 +163,7 @@ func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clearAuthCookie(w, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusLoggedOut})
 }
 
@@ -263,6 +269,7 @@ func (h AuthHandler) VKCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -306,6 +313,7 @@ func (h AuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -337,6 +345,7 @@ func (h AuthHandler) YandexToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 

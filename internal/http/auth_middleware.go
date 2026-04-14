@@ -10,7 +10,7 @@ import (
 	"kartochki-online-backend/internal/http/response"
 )
 
-// authMiddleware проверяет Bearer-токен и кладёт пользователя в context.
+// authMiddleware проверяет токен сессии (из Bearer-заголовка или куки) и кладёт пользователя в context.
 type authMiddleware struct {
 	authService *auth.Service
 }
@@ -20,10 +20,10 @@ func newAuthMiddleware(authService *auth.Service) authMiddleware {
 	return authMiddleware{authService: authService}
 }
 
-// RequireUser защищает endpoint и останавливает запрос, если сессия невалидна.
+// RequireUser защищает endpoint: извлекает токен из Bearer-заголовка или куки, проверяет сессию и кладёт пользователя в context.
 func (m authMiddleware) RequireUser(next stdhttp.Handler) stdhttp.Handler {
 	return stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
-		token, err := bearerTokenFromRequest(r)
+		token, err := tokenFromRequest(r)
 		if err != nil {
 			response.WriteError(w, r, stdhttp.StatusUnauthorized, "unauthorized", "authorization token is required")
 			return
@@ -47,21 +47,27 @@ func (m authMiddleware) RequireUser(next stdhttp.Handler) stdhttp.Handler {
 	})
 }
 
-func bearerTokenFromRequest(r *stdhttp.Request) (string, error) {
+// tokenFromRequest извлекает токен из Authorization: Bearer, при отсутствии — из куки auth_token.
+func tokenFromRequest(r *stdhttp.Request) (string, error) {
+	// Приоритет: явный Bearer-заголовок (нужен для API-клиентов и периода миграции).
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
-	if header == "" {
+	if header != "" {
+		scheme, token, ok := strings.Cut(header, " ")
+		if !ok || !strings.EqualFold(scheme, "Bearer") {
+			return "", auth.ErrUnauthorized
+		}
+		token = strings.TrimSpace(token)
+		if token == "" {
+			return "", auth.ErrUnauthorized
+		}
+		return token, nil
+	}
+
+	// Fallback: кука — браузер прикладывает её автоматически.
+	cookie, err := r.Cookie("auth_token")
+	if err != nil || strings.TrimSpace(cookie.Value) == "" {
 		return "", auth.ErrUnauthorized
 	}
 
-	scheme, token, ok := strings.Cut(header, " ")
-	if !ok || !strings.EqualFold(scheme, "Bearer") {
-		return "", auth.ErrUnauthorized
-	}
-
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return "", auth.ErrUnauthorized
-	}
-
-	return token, nil
+	return cookie.Value, nil
 }

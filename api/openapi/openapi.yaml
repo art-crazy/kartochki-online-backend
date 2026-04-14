@@ -78,6 +78,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
+              schema:
+                type: string
+                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
           content:
             application/json:
               schema:
@@ -125,6 +130,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
+              schema:
+                type: string
+                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
           content:
             application/json:
               schema:
@@ -183,6 +193,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
+              schema:
+                type: string
+                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
           content:
             application/json:
               schema:
@@ -212,12 +227,13 @@ paths:
   /api/v1/auth/logout:
     post:
       summary: Выход из текущей сессии
-      description: Отзывает текущий Bearer-токен и завершает активную сессию.
+      description: Отзывает активную сессию и сбрасывает куку auth_token.
       operationId: logoutAuthUser
       tags:
         - Auth
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Текущая сессия завершена
@@ -226,6 +242,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: Сбрасывает куку auth_token (Max-Age=0).
+              schema:
+                type: string
+                example: auth_token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0
           content:
             application/json:
               schema:
@@ -250,6 +271,7 @@ paths:
         - Auth
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Данные текущего пользователя
@@ -440,6 +462,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
+              schema:
+                type: string
+                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
           content:
             application/json:
               schema:
@@ -556,6 +583,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
+              schema:
+                type: string
+                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
           content:
             application/json:
               schema:
@@ -602,6 +634,7 @@ paths:
         - Projects
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Список проектов пользователя
@@ -644,6 +677,7 @@ paths:
         - Projects
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -704,6 +738,7 @@ paths:
         - Projects
       security:
         - BearerAuth: []
+        - CookieAuth: []
       parameters:
         - in: path
           name: id
@@ -765,6 +800,7 @@ paths:
         - Projects
       security:
         - BearerAuth: []
+        - CookieAuth: []
       parameters:
         - in: path
           name: id
@@ -843,6 +879,7 @@ paths:
         - Projects
       security:
         - BearerAuth: []
+        - CookieAuth: []
       parameters:
         - in: path
           name: id
@@ -905,6 +942,7 @@ paths:
         - Dashboard
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Данные дашборда
@@ -948,6 +986,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Данные для формы запуска генерации
@@ -980,6 +1019,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1046,6 +1086,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1128,6 +1169,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       parameters:
         - name: id
           in: path
@@ -1189,6 +1231,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Данные настроек
@@ -1231,6 +1274,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1301,6 +1345,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1360,6 +1405,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1419,6 +1465,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1478,6 +1525,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       parameters:
         - in: path
           name: id
@@ -1549,6 +1597,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Новый API-ключ успешно создан
@@ -1591,6 +1640,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Задача экспорта принята
@@ -1633,6 +1683,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1692,6 +1743,7 @@ paths:
         - Billing
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Текущая подписка, тарифы и разовые пакеты карточек
@@ -1734,6 +1786,7 @@ paths:
         - Billing
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1815,6 +1868,7 @@ paths:
         - Billing
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -1885,6 +1939,7 @@ paths:
         - Billing
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         '200':
           description: Автопродление успешно отключено
@@ -2084,6 +2139,11 @@ components:
       scheme: bearer
       bearerFormat: opaque
       description: 'Передавайте токен в заголовке Authorization: Bearer <token>.'
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+      description: HttpOnly-кука auth_token, устанавливается автоматически при входе. Браузер прикладывает её к каждому запросу без дополнительного кода.
   schemas:
     HealthResponse:
       type: object

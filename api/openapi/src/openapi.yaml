@@ -100,6 +100,11 @@ components:
       scheme: bearer
       bearerFormat: opaque
       description: "Передавайте токен в заголовке Authorization: Bearer <token>."
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+      description: "HttpOnly-кука auth_token, устанавливается автоматически при входе. Браузер прикладывает её к каждому запросу без дополнительного кода."
   schemas:
     HealthResponse:
       $ref: "./components/schemas/common.yaml#/schemas/HealthResponse"

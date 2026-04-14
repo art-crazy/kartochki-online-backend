@@ -57,6 +57,33 @@ func isValidEmail(value string) bool {
 	return parsed.Address == value
 }
 
+// setAuthCookie устанавливает HttpOnly-куку с токеном сессии.
+// secure должен быть true в production — без этого браузер отправит куку по HTTP.
+func setAuthCookie(w http.ResponseWriter, token string, secure bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+	})
+}
+
+// clearAuthCookie сбрасывает куку auth_token при logout.
+// Max-Age=0 — стандартный способ удаления куки по RFC 6265.
+func clearAuthCookie(w http.ResponseWriter, secure bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+		MaxAge:   0,
+	})
+}
+
 // decodeJSON десериализует JSON-тело запроса в dst.
 // Запрещает неизвестные поля и несколько JSON-значений подряд.
 func decodeJSON(r *http.Request, dst any) error {

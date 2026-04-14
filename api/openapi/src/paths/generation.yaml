@@ -8,6 +8,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         "200":
           description: Данные для формы запуска генерации
@@ -41,6 +42,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -108,6 +110,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -191,6 +194,7 @@ paths:
         - Generation
       security:
         - BearerAuth: []
+        - CookieAuth: []
       parameters:
         - name: id
           in: path

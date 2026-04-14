@@ -183,7 +183,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		emailSender = email.NewNoopSender(logger)
 	}
 	authService := auth.NewService(db.Pool, queries, redisClient, asynqClient, logger, cfg.Auth)
-	authHandler := handlers.NewAuthHandler(authService)
+	authHandler := handlers.NewAuthHandler(authService, cfg.App.IsProduction())
 
 	projectService := projects.NewService(queries)
 	blogService := blog.NewService(queries)

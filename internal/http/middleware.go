@@ -10,6 +10,31 @@ import (
 	"kartochki-online-backend/internal/http/requestctx"
 )
 
+// corsMiddleware выставляет CORS-заголовки только для разрешённого origin фронтенда.
+// Allow-Origin намеренно не wildcard: браузер запрещает credentials: true с *.
+func corsMiddleware(allowedOrigin string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Заголовки выставляем только если origin совпадает — иначе не раскрываем политику.
+			if r.Header.Get("Origin") == allowedOrigin {
+				w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			}
+
+			// Preflight: браузер сначала шлёт OPTIONS, нужно ответить без тела.
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// requestLogger пишет структурированный лог каждого HTTP-запроса: метод, путь, статус, размер ответа и время выполнения.
 func requestLogger(logger zerolog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

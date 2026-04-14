@@ -8,6 +8,7 @@ paths:
         - Dashboard
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         "200":
           description: Данные дашборда

@@ -8,6 +8,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         "200":
           description: Данные настроек
@@ -51,6 +52,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -122,6 +124,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -182,6 +185,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -242,6 +246,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:
@@ -302,6 +307,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       parameters:
         - in: path
           name: id
@@ -374,6 +380,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         "200":
           description: Новый API-ключ успешно создан
@@ -417,6 +424,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         "200":
           description: Задача экспорта принята
@@ -460,6 +468,7 @@ paths:
         - Settings
       security:
         - BearerAuth: []
+        - CookieAuth: []
       requestBody:
         required: true
         content:

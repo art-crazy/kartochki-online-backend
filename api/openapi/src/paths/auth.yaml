@@ -24,6 +24,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
           content:
             application/json:
               schema:
@@ -82,6 +87,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
           content:
             application/json:
               schema:
@@ -130,6 +140,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
           content:
             application/json:
               schema:
@@ -189,6 +204,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
           content:
             application/json:
               schema:
@@ -219,12 +239,13 @@ paths:
   /api/v1/auth/logout:
     post:
       summary: Выход из текущей сессии
-      description: Отзывает текущий Bearer-токен и завершает активную сессию.
+      description: Отзывает активную сессию и сбрасывает куку auth_token.
       operationId: logoutAuthUser
       tags:
         - Auth
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         "200":
           description: Текущая сессия завершена
@@ -233,6 +254,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: "Сбрасывает куку auth_token (Max-Age=0)."
+              schema:
+                type: string
+                example: "auth_token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0"
           content:
             application/json:
               schema:
@@ -258,6 +284,7 @@ paths:
         - Auth
       security:
         - BearerAuth: []
+        - CookieAuth: []
       responses:
         "200":
           description: Данные текущего пользователя
@@ -452,6 +479,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
           content:
             application/json:
               schema:
@@ -570,6 +602,11 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
           content:
             application/json:
               schema:
