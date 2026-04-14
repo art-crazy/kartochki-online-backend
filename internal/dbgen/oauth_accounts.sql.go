@@ -17,14 +17,18 @@ insert into oauth_accounts (
     user_id,
     provider,
     provider_user_id,
-    email
+    email,
+    name,
+    avatar_url
 ) values (
     $1,
     $2,
     $3,
-    $4
-)
-returning id, user_id, provider, provider_user_id, email, created_at
+    $4,
+    $5,
+    $6
+) on conflict (provider, provider_user_id) do nothing
+returning id, user_id, provider, provider_user_id, email, name, avatar_url, created_at, updated_at
 `
 
 type CreateOAuthAccountParams struct {
@@ -32,23 +36,42 @@ type CreateOAuthAccountParams struct {
 	Provider       string
 	ProviderUserID string
 	Email          pgtype.Text
+	Name           pgtype.Text
+	AvatarUrl      pgtype.Text
 }
 
-func (q *Queries) CreateOAuthAccount(ctx context.Context, arg CreateOAuthAccountParams) (OauthAccount, error) {
+type CreateOAuthAccountRow struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	Provider       string
+	ProviderUserID string
+	Email          pgtype.Text
+	Name           pgtype.Text
+	AvatarUrl      pgtype.Text
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) CreateOAuthAccount(ctx context.Context, arg CreateOAuthAccountParams) (CreateOAuthAccountRow, error) {
 	row := q.db.QueryRow(ctx, createOAuthAccount,
 		arg.UserID,
 		arg.Provider,
 		arg.ProviderUserID,
 		arg.Email,
+		arg.Name,
+		arg.AvatarUrl,
 	)
-	var i OauthAccount
+	var i CreateOAuthAccountRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.Provider,
 		&i.ProviderUserID,
 		&i.Email,
+		&i.Name,
+		&i.AvatarUrl,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -60,7 +83,10 @@ select
     provider,
     provider_user_id,
     email,
-    created_at
+    name,
+    avatar_url,
+    created_at,
+    updated_at
 from oauth_accounts
 where provider = $1
   and provider_user_id = $2
@@ -72,16 +98,31 @@ type GetOAuthAccountByProviderUserIDParams struct {
 	ProviderUserID string
 }
 
-func (q *Queries) GetOAuthAccountByProviderUserID(ctx context.Context, arg GetOAuthAccountByProviderUserIDParams) (OauthAccount, error) {
+type GetOAuthAccountByProviderUserIDRow struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	Provider       string
+	ProviderUserID string
+	Email          pgtype.Text
+	Name           pgtype.Text
+	AvatarUrl      pgtype.Text
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) GetOAuthAccountByProviderUserID(ctx context.Context, arg GetOAuthAccountByProviderUserIDParams) (GetOAuthAccountByProviderUserIDRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthAccountByProviderUserID, arg.Provider, arg.ProviderUserID)
-	var i OauthAccount
+	var i GetOAuthAccountByProviderUserIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.Provider,
 		&i.ProviderUserID,
 		&i.Email,
+		&i.Name,
+		&i.AvatarUrl,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -157,4 +198,33 @@ func (q *Queries) ListOAuthAccountsByUserID(ctx context.Context, userID uuid.UUI
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateOAuthAccountSnapshot = `-- name: UpdateOAuthAccountSnapshot :exec
+update oauth_accounts
+set email = coalesce($3, email),
+    name = coalesce($4, name),
+    avatar_url = coalesce($5, avatar_url),
+    updated_at = now()
+where provider = $1
+  and provider_user_id = $2
+`
+
+type UpdateOAuthAccountSnapshotParams struct {
+	Provider       string
+	ProviderUserID string
+	Email          pgtype.Text
+	Name           pgtype.Text
+	AvatarUrl      pgtype.Text
+}
+
+func (q *Queries) UpdateOAuthAccountSnapshot(ctx context.Context, arg UpdateOAuthAccountSnapshotParams) error {
+	_, err := q.db.Exec(ctx, updateOAuthAccountSnapshot,
+		arg.Provider,
+		arg.ProviderUserID,
+		arg.Email,
+		arg.Name,
+		arg.AvatarUrl,
+	)
+	return err
 }

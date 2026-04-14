@@ -90,7 +90,22 @@ schemas:
         description: Новый пароль пользователя.
         example: novyy-nadezhnyy-parol-456
 
-  YandexTokenRequest:
+  VkWidgetLoginRequest:
+    type: object
+    required:
+      - code
+      - device_id
+    properties:
+      code:
+        type: string
+        description: Code, полученный frontend из события LOGIN_SUCCESS виджета VK ID One Tap.
+        example: vk_widget_code
+      device_id:
+        type: string
+        description: Device ID, полученный frontend из события LOGIN_SUCCESS виджета VK ID One Tap.
+        example: vk_device_id
+
+  YandexWidgetLoginRequest:
     type: object
     required:
       - access_token

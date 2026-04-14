@@ -43,7 +43,7 @@ func NewRouter(
 	router.Use(middleware.Timeout(cfg.RequestTimeout))
 	router.Use(requestctx.WithLogger(logger))
 	router.Use(requestLogger(logger))
-	router.Use(corsMiddleware(cfg.CORSAllowedOrigin))
+	router.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 
 	// Единый fallback нужен заранее, чтобы фронтенд не зависел от разных форматов ошибок.
 	router.NotFound(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -76,11 +76,8 @@ func NewRouter(
 			authRouter.With(authMiddleware.RequireUser).Post("/logout", authHandler.Logout)
 			authRouter.Post("/forgot-password", authHandler.ForgotPassword)
 			authRouter.Post("/reset-password", authHandler.ResetPassword)
-			authRouter.Get("/vk/start", authHandler.VKStart)
-			authRouter.Get("/vk/callback", authHandler.VKCallback)
-			authRouter.Get("/yandex/start", authHandler.YandexStart)
-			authRouter.Get("/yandex/callback", authHandler.YandexCallback)
-			authRouter.Post("/yandex/token", authHandler.YandexToken)
+			authRouter.Post("/vk/widget", authHandler.VKWidget)
+			authRouter.Post("/yandex/widget", authHandler.YandexWidget)
 		})
 
 		// Все маршруты внутри этой группы требуют авторизации через Bearer-токен.

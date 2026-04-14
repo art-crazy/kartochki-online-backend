@@ -72,7 +72,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	} else {
 		emailSender = email.NewNoopSender(logger)
 	}
-	authService := auth.NewService(db.Pool, queries, redisClient, asynqClient, logger, cfg.Auth)
+	authService := auth.NewService(db.Pool, queries, asynqClient, logger, cfg.Auth)
 	authHandler := handlers.NewAuthHandler(authService, cfg.App.IsProduction())
 
 	projectService := projects.NewService(queries)

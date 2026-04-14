@@ -704,6 +704,21 @@ type UploadImageResponse struct {
 	PreviewUrl string             `json:"preview_url"`
 }
 
+// VkWidgetLoginRequest defines model for VkWidgetLoginRequest.
+type VkWidgetLoginRequest struct {
+	// Code Code, полученный frontend из события LOGIN_SUCCESS виджета VK ID One Tap.
+	Code string `json:"code"`
+
+	// DeviceId Device ID, полученный frontend из события LOGIN_SUCCESS виджета VK ID One Tap.
+	DeviceId string `json:"device_id"`
+}
+
+// YandexWidgetLoginRequest defines model for YandexWidgetLoginRequest.
+type YandexWidgetLoginRequest struct {
+	// AccessToken Access token, полученный от виджета Яндекс ID.
+	AccessToken string `json:"access_token"`
+}
+
 // YooKassaPaymentObject defines model for YooKassaPaymentObject.
 type YooKassaPaymentObject struct {
 	Amount struct {
@@ -740,24 +755,6 @@ type YooKassaWebhookEvent struct {
 // YooKassaWebhookEventType defines model for YooKassaWebhookEvent.Type.
 type YooKassaWebhookEventType string
 
-// FinishVkOAuthParams defines parameters for FinishVkOAuth.
-type FinishVkOAuthParams struct {
-	// Code Временный код авторизации, который VK ID выдаёт backend после успешного подтверждения входа.
-	Code string `form:"code" json:"code"`
-
-	// State Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
-	State string `form:"state" json:"state"`
-}
-
-// FinishYandexOAuthParams defines parameters for FinishYandexOAuth.
-type FinishYandexOAuthParams struct {
-	// Code Временный код авторизации, который Яндекс выдаёт backend после успешного подтверждения входа.
-	Code string `form:"code" json:"code"`
-
-	// State Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
-	State string `form:"state" json:"state"`
-}
-
 // ListPublicBlogPostsParams defines parameters for ListPublicBlogPosts.
 type ListPublicBlogPostsParams struct {
 	// Page Номер страницы списка статей.
@@ -786,6 +783,12 @@ type ResetPasswordJSONRequestBody = ResetPasswordRequest
 
 // LoginWithTelegramJSONRequestBody defines body for LoginWithTelegram for application/json ContentType.
 type LoginWithTelegramJSONRequestBody = TelegramLoginRequest
+
+// LoginWithVkWidgetJSONRequestBody defines body for LoginWithVkWidget for application/json ContentType.
+type LoginWithVkWidgetJSONRequestBody = VkWidgetLoginRequest
+
+// LoginWithYandexWidgetJSONRequestBody defines body for LoginWithYandexWidget for application/json ContentType.
+type LoginWithYandexWidgetJSONRequestBody = YandexWidgetLoginRequest
 
 // CreateBillingAddonCheckoutJSONRequestBody defines body for CreateBillingAddonCheckout for application/json ContentType.
 type CreateBillingAddonCheckoutJSONRequestBody = PurchaseAddonRequest

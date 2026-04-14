@@ -1,13 +1,11 @@
 paths:
-  /api/v1/auth/yandex/token:
+  /api/v1/auth/vk/widget:
     post:
-      summary: Войти через Яндекс по access token
+      summary: Войти через VK ID One Tap
       description: |
-        Альтернативный вход через Яндекс ID, когда frontend использует официальный виджет.
-
-        Frontend получает `access_token` через postMessage и отправляет его на backend.
-        Backend проверяет токен через userinfo, находит или создаёт пользователя и открывает локальную сессию.
-      operationId: loginWithYandexToken
+        Frontend показывает виджет VK ID One Tap и после LOGIN_SUCCESS отправляет `code` и `device_id` на backend.
+        Backend проверяет payload у VK ID, находит или создаёт пользователя, привязывает OAuth-аккаунт и открывает локальную сессию.
+      operationId: loginWithVkWidget
       tags:
         - Auth
       requestBody:
@@ -15,7 +13,71 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "../components/schemas/auth.yaml#/schemas/YandexTokenRequest"
+              $ref: "../components/schemas/auth.yaml#/schemas/VkWidgetLoginRequest"
+      responses:
+        "200":
+          description: Вход через VK ID завершён, локальная сессия создана
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Payload виджета отсутствует или некорректен
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: VK ID отклонил code или device_id
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Email уже связан с другим способом входа
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: VK ID недоступен или вернул неожиданный ответ
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через VK ID пока не настроен
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+  /api/v1/auth/yandex/widget:
+    post:
+      summary: Войти через Яндекс по access token
+      description: |
+        Альтернативный вход через Яндекс ID, когда frontend использует официальный виджет.
+
+        Frontend получает `access_token` через postMessage и отправляет его на backend.
+        Backend проверяет токен через userinfo, находит или создаёт пользователя и открывает локальную сессию.
+      operationId: loginWithYandexWidget
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/YandexWidgetLoginRequest"
       responses:
         "200":
           description: Вход через Яндекс завершён, локальная сессия создана
@@ -34,7 +96,7 @@ paths:
               schema:
                 $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
         "400":
-          description: Токен отсутствует, некорректен или истёк
+          description: Payload виджета отсутствует или некорректен
           headers:
             X-Request-ID:
               description: Идентификатор запроса для поиска в логах.
@@ -44,8 +106,20 @@ paths:
             application/json:
               schema:
                 $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: Яндекс отклонил access token
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Email уже связан с другим способом входа
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
         "500":
-          description: Не удалось завершить вход из-за внутренней ошибки backend
+          description: Яндекс ID недоступен или вернул неожиданный ответ
           headers:
             X-Request-ID:
               description: Идентификатор запроса для поиска в логах.
@@ -384,257 +458,6 @@ paths:
                 $ref: "../components/schemas/common.yaml#/schemas/StatusResponse"
         "400":
           description: Токен недействителен, истёк или уже был использован; либо пароль не прошёл валидацию
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-
-  /api/v1/auth/vk/start:
-    get:
-      summary: Начать вход через VK
-      description: |
-        Первый шаг входа через VK ID.
-
-        Frontend открывает этот endpoint, когда пользователь нажимает кнопку
-        "Войти через VK". Backend подготавливает OAuth-запрос, сохраняет
-        одноразовый `state` и перенаправляет пользователя на страницу VK ID.
-
-        Этот endpoint не логинит пользователя сам по себе.
-        Его задача только начать внешний OAuth-flow и отправить пользователя к провайдеру.
-      operationId: startVkOAuth
-      tags:
-        - Auth
-      responses:
-        "302":
-          description: Backend перенаправил пользователя на страницу VK ID для подтверждения входа
-          headers:
-            Location:
-              description: URL страницы VK ID, куда нужно перейти для продолжения входа.
-              schema:
-                type: string
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-        "500":
-          description: Не удалось начать OAuth-flow из-за внутренней ошибки backend
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-        "501":
-          description: Вход через VK пока не настроен
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-
-  /api/v1/auth/vk/callback:
-    get:
-      summary: Завершить вход через VK
-      description: |
-        Второй шаг входа через VK ID.
-
-        Сюда VK ID вернёт пользователя после подтверждения входа.
-        Обычно frontend не вызывает этот endpoint вручную.
-
-        Backend проверяет `state`, получает профиль VK ID, находит или создаёт
-        локального пользователя и затем открывает обычную локальную сессию backend.
-      operationId: finishVkOAuth
-      tags:
-        - Auth
-      parameters:
-        - in: query
-          name: code
-          required: true
-          description: Временный код авторизации, который VK ID выдаёт backend после успешного подтверждения входа.
-          schema:
-            type: string
-        - in: query
-          name: state
-          required: true
-          description: Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Вход через VK завершён, локальная сессия создана
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-            Set-Cookie:
-              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
-              schema:
-                type: string
-                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
-        "400":
-          description: Параметры `code` или `state` отсутствуют, истекли или не прошли проверку
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-        "500":
-          description: Не удалось завершить OAuth-flow из-за внутренней ошибки backend
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-        "501":
-          description: Вход через VK пока не настроен
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-
-  /api/v1/auth/yandex/start:
-    get:
-      summary: Начать вход через Яндекс
-      description: |
-        Первый шаг входа через Яндекс ID.
-
-        Frontend открывает этот endpoint, когда пользователь нажимает кнопку
-        "Войти через Яндекс". Backend подготавливает OAuth-запрос, сохраняет
-        одноразовый `state` и перенаправляет пользователя на страницу Яндекса.
-      operationId: startYandexOAuth
-      tags:
-        - Auth
-      responses:
-        "302":
-          description: Backend перенаправил пользователя на страницу Яндекса для подтверждения входа
-          headers:
-            Location:
-              description: URL страницы Яндекса, куда нужно перейти для продолжения входа.
-              schema:
-                type: string
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-        "500":
-          description: Не удалось начать OAuth-flow из-за внутренней ошибки backend
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-        "501":
-          description: Вход через Яндекс пока не настроен
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-
-  /api/v1/auth/yandex/callback:
-    get:
-      summary: Завершить вход через Яндекс
-      description: |
-        Второй шаг входа через Яндекс ID.
-
-        Сюда Яндекс вернёт пользователя после подтверждения входа.
-        Backend проверяет `state`, получает профиль Яндекс ID, находит или создаёт
-        локального пользователя и затем открывает обычную локальную сессию backend.
-      operationId: finishYandexOAuth
-      tags:
-        - Auth
-      parameters:
-        - in: query
-          name: code
-          required: true
-          description: Временный код авторизации, который Яндекс выдаёт backend после успешного подтверждения входа.
-          schema:
-            type: string
-        - in: query
-          name: state
-          required: true
-          description: Защитный параметр, который помогает убедиться, что callback относится к нашему OAuth-запросу.
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Вход через Яндекс завершён, локальная сессия создана
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-            Set-Cookie:
-              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
-              schema:
-                type: string
-                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
-        "400":
-          description: Параметры `code` или `state` отсутствуют, истекли или не прошли проверку
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-        "500":
-          description: Не удалось завершить OAuth-flow из-за внутренней ошибки backend
-          headers:
-            X-Request-ID:
-              description: Идентификатор запроса для поиска в логах.
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-        "501":
-          description: Вход через Яндекс пока не настроен
           headers:
             X-Request-ID:
               description: Идентификатор запроса для поиска в логах.

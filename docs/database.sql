@@ -71,7 +71,10 @@ create table oauth_accounts (
     provider varchar not null,
     provider_user_id varchar not null,
     email varchar,
+    name text,
+    avatar_url text,
     created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
     unique (provider, provider_user_id)
 );
 

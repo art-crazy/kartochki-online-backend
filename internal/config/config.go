@@ -87,8 +87,8 @@ type HTTPConfig struct {
 	WriteTimeout    time.Duration
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
-	// CORSAllowedOrigin — конкретный origin фронтенда (без wildcard), нужен для credentials: true.
-	CORSAllowedOrigin string
+	// CORSAllowedOrigins — список origin фронтенда без wildcard, потому что credentials: true не работает с *.
+	CORSAllowedOrigins []string
 }
 
 // PostgresConfig хранит настройки подключения к PostgreSQL.
@@ -129,16 +129,12 @@ type AuthConfig struct {
 type VKOAuthConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
-	StateTTL     time.Duration
 }
 
 // YandexOAuthConfig хранит env-параметры для входа через Яндекс ID.
 type YandexOAuthConfig struct {
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
-	StateTTL     time.Duration
 }
 
 // TelegramAuthConfig хранит env-параметры для входа через Telegram Login Widget.
@@ -205,16 +201,6 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
-	vkStateTTL, err := getDuration("AUTH_VK_STATE_TTL", 15*time.Minute)
-	if err != nil {
-		return Config{}, err
-	}
-
-	yandexStateTTL, err := getDuration("AUTH_YANDEX_STATE_TTL", 15*time.Minute)
-	if err != nil {
-		return Config{}, err
-	}
-
 	telegramAuthMaxAge, err := getDuration("AUTH_TELEGRAM_AUTH_MAX_AGE", 15*time.Minute)
 	if err != nil {
 		return Config{}, err
@@ -257,14 +243,14 @@ func loadFromEnv() (Config, error) {
 			FrontendURL: getEnv("FRONTEND_URL", "http://localhost:3000"),
 		},
 		HTTP: HTTPConfig{
-			Host:              getEnv("HTTP_HOST", "0.0.0.0"),
-			Port:              getEnv("HTTP_PORT", "8080"),
-			RequestTimeout:    requestTimeout,
-			ReadTimeout:       readTimeout,
-			WriteTimeout:      writeTimeout,
-			IdleTimeout:       idleTimeout,
-			ShutdownTimeout:   shutdownTimeout,
-			CORSAllowedOrigin: getEnv("CORS_ALLOWED_ORIGIN", "http://localhost:3000"),
+			Host:               getEnv("HTTP_HOST", "0.0.0.0"),
+			Port:               getEnv("HTTP_PORT", "8080"),
+			RequestTimeout:     requestTimeout,
+			ReadTimeout:        readTimeout,
+			WriteTimeout:       writeTimeout,
+			IdleTimeout:        idleTimeout,
+			ShutdownTimeout:    shutdownTimeout,
+			CORSAllowedOrigins: splitCSV(getEnv("AUTH_ALLOWED_ORIGINS", getEnv("CORS_ALLOWED_ORIGIN", "http://localhost:3000"))),
 		},
 		Postgres: PostgresConfig{
 			DSN: getEnv("POSTGRES_DSN", "postgres://postgres:postgres@localhost:5432/kartochki_online?sslmode=disable"),
@@ -306,16 +292,12 @@ func loadFromEnv() (Config, error) {
 			PasswordResetTokenTTL: passwordResetTokenTTL,
 			EmailSendTimeout:      emailSendTimeout,
 			VKOAuth: VKOAuthConfig{
-				ClientID:     getEnv("AUTH_VK_CLIENT_ID", ""),
-				ClientSecret: getEnv("AUTH_VK_CLIENT_SECRET", ""),
-				RedirectURL:  getEnv("AUTH_VK_REDIRECT_URL", ""),
-				StateTTL:     vkStateTTL,
+				ClientID:     getEnv("VK_ID_APP_ID", ""),
+				ClientSecret: getEnv("VK_ID_CLIENT_SECRET", ""),
 			},
 			YandexOAuth: YandexOAuthConfig{
-				ClientID:     getEnv("AUTH_YANDEX_CLIENT_ID", ""),
-				ClientSecret: getEnv("AUTH_YANDEX_CLIENT_SECRET", ""),
-				RedirectURL:  getEnv("AUTH_YANDEX_REDIRECT_URL", ""),
-				StateTTL:     yandexStateTTL,
+				ClientID:     getEnv("YANDEX_CLIENT_ID", ""),
+				ClientSecret: getEnv("YANDEX_CLIENT_SECRET", ""),
 			},
 			TelegramAuth: TelegramAuthConfig{
 				BotToken:   getEnv("AUTH_TELEGRAM_BOT_TOKEN", ""),
@@ -400,6 +382,19 @@ func normalizePublicPath(value string) string {
 	return value
 }
 
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+
+	return result
+}
+
 func validate(cfg Config) error {
 	if cfg.HTTP.Host == "" {
 		return fmt.Errorf("HTTP_HOST must not be empty")
@@ -407,6 +402,10 @@ func validate(cfg Config) error {
 
 	if cfg.HTTP.Port == "" {
 		return fmt.Errorf("HTTP_PORT must not be empty")
+	}
+
+	if len(cfg.HTTP.CORSAllowedOrigins) == 0 {
+		return fmt.Errorf("AUTH_ALLOWED_ORIGINS must contain at least one origin")
 	}
 
 	if cfg.Postgres.DSN == "" {
@@ -471,14 +470,6 @@ func validate(cfg Config) error {
 
 	if cfg.Auth.EmailSendTimeout <= 0 {
 		return fmt.Errorf("AUTH_EMAIL_SEND_TIMEOUT must be greater than zero")
-	}
-
-	if cfg.Auth.VKOAuth.StateTTL <= 0 {
-		return fmt.Errorf("AUTH_VK_STATE_TTL must be greater than zero")
-	}
-
-	if cfg.Auth.YandexOAuth.StateTTL <= 0 {
-		return fmt.Errorf("AUTH_YANDEX_STATE_TTL must be greater than zero")
 	}
 
 	if cfg.Auth.TelegramAuth.AuthMaxAge <= 0 {

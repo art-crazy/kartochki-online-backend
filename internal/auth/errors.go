@@ -19,17 +19,11 @@ var (
 	// но провайдер ещё не настроен на backend.
 	ErrOAuthNotConfigured = errors.New("oauth provider is not configured")
 
-	// ErrInvalidOAuthState возвращается, когда state отсутствует, истёк или уже был использован.
-	ErrInvalidOAuthState = errors.New("oauth state is invalid")
-
-	// ErrOAuthEmailNotVerified возвращается, когда провайдер не подтвердил email пользователя.
-	ErrOAuthEmailNotVerified = errors.New("oauth email is not verified")
-
-	// ErrOAuthEmailMissing возвращается, когда провайдер не вернул email, нужный для локального пользователя.
-	ErrOAuthEmailMissing = errors.New("oauth email is missing")
-
 	// ErrOAuthTokenInvalid возвращается, когда access token от OAuth-провайдера неверен или уже истёк.
 	ErrOAuthTokenInvalid = errors.New("oauth access token is invalid")
+
+	// ErrOAuthProviderError возвращается, когда провайдер недоступен или вернул неожиданный ответ.
+	ErrOAuthProviderError = errors.New("oauth provider error")
 
 	// ErrTelegramAuthNotConfigured возвращается, когда backend ещё не получил токен Telegram-бота.
 	ErrTelegramAuthNotConfigured = errors.New("telegram auth is not configured")

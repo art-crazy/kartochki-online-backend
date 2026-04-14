@@ -13,8 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
-	"golang.org/x/oauth2"
-
 	"kartochki-online-backend/internal/config"
 	"kartochki-online-backend/internal/dbgen"
 )
@@ -23,6 +21,8 @@ const (
 	providerVK       = "vk"
 	providerYandex   = "yandex"
 	providerTelegram = "telegram"
+
+	maxOAuthLoginRetries = 2
 )
 
 // User описывает пользователя в auth-сценариях без HTTP-деталей.
@@ -69,8 +69,6 @@ type OAuthProviderConfig struct {
 	Name         string
 	ClientID     string
 	ClientSecret string
-	RedirectURL  string
-	StateTTL     time.Duration
 }
 
 // TelegramAuthConfig хранит параметры серверной проверки Telegram Login Widget.
@@ -83,7 +81,6 @@ type TelegramAuthConfig struct {
 type Service struct {
 	queries               *dbgen.Queries
 	pool                  *pgxpool.Pool
-	stateStore            OAuthStateStore
 	emailEnqueuer         PasswordResetEmailEnqueuer
 	logger                zerolog.Logger
 	sessionTTL            time.Duration
@@ -95,11 +92,10 @@ type Service struct {
 }
 
 // NewService создаёт auth-сервис с настройками локальных сессий и OAuth-провайдеров.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, stateStore OAuthStateStore, emailEnqueuer PasswordResetEmailEnqueuer, logger zerolog.Logger, cfg config.AuthConfig) *Service {
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, emailEnqueuer PasswordResetEmailEnqueuer, logger zerolog.Logger, cfg config.AuthConfig) *Service {
 	return &Service{
 		queries:               queries,
 		pool:                  pool,
-		stateStore:            stateStore,
 		emailEnqueuer:         emailEnqueuer,
 		logger:                logger,
 		sessionTTL:            cfg.SessionTTL,
@@ -109,15 +105,11 @@ func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, stateStore OAuthStat
 			Name:         providerVK,
 			ClientID:     cfg.VKOAuth.ClientID,
 			ClientSecret: cfg.VKOAuth.ClientSecret,
-			RedirectURL:  cfg.VKOAuth.RedirectURL,
-			StateTTL:     cfg.VKOAuth.StateTTL,
 		},
 		yandexOAuth: OAuthProviderConfig{
 			Name:         providerYandex,
 			ClientID:     cfg.YandexOAuth.ClientID,
 			ClientSecret: cfg.YandexOAuth.ClientSecret,
-			RedirectURL:  cfg.YandexOAuth.RedirectURL,
-			StateTTL:     cfg.YandexOAuth.StateTTL,
 		},
 		telegramAuth: TelegramAuthConfig{
 			BotToken:   cfg.TelegramAuth.BotToken,
@@ -237,114 +229,33 @@ func (s *Service) Logout(ctx context.Context, accessToken string) error {
 	return nil
 }
 
-// StartVKOAuth подготавливает redirect URL на VK ID и сохраняет одноразовый state в Redis.
-func (s *Service) StartVKOAuth(ctx context.Context) (string, error) {
-	if !s.vkOAuthConfigured() {
-		return "", ErrOAuthNotConfigured
-	}
-
-	state, err := generateOAuthState()
-	if err != nil {
-		return "", err
-	}
-
-	if err := s.stateStore.SaveOAuthState(ctx, oauthStateKey(s.vkOAuth.Name, state), s.vkOAuth.StateTTL); err != nil {
-		return "", fmt.Errorf("save vk oauth state: %w", err)
-	}
-
-	redirectURL := newVKOAuthClient(s.vkOAuth).AuthCodeURL(state, oauth2.AccessTypeOffline)
-	return redirectURL, nil
-}
-
-// FinishVKOAuth завершает внешний вход через VK ID и создаёт обычную локальную сессию backend.
-func (s *Service) FinishVKOAuth(ctx context.Context, code string, state string, metadata SessionMetadata) (AuthResult, error) {
-	if !s.vkOAuthConfigured() {
+// LoginWithVKWidget проверяет code и device_id от VK ID One Tap и открывает локальную сессию.
+// Email от VK может отсутствовать, поэтому пользователь создаётся и без email.
+func (s *Service) LoginWithVKWidget(ctx context.Context, code string, deviceID string, metadata SessionMetadata) (AuthResult, error) {
+	if !s.vkWidgetConfigured() {
 		return AuthResult{}, ErrOAuthNotConfigured
 	}
 
-	ok, err := s.stateStore.ConsumeOAuthState(ctx, oauthStateKey(s.vkOAuth.Name, strings.TrimSpace(state)))
+	profile, err := fetchVKWidgetProfile(ctx, s.vkOAuth, code, deviceID)
 	if err != nil {
-		return AuthResult{}, fmt.Errorf("consume vk oauth state: %w", err)
-	}
-
-	if !ok {
-		return AuthResult{}, ErrInvalidOAuthState
-	}
-
-	profile, err := fetchVKOAuthProfile(ctx, newVKOAuthClient(s.vkOAuth), strings.TrimSpace(code))
-	if err != nil {
-		return AuthResult{}, err
-	}
-
-	if profile.Email == "" {
-		return AuthResult{}, ErrOAuthEmailMissing
+		return AuthResult{}, oauthProviderError(err)
 	}
 
 	return s.loginOrCreateVKOAuthUser(ctx, profile, metadata)
 }
 
-// StartYandexOAuth подготавливает redirect URL на Яндекс ID и сохраняет одноразовый state в Redis.
-func (s *Service) StartYandexOAuth(ctx context.Context) (string, error) {
-	if !s.providerConfigured(s.yandexOAuth) {
-		return "", ErrOAuthNotConfigured
-	}
-
-	state, err := generateOAuthState()
-	if err != nil {
-		return "", err
-	}
-
-	if err := s.stateStore.SaveOAuthState(ctx, oauthStateKey(s.yandexOAuth.Name, state), s.yandexOAuth.StateTTL); err != nil {
-		return "", fmt.Errorf("save yandex oauth state: %w", err)
-	}
-
-	redirectURL := newYandexOAuthClient(s.yandexOAuth).AuthCodeURL(state)
-	return redirectURL, nil
-}
-
-// FinishYandexOAuth завершает внешний вход через Яндекс ID и создаёт обычную локальную сессию backend.
-func (s *Service) FinishYandexOAuth(ctx context.Context, code string, state string, metadata SessionMetadata) (AuthResult, error) {
-	if !s.providerConfigured(s.yandexOAuth) {
-		return AuthResult{}, ErrOAuthNotConfigured
-	}
-
-	ok, err := s.stateStore.ConsumeOAuthState(ctx, oauthStateKey(s.yandexOAuth.Name, strings.TrimSpace(state)))
-	if err != nil {
-		return AuthResult{}, fmt.Errorf("consume yandex oauth state: %w", err)
-	}
-
-	if !ok {
-		return AuthResult{}, ErrInvalidOAuthState
-	}
-
-	profile, err := fetchYandexOAuthProfile(ctx, newYandexOAuthClient(s.yandexOAuth), strings.TrimSpace(code))
-	if err != nil {
-		return AuthResult{}, err
-	}
-
-	if profile.DefaultEmail == "" {
-		return AuthResult{}, ErrOAuthEmailMissing
-	}
-
-	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName, metadata)
-}
-
-// LoginWithYandexToken принимает access token от виджета Яндекс ID и создаёт локальную сессию backend.
-func (s *Service) LoginWithYandexToken(ctx context.Context, accessToken string, metadata SessionMetadata) (AuthResult, error) {
+// LoginWithYandexWidget принимает access token от виджета Яндекс ID и создаёт локальную сессию backend.
+func (s *Service) LoginWithYandexWidget(ctx context.Context, accessToken string, metadata SessionMetadata) (AuthResult, error) {
 	if !s.yandexTokenConfigured() {
 		return AuthResult{}, ErrOAuthNotConfigured
 	}
 
 	profile, err := fetchYandexOAuthProfileByToken(ctx, strings.TrimSpace(accessToken))
 	if err != nil {
-		return AuthResult{}, err
+		return AuthResult{}, oauthProviderError(err)
 	}
 
-	if profile.DefaultEmail == "" {
-		return AuthResult{}, ErrOAuthEmailMissing
-	}
-
-	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName, metadata)
+	return s.loginOrCreateOAuthUser(ctx, s.yandexOAuth.Name, profile.Subject, profile.DefaultEmail, profile.RealName, yandexAvatarURL(profile.AvatarID), metadata)
 }
 
 // LoginWithTelegram проверяет подпись Telegram Login Widget и открывает локальную сессию.
@@ -357,7 +268,7 @@ func (s *Service) LoginWithTelegram(ctx context.Context, data TelegramLoginData,
 		return AuthResult{}, err
 	}
 
-	return s.loginOrCreateOAuthUser(ctx, providerTelegram, fmt.Sprintf("%d", data.ID), "", BuildTelegramDisplayName(data), metadata)
+	return s.loginOrCreateOAuthUser(ctx, providerTelegram, fmt.Sprintf("%d", data.ID), "", BuildTelegramDisplayName(data), data.PhotoURL, metadata)
 }
 
 // ForgotPassword создаёт токен сброса пароля и запрашивает его отправку на email.
@@ -538,31 +449,37 @@ func normalizeEmail(email string) string {
 }
 
 func (s *Service) vkOAuthConfigured() bool {
-	return s.providerConfigured(s.vkOAuth)
+	return s.vkWidgetConfigured()
+}
+
+func (s *Service) vkWidgetConfigured() bool {
+	return strings.TrimSpace(s.vkOAuth.ClientID) != "" &&
+		strings.TrimSpace(s.vkOAuth.ClientSecret) != ""
 }
 
 func (s *Service) loginOrCreateVKOAuthUser(ctx context.Context, profile VKOAuthProfile, metadata SessionMetadata) (AuthResult, error) {
-	return s.loginOrCreateOAuthUser(ctx, s.vkOAuth.Name, profile.Subject, profile.Email, profile.Name, metadata)
-}
-
-func (s *Service) providerConfigured(provider OAuthProviderConfig) bool {
-	return s.stateStore != nil &&
-		strings.TrimSpace(provider.ClientID) != "" &&
-		strings.TrimSpace(provider.ClientSecret) != "" &&
-		isRedirectURLConfigured(provider.RedirectURL)
+	return s.loginOrCreateOAuthUser(ctx, s.vkOAuth.Name, profile.Subject, profile.Email, profile.Name, profile.AvatarURL, metadata)
 }
 
 func (s *Service) yandexTokenConfigured() bool {
-	// Для виджета достаточно client_id, redirect_url и client_secret не используются.
-	return strings.TrimSpace(s.yandexOAuth.ClientID) != ""
+	return strings.TrimSpace(s.yandexOAuth.ClientID) != "" &&
+		strings.TrimSpace(s.yandexOAuth.ClientSecret) != ""
 }
 
 func (s *Service) telegramAuthConfigured() bool {
 	return strings.TrimSpace(s.telegramAuth.BotToken) != ""
 }
 
-func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName string, providerUserID string, email string, name string, metadata SessionMetadata) (AuthResult, error) {
+func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName string, providerUserID string, email string, name string, avatarURL string, metadata SessionMetadata) (AuthResult, error) {
+	return s.loginOrCreateOAuthUserAttempt(ctx, providerName, providerUserID, email, name, avatarURL, metadata, 0)
+}
+
+func (s *Service) loginOrCreateOAuthUserAttempt(ctx context.Context, providerName string, providerUserID string, email string, name string, avatarURL string, metadata SessionMetadata, attempt int) (AuthResult, error) {
 	email = normalizeEmail(email)
+	providerUserID = strings.TrimSpace(providerUserID)
+	if providerUserID == "" {
+		return AuthResult{}, fmt.Errorf("%w: provider user id is empty", ErrOAuthProviderError)
+	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -577,6 +494,17 @@ func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName strin
 	})
 	switch {
 	case err == nil:
+		// При каждом входе обновляем снимок профиля, но не стираем поля, которые провайдер не вернул.
+		if err := txQueries.UpdateOAuthAccountSnapshot(ctx, dbgen.UpdateOAuthAccountSnapshotParams{
+			Provider:       providerName,
+			ProviderUserID: providerUserID,
+			Email:          nullableText(email),
+			Name:           nullableText(name),
+			AvatarUrl:      nullableText(avatarURL),
+		}); err != nil {
+			return AuthResult{}, fmt.Errorf("update oauth account snapshot: %w", err)
+		}
+
 		result, sessionErr := s.createSessionForUser(ctx, txQueries, User{
 			ID:    existingIdentity.ID.String(),
 			Name:  strings.TrimSpace(existingIdentity.Name),
@@ -604,10 +532,17 @@ func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName strin
 				Provider:       providerName,
 				ProviderUserID: providerUserID,
 				Email:          nullableText(email),
+				Name:           nullableText(name),
+				AvatarUrl:      nullableText(avatarURL),
 			}); err != nil {
-				if !isUniqueViolation(err) {
-					return AuthResult{}, fmt.Errorf("link oauth account: %w", err)
+				if errors.Is(err, pgx.ErrNoRows) && attempt < maxOAuthLoginRetries {
+					// В параллельном запросе такая же внешняя учётка могла привязаться первой.
+					// Откатываем текущую транзакцию и повторяем вход, чтобы provider identity был источником правды.
+					_ = tx.Rollback(ctx)
+					return s.loginOrCreateOAuthUserAttempt(ctx, providerName, providerUserID, email, name, avatarURL, metadata, attempt+1)
 				}
+
+				return AuthResult{}, fmt.Errorf("link oauth account: %w", err)
 			}
 
 			result, sessionErr := s.createSessionForUser(ctx, txQueries, User{
@@ -635,6 +570,13 @@ func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName strin
 		Name:         strings.TrimSpace(name),
 	})
 	if err != nil {
+		if email != "" && isUniqueViolation(err) && attempt < maxOAuthLoginRetries {
+			// Если такой email появился параллельно, повторный проход найдёт пользователя
+			// и привяжет OAuth-аккаунт без создания дубля.
+			_ = tx.Rollback(ctx)
+			return s.loginOrCreateOAuthUserAttempt(ctx, providerName, providerUserID, email, name, avatarURL, metadata, attempt+1)
+		}
+
 		return AuthResult{}, fmt.Errorf("create user from oauth: %w", err)
 	}
 
@@ -643,7 +585,15 @@ func (s *Service) loginOrCreateOAuthUser(ctx context.Context, providerName strin
 		Provider:       providerName,
 		ProviderUserID: providerUserID,
 		Email:          nullableText(email),
+		Name:           nullableText(name),
+		AvatarUrl:      nullableText(avatarURL),
 	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) && attempt < maxOAuthLoginRetries {
+			// Если привязка появилась между поиском и insert, не коммитим нового пользователя.
+			_ = tx.Rollback(ctx)
+			return s.loginOrCreateOAuthUserAttempt(ctx, providerName, providerUserID, email, name, avatarURL, metadata, attempt+1)
+		}
+
 		return AuthResult{}, fmt.Errorf("create oauth account: %w", err)
 	}
 
@@ -678,6 +628,14 @@ func nullableTextValue(value pgtype.Text) string {
 	}
 
 	return strings.TrimSpace(value.String)
+}
+
+func oauthProviderError(err error) error {
+	if errors.Is(err, ErrOAuthTokenInvalid) {
+		return err
+	}
+
+	return fmt.Errorf("%w: %v", ErrOAuthProviderError, err)
 }
 
 func isUniqueViolation(err error) bool {

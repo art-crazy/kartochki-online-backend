@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -12,12 +13,21 @@ import (
 
 // corsMiddleware выставляет CORS-заголовки только для разрешённого origin фронтенда.
 // Allow-Origin намеренно не wildcard: браузер запрещает credentials: true с *.
-func corsMiddleware(allowedOrigin string) func(http.Handler) http.Handler {
+func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
+	allowed := make(map[string]struct{}, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			allowed[origin] = struct{}{}
+		}
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Заголовки выставляем только если origin совпадает — иначе не раскрываем политику.
-			if r.Header.Get("Origin") == allowedOrigin {
-				w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+			origin := r.Header.Get("Origin")
+			if _, ok := allowed[origin]; ok {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")

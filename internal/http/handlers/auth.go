@@ -20,10 +20,6 @@ type AuthHandler struct {
 	secureCookie bool // true в production: кука отправляется только по HTTPS
 }
 
-type yandexTokenRequest struct {
-	AccessToken string `json:"access_token"`
-}
-
 // NewAuthHandler создаёт обработчик auth endpoint.
 // secureCookie должен быть true в production-окружении.
 func NewAuthHandler(authService *auth.Service, secureCookie bool) AuthHandler {
@@ -229,119 +225,51 @@ func (h AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusPasswordChanged})
 }
 
-// VKStart начинает внешний OAuth-flow и перенаправляет пользователя на страницу VK ID.
-func (h AuthHandler) VKStart(w http.ResponseWriter, r *http.Request) {
-	redirectURL, err := h.authService.StartVKOAuth(r.Context())
-	if err != nil {
-		if errors.Is(err, auth.ErrOAuthNotConfigured) {
-			response.WriteError(w, r, http.StatusNotImplemented, "oauth_not_configured", "vk oauth is not configured yet")
-			return
-		}
-
-		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to start oauth flow")
-		return
-	}
-
-	http.Redirect(w, r, redirectURL, http.StatusFound)
-}
-
-// VKCallback завершает внешний OAuth-flow и создаёт обычную локальную сессию backend.
-func (h AuthHandler) VKCallback(w http.ResponseWriter, r *http.Request) {
-	code := strings.TrimSpace(r.URL.Query().Get("code"))
-	state := strings.TrimSpace(r.URL.Query().Get("state"))
-	if code == "" || state == "" {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "code and state query params are required")
-		return
-	}
-
-	result, err := h.authService.FinishVKOAuth(r.Context(), code, state, sessionMetadataFromRequest(r))
-	if err != nil {
-		switch {
-		case errors.Is(err, auth.ErrOAuthNotConfigured):
-			response.WriteError(w, r, http.StatusNotImplemented, "oauth_not_configured", "vk oauth is not configured yet")
-		case errors.Is(err, auth.ErrInvalidOAuthState):
-			response.WriteError(w, r, http.StatusBadRequest, "invalid_oauth_state", "oauth state is invalid or expired")
-		case errors.Is(err, auth.ErrOAuthEmailMissing):
-			response.WriteError(w, r, http.StatusBadRequest, "oauth_email_missing", "vk account did not provide email")
-		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to finish oauth flow")
-		}
-		return
-	}
-
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
-	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
-}
-
-// YandexStart начинает внешний OAuth-flow и перенаправляет пользователя на страницу Яндекс ID.
-func (h AuthHandler) YandexStart(w http.ResponseWriter, r *http.Request) {
-	redirectURL, err := h.authService.StartYandexOAuth(r.Context())
-	if err != nil {
-		if errors.Is(err, auth.ErrOAuthNotConfigured) {
-			response.WriteError(w, r, http.StatusNotImplemented, "oauth_not_configured", "yandex oauth is not configured yet")
-			return
-		}
-
-		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to start oauth flow")
-		return
-	}
-
-	http.Redirect(w, r, redirectURL, http.StatusFound)
-}
-
-// YandexCallback завершает внешний OAuth-flow Яндекс ID и создаёт обычную локальную сессию backend.
-func (h AuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
-	code := strings.TrimSpace(r.URL.Query().Get("code"))
-	state := strings.TrimSpace(r.URL.Query().Get("state"))
-	if code == "" || state == "" {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "code and state query params are required")
-		return
-	}
-
-	result, err := h.authService.FinishYandexOAuth(r.Context(), code, state, sessionMetadataFromRequest(r))
-	if err != nil {
-		switch {
-		case errors.Is(err, auth.ErrOAuthNotConfigured):
-			response.WriteError(w, r, http.StatusNotImplemented, "oauth_not_configured", "yandex oauth is not configured yet")
-		case errors.Is(err, auth.ErrInvalidOAuthState):
-			response.WriteError(w, r, http.StatusBadRequest, "invalid_oauth_state", "oauth state is invalid or expired")
-		case errors.Is(err, auth.ErrOAuthEmailMissing):
-			response.WriteError(w, r, http.StatusBadRequest, "oauth_email_missing", "yandex account did not provide email")
-		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to finish oauth flow")
-		}
-		return
-	}
-
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
-	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
-}
-
-// YandexToken завершает вход по access token от виджета Яндекс ID и создаёт локальную сессию backend.
-func (h AuthHandler) YandexToken(w http.ResponseWriter, r *http.Request) {
-	var req yandexTokenRequest
+// VKWidget завершает вход через VK ID One Tap и создаёт обычную локальную сессию backend.
+func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
+	var req openapi.VkWidgetLoginRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "request body must be valid JSON")
 		return
 	}
 
-	if details := validateYandexTokenRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+	if details := validateVKWidgetRequest(req); len(details) > 0 {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "vk widget payload is invalid", details...)
 		return
 	}
 
-	result, err := h.authService.LoginWithYandexToken(r.Context(), req.AccessToken, sessionMetadataFromRequest(r))
+	result, err := h.authService.LoginWithVKWidget(r.Context(), req.Code, req.DeviceId, sessionMetadataFromRequest(r))
 	if err != nil {
-		switch {
-		case errors.Is(err, auth.ErrOAuthNotConfigured):
-			response.WriteError(w, r, http.StatusNotImplemented, "oauth_not_configured", "yandex oauth is not configured yet")
-		case errors.Is(err, auth.ErrOAuthTokenInvalid):
-			response.WriteError(w, r, http.StatusBadRequest, "invalid_oauth_token", "yandex access token is invalid or expired")
-		case errors.Is(err, auth.ErrOAuthEmailMissing):
-			response.WriteError(w, r, http.StatusBadRequest, "oauth_email_missing", "yandex account did not provide email")
-		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to login with yandex token")
+		if h.writeWidgetOAuthError(w, r, err) {
+			return
 		}
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "failed to login with vk widget")
+		return
+	}
+
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
+}
+
+// YandexWidget завершает вход по access token от виджета Яндекс ID и создаёт локальную сессию backend.
+func (h AuthHandler) YandexWidget(w http.ResponseWriter, r *http.Request) {
+	var req openapi.YandexWidgetLoginRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "request body must be valid JSON")
+		return
+	}
+
+	if details := validateYandexWidgetRequest(req); len(details) > 0 {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "yandex widget payload is invalid", details...)
+		return
+	}
+
+	result, err := h.authService.LoginWithYandexWidget(r.Context(), req.AccessToken, sessionMetadataFromRequest(r))
+	if err != nil {
+		if h.writeWidgetOAuthError(w, r, err) {
+			return
+		}
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "failed to login with yandex widget")
 		return
 	}
 
@@ -438,7 +366,20 @@ func validateTelegramLoginRequest(req openapi.TelegramLoginRequest) []openapi.Er
 	return details
 }
 
-func validateYandexTokenRequest(req yandexTokenRequest) []openapi.ErrorDetail {
+func validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
+
+	if strings.TrimSpace(req.Code) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "field is required"})
+	}
+	if strings.TrimSpace(req.DeviceId) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "field is required"})
+	}
+
+	return details
+}
+
+func validateYandexWidgetRequest(req openapi.YandexWidgetLoginRequest) []openapi.ErrorDetail {
 	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.AccessToken) == "" {
@@ -448,10 +389,25 @@ func validateYandexTokenRequest(req yandexTokenRequest) []openapi.ErrorDetail {
 	return details
 }
 
+func (h AuthHandler) writeWidgetOAuthError(w http.ResponseWriter, r *http.Request, err error) bool {
+	switch {
+	case errors.Is(err, auth.ErrOAuthNotConfigured):
+		response.WriteError(w, r, http.StatusNotImplemented, "provider_not_configured", "oauth provider is not configured")
+	case errors.Is(err, auth.ErrOAuthTokenInvalid):
+		response.WriteError(w, r, http.StatusUnauthorized, "provider_auth_failed", "provider rejected widget payload")
+	case errors.Is(err, auth.ErrOAuthProviderError):
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "oauth provider returned an unexpected response")
+	default:
+		return false
+	}
+
+	return true
+}
+
 // toAuthResponse конвертирует доменный AuthResult в openapi.AuthResponse для HTTP-ответа.
 func toAuthResponse(result auth.AuthResult) openapi.AuthResponse {
 	return openapi.AuthResponse{
-		User:    authUserToAPI(result.User),
+		User: authUserToAPI(result.User),
 		Session: openapi.AuthSession{
 			AccessToken: result.Session.AccessToken,
 			TokenType:   "Bearer",

@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -50,42 +49,6 @@ func (c *Client) Ping(ctx context.Context) error {
 	}
 
 	return c.inner.Ping(ctx).Err()
-}
-
-// SaveOAuthState сохраняет одноразовый OAuth state в Redis с TTL.
-func (c *Client) SaveOAuthState(ctx context.Context, key string, ttl time.Duration) error {
-	if c == nil || c.inner == nil {
-		return fmt.Errorf("redis client is not initialized")
-	}
-
-	ok, err := c.inner.SetNX(ctx, key, "1", ttl).Result()
-	if err != nil {
-		return fmt.Errorf("save oauth state: %w", err)
-	}
-
-	if !ok {
-		return fmt.Errorf("oauth state already exists")
-	}
-
-	return nil
-}
-
-// ConsumeOAuthState достаёт и сразу удаляет OAuth state, чтобы им нельзя было воспользоваться повторно.
-func (c *Client) ConsumeOAuthState(ctx context.Context, key string) (bool, error) {
-	if c == nil || c.inner == nil {
-		return false, fmt.Errorf("redis client is not initialized")
-	}
-
-	value, err := c.inner.GetDel(ctx, key).Result()
-	if err != nil {
-		if errors.Is(err, redisv9.Nil) {
-			return false, nil
-		}
-
-		return false, fmt.Errorf("consume oauth state: %w", err)
-	}
-
-	return value != "", nil
 }
 
 // AsynqOpt возвращает настройки подключения, которые использует Asynq.

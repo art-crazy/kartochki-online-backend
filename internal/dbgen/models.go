@@ -162,6 +162,12 @@ type OauthAccount struct {
 	ProviderUserID string
 	Email          pgtype.Text
 	CreatedAt      pgtype.Timestamptz
+	// Снимок имени, которое вернул OAuth-провайдер во время входа.
+	Name pgtype.Text
+	// Снимок аватара, который вернул OAuth-провайдер во время входа.
+	AvatarUrl pgtype.Text
+	// Время последнего обновления снимка OAuth-аккаунта.
+	UpdatedAt pgtype.Timestamptz
 }
 
 // Одноразовые токены сброса пароля. Хранится только хэш, сырой токен уходит по email.
