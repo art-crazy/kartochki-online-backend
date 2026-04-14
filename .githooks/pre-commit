@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+make check
+make check-staged-encoding
+
+git diff --cached --check

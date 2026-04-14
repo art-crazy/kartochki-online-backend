@@ -38,6 +38,21 @@ build:
 check-file-lines:
 	go run ./tools/check-file-lines
 
+.PHONY: check-encoding
+check-encoding:
+	go run ./tools/check-encoding
+
+.PHONY: check-staged-encoding
+check-staged-encoding:
+	go run ./tools/check-encoding --staged
+
+.PHONY: check
+check: check-encoding check-file-lines
+
+.PHONY: install-git-hooks
+install-git-hooks:
+	git config core.hooksPath .githooks
+
 .PHONY: sqlc
 sqlc:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) generate

@@ -61,13 +61,19 @@ make migrate-down
 make migrate-version
 make bundle    # собрать api/openapi/openapi.yaml из src/
 make generate  # сгенерировать Go-типы в api/gen/openapi.gen.go
+make check     # проверить кодировку и лимит строк
+make check-encoding  # найти невалидный UTF-8 и похожий на mojibake текст
 make check-file-lines  # проверить лимит 300 строк для ручных файлов
+make install-git-hooks  # подключить pre-commit проверки из .githooks/
 ```
 
 `migrate-*` используют `POSTGRES_DSN` из env или значение по умолчанию из `Makefile`.
 
 `make check-file-lines` проверяет, что ручные файлы проекта не превышают 300 строк.
 Старые превышения временно перечислены в `.line-limit-ignore`; новые большие файлы лучше сразу разделять по ответственности.
+
+`make check-encoding` проверяет текстовые файлы на невалидный UTF-8 и типичные следы mojibake вроде повреждённой кириллицы.
+`make install-git-hooks` включает pre-commit hook, который запускает проверки перед коммитом.
 
 ## OpenAPI
 
