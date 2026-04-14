@@ -305,11 +305,15 @@ Responsibilities:
 
 Domain packages (`internal/auth`, `internal/generation`, etc.) must not import `internal/jobs` directly to avoid circular dependencies.
 
-Instead, use one of two approaches:
+Instead, use app-level adapters:
 
-1. **Domain implements a jobs interface** — when the domain service needs to be called *by* a worker. The domain method signature matches the `jobs.*Handler` interface, and `internal/app` passes the domain service directly (see `generation.Service` implementing `jobs.GenerationHandler`).
+`internal/app` defines a small adapter struct that holds only what the worker needs, implements the `jobs.*Handler` interface, and is passed to `jobs.NewServer`. The domain package never sees `jobs`.
 
-2. **App-level adapter** — when wiring would create a cycle. `internal/app` defines a small adapter struct that holds only what the worker needs (e.g. `auth.EmailSender` + timeout), implements the `jobs.*Handler` interface, and is passed to `jobs.NewServer`. The domain package never sees `jobs`. (see `authEmailWorker` in `internal/app/app.go`).
+Examples:
+
+- `authEmailWorker` adapts `auth.EmailSender` to `jobs.SendPasswordResetEmailHandler`.
+- `generationWorkerAdapter` adapts `generation.Service` to `jobs.GenerationHandler`.
+- `asynqGenerationEnqueuer` adapts `jobs.Client` to `generation.GenerationJobEnqueuer`.
 
 A `var _ jobs.XHandler = adapterType{}` compile-time check must accompany every adapter.
 
@@ -364,6 +368,8 @@ It owns:
 - AI image generation via the `ImageGenerator` interface
 
 The `ImageGenerator` interface is defined in `internal/generation` and implemented in `internal/platform/routerai`. Wiring lives in `internal/app` via `routerAIAdapter` — the same adapter pattern used for `authEmailWorker` and `yookassaCheckoutAdapter`.
+
+Generation enqueueing uses `generation.GenerationJobEnqueuer`; `internal/app` adapts the concrete `jobs.Client` via `asynqGenerationEnqueuer`. Worker handling also goes through `generationWorkerAdapter`, so `internal/generation` does not import `internal/jobs`.
 
 When `ROUTERAI_API_KEY` is not set, `generation.NewService` receives `nil` and substitutes a `noopImageGenerator` that returns an error, causing the generation job to fail visibly rather than silently produce empty files.
 

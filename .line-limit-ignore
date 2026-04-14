@@ -12,7 +12,6 @@ internal/auth/service.go
 internal/billing/service.go
 internal/blog/service.go
 internal/config/config.go
-internal/generation/service.go
 internal/http/handlers/auth.go
 internal/http/handlers/generation.go
 internal/http/handlers/projects.go
