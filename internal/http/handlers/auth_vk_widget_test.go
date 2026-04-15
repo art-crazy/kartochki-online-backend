@@ -9,8 +9,8 @@ func TestIsValidPKCEVerifier(t *testing.T) {
 		value string
 		want  bool
 	}{
-		{name: "valid minimum length", value: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOQ", want: true},
-		{name: "valid allowed punctuation", value: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOQ-._~", want: true},
+		{name: "valid minimum length", value: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ", want: true},
+		{name: "valid allowed punctuation", value: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ-._~", want: true},
 		{name: "too short", value: "short", want: false},
 		{name: "too long", value: "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", want: false},
 		{name: "invalid symbol", value: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOQ!", want: false},
