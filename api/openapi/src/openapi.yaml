@@ -8,7 +8,10 @@ info:
     Эта спецификация является источником правды для автогенерации frontend-клиента.
     Реализация backend и этот файл должны оставаться синхронными.
 servers:
+  - url: /
+    description: Текущий хост, с которого открыта спецификация
   - url: http://localhost:8080
+    description: Локальный backend для разработки
 
 paths:
   # Infrastructure endpoints stay outside /api/v1 because deployment tooling
