@@ -11,6 +11,12 @@ import (
 	"kartochki-online-backend/internal/http/requestctx"
 )
 
+const (
+	corsAllowedMethods = "GET, POST, PATCH, DELETE, OPTIONS"
+	corsAllowedHeaders = "Authorization, Content-Type"
+	corsMaxAge         = "600"
+)
+
 // corsMiddleware выставляет CORS-заголовки только для разрешённого origin фронтенда.
 // Allow-Origin намеренно не wildcard: браузер запрещает credentials: true с *.
 func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
@@ -26,11 +32,18 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Заголовки выставляем только если origin совпадает — иначе не раскрываем политику.
 			origin := r.Header.Get("Origin")
+			if origin != "" {
+				// Vary нужен прокси и кешам: CORS-ответ зависит от Origin и preflight-заголовков.
+				w.Header().Add("Vary", "Origin")
+				w.Header().Add("Vary", "Access-Control-Request-Method")
+				w.Header().Add("Vary", "Access-Control-Request-Headers")
+			}
 			if _, ok := allowed[origin]; ok {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Access-Control-Allow-Methods", corsAllowedMethods)
+				w.Header().Set("Access-Control-Allow-Headers", corsAllowedHeaders)
+				w.Header().Set("Access-Control-Max-Age", corsMaxAge)
 			}
 
 			// Preflight: браузер сначала шлёт OPTIONS, нужно ответить без тела.

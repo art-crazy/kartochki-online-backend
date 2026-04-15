@@ -67,9 +67,7 @@ This repository contains the backend for `kartochki.online`, a SaaS product for 
 
 ## Product Context
 
-- Primary domains:
-  - `kartochki-online.ru`
-  - `xn----7sbabjowfpen9ag6h.xn--p1ai`
+- Primary domain: `kartochki-online.ru`
 - Brand name: `kartochki.online`
 - The product helps users generate product-card visuals and content assets for marketplace listings.
 - The frontend is a separate `Next.js` application and will auto-generate API clients from the backend OpenAPI spec.
