@@ -491,11 +491,13 @@ func toAuthResponse(result auth.AuthResult) openapi.AuthResponse {
 // authUserToAPI конвертирует доменного auth.User в openapi.AuthUser.
 // auth.User.ID — строковый UUID, openapi.AuthUser.Id — типизированный openapi_types.UUID.
 func authUserToAPI(user auth.User) openapi.AuthUser {
-	email := openapi_types.Email(user.Email)
-
 	apiUser := openapi.AuthUser{
-		Id:    mustParseUUID(user.ID),
-		Email: &email,
+		Id: mustParseUUID(user.ID),
+	}
+	if user.Email != "" {
+		// Email в контракте nullable: OAuth-провайдеры могут не вернуть почту.
+		email := openapi_types.Email(user.Email)
+		apiUser.Email = &email
 	}
 	if user.Name != "" {
 		apiUser.Name = &user.Name
