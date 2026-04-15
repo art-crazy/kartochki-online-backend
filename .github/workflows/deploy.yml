@@ -1,0 +1,121 @@
+name: Deploy backend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/art-crazy/kartochki-online-backend:latest
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}
+
+      - name: Configure SSH
+        env:
+          SERVER_DEPLOY_SSH_KEY: ${{ secrets.SERVER_DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_DEPLOY_SSH_KEY" > ~/.ssh/server_key
+          chmod 600 ~/.ssh/server_key
+          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Write backend env
+        env:
+          APP_ENV: production
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          AUTH_ALLOWED_ORIGINS: ${{ secrets.AUTH_ALLOWED_ORIGINS }}
+          POSTGRES_DSN: ${{ secrets.POSTGRES_DSN }}
+          REDIS_ADDR: redis:6379
+          STORAGE_ROOT_DIR: /app/storage
+          STORAGE_PUBLIC_PATH: /media
+          YANDEX_CLIENT_ID: ${{ secrets.YANDEX_CLIENT_ID }}
+          YANDEX_CLIENT_SECRET: ${{ secrets.YANDEX_CLIENT_SECRET }}
+          VK_ID_APP_ID: ${{ secrets.VK_ID_APP_ID }}
+          VK_ID_CLIENT_SECRET: ${{ secrets.VK_ID_CLIENT_SECRET }}
+          AUTH_TELEGRAM_BOT_TOKEN: ${{ secrets.AUTH_TELEGRAM_BOT_TOKEN }}
+          ROUTERAI_API_KEY: ${{ secrets.ROUTERAI_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
+          YOOKASSA_SHOP_ID: ${{ secrets.YOOKASSA_SHOP_ID }}
+          YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
+          YOOKASSA_WEBHOOK_SECRET: ${{ secrets.YOOKASSA_WEBHOOK_SECRET }}
+          YOOKASSA_RETURN_URL: ${{ secrets.YOOKASSA_RETURN_URL }}
+        run: |
+          {
+            printf 'APP_ENV=%s\n' "$APP_ENV"
+            printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
+            printf 'AUTH_ALLOWED_ORIGINS=%s\n' "$AUTH_ALLOWED_ORIGINS"
+            printf 'POSTGRES_DSN=%s\n' "$POSTGRES_DSN"
+            printf 'REDIS_ADDR=%s\n' "$REDIS_ADDR"
+            printf 'STORAGE_ROOT_DIR=%s\n' "$STORAGE_ROOT_DIR"
+            printf 'STORAGE_PUBLIC_PATH=%s\n' "$STORAGE_PUBLIC_PATH"
+            printf 'YANDEX_CLIENT_ID=%s\n' "$YANDEX_CLIENT_ID"
+            printf 'YANDEX_CLIENT_SECRET=%s\n' "$YANDEX_CLIENT_SECRET"
+            printf 'VK_ID_APP_ID=%s\n' "$VK_ID_APP_ID"
+            printf 'VK_ID_CLIENT_SECRET=%s\n' "$VK_ID_CLIENT_SECRET"
+            printf 'AUTH_TELEGRAM_BOT_TOKEN=%s\n' "$AUTH_TELEGRAM_BOT_TOKEN"
+            printf 'ROUTERAI_API_KEY=%s\n' "$ROUTERAI_API_KEY"
+            printf 'SMTP_HOST=%s\n' "$SMTP_HOST"
+            printf 'SMTP_PORT=%s\n' "$SMTP_PORT"
+            printf 'SMTP_USER=%s\n' "$SMTP_USER"
+            printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
+            printf 'EMAIL_FROM=%s\n' "$EMAIL_FROM"
+            printf 'EMAIL_FROM_NAME=%s\n' "$EMAIL_FROM_NAME"
+            printf 'YOOKASSA_SHOP_ID=%s\n' "$YOOKASSA_SHOP_ID"
+            printf 'YOOKASSA_SECRET_KEY=%s\n' "$YOOKASSA_SECRET_KEY"
+            printf 'YOOKASSA_WEBHOOK_SECRET=%s\n' "$YOOKASSA_WEBHOOK_SECRET"
+            printf 'YOOKASSA_RETURN_URL=%s\n' "$YOOKASSA_RETURN_URL"
+          } > backend.env
+
+          scp -i ~/.ssh/server_key backend.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/kartochki-backend.env
+          ssh -i ~/.ssh/server_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
+            set -e
+            install -m 0600 /tmp/kartochki-backend.env /opt/kartochki/backend.env
+            rm -f /tmp/kartochki-backend.env
+          '
+
+      - name: Deploy backend
+        run: |
+          ssh -i ~/.ssh/server_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
+            cd /opt/kartochki
+            ./deploy.sh backend
+          '
