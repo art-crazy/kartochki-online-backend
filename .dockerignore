@@ -1,0 +1,12 @@
+.git
+.idea
+.vscode
+.env
+.env.*
+bin
+coverage
+dist
+tmp
+vendor
+storage
+*.log
