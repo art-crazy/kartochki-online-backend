@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -18,17 +17,15 @@ import (
 // AuthHandler обслуживает публичные auth-сценарии и маршруты текущего пользователя.
 type AuthHandler struct {
 	authService       *auth.Service
-	secureCookie      bool   // true в production: кука отправляется только по HTTPS
-	frontendURLOrigin string // ожидаемый origin frontend для OAuth redirect_uri
+	secureCookie bool // true в production: кука отправляется только по HTTPS
 }
 
 // NewAuthHandler создаёт обработчик auth endpoint.
 // secureCookie должен быть true в production-окружении.
-func NewAuthHandler(authService *auth.Service, secureCookie bool, frontendURL string) AuthHandler {
+func NewAuthHandler(authService *auth.Service, secureCookie bool) AuthHandler {
 	return AuthHandler{
-		authService:       authService,
-		secureCookie:      secureCookie,
-		frontendURLOrigin: normalizeOrigin(frontendURL),
+		authService:  authService,
+		secureCookie: secureCookie,
 	}
 }
 
@@ -424,8 +421,6 @@ func (h AuthHandler) validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) [
 	}
 	if strings.TrimSpace(req.RedirectUri) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
-	} else if !isValidVKRedirectURI(req.RedirectUri, h.frontendURLOrigin) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "must be a valid /auth redirect uri"})
 	}
 
 	return details
@@ -444,8 +439,6 @@ func (h AuthHandler) validateVKOAuthRequest(req openapi.VkOAuthLoginRequest) []o
 	}
 	if strings.TrimSpace(req.RedirectUri) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
-	} else if !isValidVKRedirectURI(req.RedirectUri, h.frontendURLOrigin) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "must be a valid /auth redirect uri"})
 	}
 
 	return details
@@ -469,37 +462,6 @@ func isValidPKCEVerifier(value string) bool {
 	}
 
 	return true
-}
-
-// isValidVKRedirectURI не даёт использовать backend для обмена code, выпущенного под неожиданный redirect URL.
-func isValidVKRedirectURI(value string, expectedOrigin string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(value))
-	if err != nil {
-		return false
-	}
-
-	if parsed.Host == "" || parsed.Path != "/auth" || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return false
-	}
-
-	origin := normalizeOrigin(parsed.Scheme + "://" + parsed.Host)
-	if expectedOrigin != "" && origin == expectedOrigin {
-		return true
-	}
-
-	// Локальный http разрешён только когда сам backend настроен на локальный frontend.
-	return strings.HasPrefix(expectedOrigin, "http://localhost:") &&
-		parsed.Scheme == "http" &&
-		strings.HasPrefix(parsed.Host, "localhost:")
-}
-
-func normalizeOrigin(value string) string {
-	parsed, err := url.Parse(strings.TrimSpace(value))
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return ""
-	}
-
-	return parsed.Scheme + "://" + parsed.Host
 }
 
 func validateYandexWidgetRequest(req openapi.YandexWidgetLoginRequest) []openapi.ErrorDetail {
