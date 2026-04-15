@@ -57,8 +57,6 @@ jobs:
       - name: Write backend env
         env:
           APP_ENV: production
-          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-          AUTH_ALLOWED_ORIGINS: ${{ secrets.AUTH_ALLOWED_ORIGINS }}
           POSTGRES_DSN: ${{ secrets.POSTGRES_DSN }}
           REDIS_ADDR: redis:6379
           STORAGE_ROOT_DIR: /app/storage
@@ -78,8 +76,11 @@ jobs:
           YOOKASSA_SHOP_ID: ${{ secrets.YOOKASSA_SHOP_ID }}
           YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
           YOOKASSA_WEBHOOK_SECRET: ${{ secrets.YOOKASSA_WEBHOOK_SECRET }}
-          YOOKASSA_RETURN_URL: ${{ secrets.YOOKASSA_RETURN_URL }}
         run: |
+          set -a
+          . ./config/production.env
+          set +a
+
           {
             printf 'APP_ENV=%s\n' "$APP_ENV"
             printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
