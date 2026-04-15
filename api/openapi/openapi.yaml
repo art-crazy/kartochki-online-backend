@@ -385,7 +385,7 @@ paths:
     post:
       summary: Войти через VK ID One Tap
       description: |
-        Frontend показывает виджет VK ID One Tap и после LOGIN_SUCCESS отправляет `code` и `device_id` на backend.
+        Frontend показывает виджет VK ID One Tap и после LOGIN_SUCCESS отправляет `code`, `device_id`, `code_verifier` и `redirect_uri` на backend.
         Backend проверяет payload у VK ID, находит или создаёт пользователя, привязывает OAuth-аккаунт и открывает локальную сессию.
       operationId: loginWithVkWidget
       tags:
@@ -420,7 +420,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: VK ID отклонил code или device_id
+          description: VK ID отклонил code, device_id, code_verifier или redirect_uri
           content:
             application/json:
               schema:
