@@ -436,8 +436,10 @@ func isValidVKRedirectURI(value string, expectedOrigin string) bool {
 		return true
 	}
 
-	// Локальный http нужен только для разработки виджета на localhost.
-	return parsed.Scheme == "http" && strings.HasPrefix(parsed.Host, "localhost:")
+	// Локальный http разрешён только когда сам backend настроен на локальный frontend.
+	return strings.HasPrefix(expectedOrigin, "http://localhost:") &&
+		parsed.Scheme == "http" &&
+		strings.HasPrefix(parsed.Host, "localhost:")
 }
 
 func normalizeOrigin(value string) string {
