@@ -102,22 +102,13 @@ jobs:
           } > backend.env
 
           scp -i ~/.ssh/server_key backend.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/kartochki-backend.env
-          ssh -i ~/.ssh/server_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
+          ssh -i ~/.ssh/server_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} 'bash -s' <<'REMOTE_SCRIPT'
             set -e
             test -s /opt/kartochki/postgres.env
             set -a
             . /opt/kartochki/postgres.env
             set +a
-            POSTGRES_DSN="$(python3 - <<'"'"'PY'"'"'
-import os
-from urllib.parse import quote
-
-user = quote(os.environ["POSTGRES_USER"], safe="")
-password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
-db = quote(os.environ["POSTGRES_DB"], safe="")
-print(f"postgres://{user}:{password}@postgres:5432/{db}?sslmode=disable")
-PY
-)"
+            POSTGRES_DSN="$(python3 -c 'import os; from urllib.parse import quote; user=quote(os.environ["POSTGRES_USER"], safe=""); password=quote(os.environ["POSTGRES_PASSWORD"], safe=""); db=quote(os.environ["POSTGRES_DB"], safe=""); print(f"postgres://{user}:{password}@postgres:5432/{db}?sslmode=disable")')"
             {
               cat /tmp/kartochki-backend.env
               printf "POSTGRES_DSN=%s\n" "$POSTGRES_DSN"
@@ -125,7 +116,7 @@ PY
             install -m 0600 /tmp/kartochki-backend.env.with-dsn /opt/kartochki/backend.env
             rm -f /tmp/kartochki-backend.env
             rm -f /tmp/kartochki-backend.env.with-dsn
-          '
+          REMOTE_SCRIPT
 
       - name: Deploy backend
         run: |
