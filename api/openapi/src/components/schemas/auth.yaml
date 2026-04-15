@@ -142,6 +142,12 @@ schemas:
         format: email
         nullable: true
         example: ivan@example.com
+      avatar_url:
+        type: string
+        format: uri
+        nullable: true
+        description: URL аватарки пользователя, если OAuth-провайдер вернул изображение профиля.
+        example: https://sun9-1.userapi.com/example.jpg
 
   AuthSession:
     type: object

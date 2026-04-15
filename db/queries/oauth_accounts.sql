@@ -36,7 +36,8 @@ limit 1;
 select
     u.id,
     coalesce(u.email, '') as email,
-    u.name
+    u.name,
+    coalesce(oa.avatar_url, '') as avatar_url
 from oauth_accounts oa
 join users u on u.id = oa.user_id
 where oa.provider = $1
@@ -51,6 +52,16 @@ set email = coalesce($3, email),
     updated_at = now()
 where provider = $1
   and provider_user_id = $2;
+
+-- name: GetLatestOAuthAvatarByUserID :one
+-- Берём свежий OAuth-аватар для /me. У обычной email-регистрации такого снимка может не быть.
+select coalesce(avatar_url, '') as avatar_url
+from oauth_accounts
+where user_id = $1
+  and avatar_url is not null
+  and avatar_url <> ''
+order by updated_at desc, created_at desc
+limit 1;
 
 -- name: ListOAuthAccountsByUserID :many
 select

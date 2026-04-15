@@ -127,9 +127,11 @@ type AuthSession struct {
 
 // AuthUser defines model for AuthUser.
 type AuthUser struct {
-	Email *openapi_types.Email `json:"email"`
-	Id    openapi_types.UUID   `json:"id"`
-	Name  *string              `json:"name,omitempty"`
+	// AvatarUrl URL аватарки пользователя, если OAuth-провайдер вернул изображение профиля.
+	AvatarUrl *string              `json:"avatar_url"`
+	Email     *openapi_types.Email `json:"email"`
+	Id        openapi_types.UUID   `json:"id"`
+	Name      *string              `json:"name,omitempty"`
 }
 
 // BillingAddon defines model for BillingAddon.

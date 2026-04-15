@@ -176,6 +176,7 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user = h.authService.WithLatestOAuthAvatar(r.Context(), user)
 	response.WriteJSON(w, r, http.StatusOK, openapi.CurrentUserResponse{
 		User: authUserToAPI(user),
 	})
@@ -501,6 +502,10 @@ func authUserToAPI(user auth.User) openapi.AuthUser {
 	}
 	if user.Name != "" {
 		apiUser.Name = &user.Name
+	}
+	if user.AvatarURL != "" {
+		// Аватар может прийти только от OAuth-провайдера, поэтому поле остаётся nullable.
+		apiUser.AvatarUrl = &user.AvatarURL
 	}
 
 	return apiUser

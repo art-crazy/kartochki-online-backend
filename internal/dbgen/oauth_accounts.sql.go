@@ -76,6 +76,24 @@ func (q *Queries) CreateOAuthAccount(ctx context.Context, arg CreateOAuthAccount
 	return i, err
 }
 
+const getLatestOAuthAvatarByUserID = `-- name: GetLatestOAuthAvatarByUserID :one
+select coalesce(avatar_url, '') as avatar_url
+from oauth_accounts
+where user_id = $1
+  and avatar_url is not null
+  and avatar_url <> ''
+order by updated_at desc, created_at desc
+limit 1
+`
+
+// Берём свежий OAuth-аватар для /me. У обычной email-регистрации такого снимка может не быть.
+func (q *Queries) GetLatestOAuthAvatarByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getLatestOAuthAvatarByUserID, userID)
+	var avatar_url string
+	err := row.Scan(&avatar_url)
+	return avatar_url, err
+}
+
 const getOAuthAccountByProviderUserID = `-- name: GetOAuthAccountByProviderUserID :one
 select
     id,
@@ -131,7 +149,8 @@ const getOAuthIdentityByProviderUserID = `-- name: GetOAuthIdentityByProviderUse
 select
     u.id,
     coalesce(u.email, '') as email,
-    u.name
+    u.name,
+    coalesce(oa.avatar_url, '') as avatar_url
 from oauth_accounts oa
 join users u on u.id = oa.user_id
 where oa.provider = $1
@@ -145,15 +164,21 @@ type GetOAuthIdentityByProviderUserIDParams struct {
 }
 
 type GetOAuthIdentityByProviderUserIDRow struct {
-	ID    uuid.UUID
-	Email string
-	Name  string
+	ID        uuid.UUID
+	Email     string
+	Name      string
+	AvatarUrl string
 }
 
 func (q *Queries) GetOAuthIdentityByProviderUserID(ctx context.Context, arg GetOAuthIdentityByProviderUserIDParams) (GetOAuthIdentityByProviderUserIDRow, error) {
 	row := q.db.QueryRow(ctx, getOAuthIdentityByProviderUserID, arg.Provider, arg.ProviderUserID)
 	var i GetOAuthIdentityByProviderUserIDRow
-	err := row.Scan(&i.ID, &i.Email, &i.Name)
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.AvatarUrl,
+	)
 	return i, err
 }
 

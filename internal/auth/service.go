@@ -27,9 +27,10 @@ const (
 
 // User описывает пользователя в auth-сценариях без HTTP-деталей.
 type User struct {
-	ID    string
-	Name  string
-	Email string
+	ID        string
+	Name      string
+	Email     string
+	AvatarURL string
 }
 
 // Session описывает выданную клиенту локальную сессию.
@@ -221,6 +222,19 @@ func (s *Service) Authenticate(ctx context.Context, accessToken string) (User, e
 		Name:  strings.TrimSpace(identity.Name),
 		Email: identity.Email,
 	}, nil
+}
+
+// WithLatestOAuthAvatar добавляет к пользователю свежий аватар из OAuth-снимка.
+// Ошибка чтения не ломает ответ: аватар не участвует в авторизации и может временно отсутствовать.
+func (s *Service) WithLatestOAuthAvatar(ctx context.Context, user User) User {
+	userID, err := uuid.Parse(user.ID)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("user_id", user.ID).Msg("не удалось прочитать user id для загрузки аватара")
+		return user
+	}
+
+	user.AvatarURL = s.latestOAuthAvatarURL(ctx, s.queries, userID)
+	return user
 }
 
 // Logout отзывает текущую сессию по токену.
@@ -514,9 +528,10 @@ func (s *Service) loginOrCreateOAuthUserAttempt(ctx context.Context, providerNam
 		}
 
 		result, sessionErr := s.createSessionForUser(ctx, txQueries, User{
-			ID:    existingIdentity.ID.String(),
-			Name:  strings.TrimSpace(existingIdentity.Name),
-			Email: existingIdentity.Email,
+			ID:        existingIdentity.ID.String(),
+			Name:      strings.TrimSpace(existingIdentity.Name),
+			Email:     existingIdentity.Email,
+			AvatarURL: firstNonEmpty(avatarURL, existingIdentity.AvatarUrl),
 		}, metadata)
 		if sessionErr != nil {
 			return AuthResult{}, sessionErr
@@ -553,10 +568,16 @@ func (s *Service) loginOrCreateOAuthUserAttempt(ctx context.Context, providerNam
 				return AuthResult{}, fmt.Errorf("link oauth account: %w", err)
 			}
 
+			resolvedAvatarURL := strings.TrimSpace(avatarURL)
+			if resolvedAvatarURL == "" {
+				resolvedAvatarURL = s.latestOAuthAvatarURL(ctx, txQueries, user.ID)
+			}
+
 			result, sessionErr := s.createSessionForUser(ctx, txQueries, User{
-				ID:    user.ID.String(),
-				Name:  strings.TrimSpace(user.Name),
-				Email: user.Email,
+				ID:        user.ID.String(),
+				Name:      strings.TrimSpace(user.Name),
+				Email:     user.Email,
+				AvatarURL: resolvedAvatarURL,
 			}, metadata)
 			if sessionErr != nil {
 				return AuthResult{}, sessionErr
@@ -606,9 +627,10 @@ func (s *Service) loginOrCreateOAuthUserAttempt(ctx context.Context, providerNam
 	}
 
 	result, err := s.createSessionForUser(ctx, txQueries, User{
-		ID:    createdUser.ID.String(),
-		Name:  strings.TrimSpace(createdUser.Name),
-		Email: createdUser.Email,
+		ID:        createdUser.ID.String(),
+		Name:      strings.TrimSpace(createdUser.Name),
+		Email:     createdUser.Email,
+		AvatarURL: avatarURL,
 	}, metadata)
 	if err != nil {
 		return AuthResult{}, err
@@ -636,6 +658,31 @@ func nullableTextValue(value pgtype.Text) string {
 	}
 
 	return strings.TrimSpace(value.String)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return ""
+}
+
+func (s *Service) latestOAuthAvatarURL(ctx context.Context, queries *dbgen.Queries, userID uuid.UUID) string {
+	avatarURL, err := queries.GetLatestOAuthAvatarByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ""
+		}
+
+		// Аватар не участвует в авторизации, поэтому сбой чтения не должен ломать текущую сессию.
+		s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("не удалось загрузить OAuth-аватар пользователя")
+		return ""
+	}
+
+	return strings.TrimSpace(avatarURL)
 }
 
 func oauthProviderError(err error) error {
