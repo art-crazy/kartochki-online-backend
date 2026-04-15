@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -408,6 +409,11 @@ func validate(cfg Config) error {
 		return fmt.Errorf("AUTH_ALLOWED_ORIGINS must contain at least one origin")
 	}
 
+	// VK ID redirect_uri в production привязан к FRONTEND_URL, поэтому здесь нужен строгий origin без path/query.
+	if cfg.App.IsProduction() && !isHTTPSOrigin(cfg.App.FrontendURL) {
+		return fmt.Errorf("FRONTEND_URL must be an https origin in production")
+	}
+
 	if cfg.Postgres.DSN == "" {
 		return fmt.Errorf("POSTGRES_DSN must not be empty")
 	}
@@ -499,4 +505,13 @@ func validate(cfg Config) error {
 	}
 
 	return nil
+}
+
+func isHTTPSOrigin(value string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return false
+	}
+
+	return parsed.Scheme == "https" && parsed.Host != "" && parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""
 }
