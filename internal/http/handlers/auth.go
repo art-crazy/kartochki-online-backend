@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -382,12 +383,55 @@ func validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) []openapi.ErrorDe
 	}
 	if strings.TrimSpace(req.CodeVerifier) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "field is required"})
+	} else if !isValidPKCEVerifier(req.CodeVerifier) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "must be a valid PKCE verifier"})
 	}
 	if strings.TrimSpace(req.RedirectUri) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
+	} else if !isValidVKRedirectURI(req.RedirectUri) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "must be a valid /auth redirect uri"})
 	}
 
 	return details
+}
+
+// isValidPKCEVerifier проверяет формат verifier до запроса к VK, чтобы отсечь явно чужой или повреждённый payload.
+func isValidPKCEVerifier(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) < 43 || len(value) > 128 {
+		return false
+	}
+
+	for _, r := range value {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
+			continue
+		}
+		if r == '-' || r == '.' || r == '_' || r == '~' {
+			continue
+		}
+		return false
+	}
+
+	return true
+}
+
+// isValidVKRedirectURI не даёт использовать backend для обмена code, выпущенного под неожиданный redirect URL.
+func isValidVKRedirectURI(value string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return false
+	}
+
+	if parsed.Host == "" || parsed.Path != "/auth" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+
+	if parsed.Scheme == "https" {
+		return true
+	}
+
+	// Локальный http нужен только для разработки виджета на localhost.
+	return parsed.Scheme == "http" && strings.HasPrefix(parsed.Host, "localhost:")
 }
 
 func validateYandexWidgetRequest(req openapi.YandexWidgetLoginRequest) []openapi.ErrorDetail {
