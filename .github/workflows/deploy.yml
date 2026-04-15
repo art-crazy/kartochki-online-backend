@@ -57,10 +57,7 @@ jobs:
       - name: Write backend env
         env:
           APP_ENV: production
-          POSTGRES_DSN: ${{ secrets.POSTGRES_DSN }}
           REDIS_ADDR: redis:6379
-          STORAGE_ROOT_DIR: /app/storage
-          STORAGE_PUBLIC_PATH: /media
           YANDEX_CLIENT_ID: ${{ secrets.YANDEX_CLIENT_ID }}
           YANDEX_CLIENT_SECRET: ${{ secrets.YANDEX_CLIENT_SECRET }}
           VK_ID_APP_ID: ${{ secrets.VK_ID_APP_ID }}
@@ -85,10 +82,7 @@ jobs:
             printf 'APP_ENV=%s\n' "$APP_ENV"
             printf 'FRONTEND_URL=%s\n' "$FRONTEND_URL"
             printf 'AUTH_ALLOWED_ORIGINS=%s\n' "$AUTH_ALLOWED_ORIGINS"
-            printf 'POSTGRES_DSN=%s\n' "$POSTGRES_DSN"
             printf 'REDIS_ADDR=%s\n' "$REDIS_ADDR"
-            printf 'STORAGE_ROOT_DIR=%s\n' "$STORAGE_ROOT_DIR"
-            printf 'STORAGE_PUBLIC_PATH=%s\n' "$STORAGE_PUBLIC_PATH"
             printf 'YANDEX_CLIENT_ID=%s\n' "$YANDEX_CLIENT_ID"
             printf 'YANDEX_CLIENT_SECRET=%s\n' "$YANDEX_CLIENT_SECRET"
             printf 'VK_ID_APP_ID=%s\n' "$VK_ID_APP_ID"
@@ -110,8 +104,27 @@ jobs:
           scp -i ~/.ssh/server_key backend.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/kartochki-backend.env
           ssh -i ~/.ssh/server_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
             set -e
-            install -m 0600 /tmp/kartochki-backend.env /opt/kartochki/backend.env
+            test -s /opt/kartochki/postgres.env
+            set -a
+            . /opt/kartochki/postgres.env
+            set +a
+            POSTGRES_DSN="$(python3 - <<'"'"'PY'"'"'
+import os
+from urllib.parse import quote
+
+user = quote(os.environ["POSTGRES_USER"], safe="")
+password = quote(os.environ["POSTGRES_PASSWORD"], safe="")
+db = quote(os.environ["POSTGRES_DB"], safe="")
+print(f"postgres://{user}:{password}@postgres:5432/{db}?sslmode=disable")
+PY
+)"
+            {
+              cat /tmp/kartochki-backend.env
+              printf "POSTGRES_DSN=%s\n" "$POSTGRES_DSN"
+            } > /tmp/kartochki-backend.env.with-dsn
+            install -m 0600 /tmp/kartochki-backend.env.with-dsn /opt/kartochki/backend.env
             rm -f /tmp/kartochki-backend.env
+            rm -f /tmp/kartochki-backend.env.with-dsn
           '
 
       - name: Deploy backend
