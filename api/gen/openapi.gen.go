@@ -709,8 +709,14 @@ type VkWidgetLoginRequest struct {
 	// Code Code, полученный frontend из события LOGIN_SUCCESS виджета VK ID One Tap.
 	Code string `json:"code"`
 
+	// CodeVerifier PKCE verifier, который frontend использовал при настройке VK ID SDK.
+	CodeVerifier string `json:"code_verifier"`
+
 	// DeviceId Device ID, полученный frontend из события LOGIN_SUCCESS виджета VK ID One Tap.
 	DeviceId string `json:"device_id"`
+
+	// RedirectUri Redirect URI, который frontend передал в VK ID SDK.
+	RedirectUri string `json:"redirect_uri"`
 }
 
 // YandexWidgetLoginRequest defines model for YandexWidgetLoginRequest.

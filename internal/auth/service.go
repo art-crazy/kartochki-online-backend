@@ -71,6 +71,14 @@ type OAuthProviderConfig struct {
 	ClientSecret string
 }
 
+// VKWidgetLoginInput содержит одноразовые OAuth-данные, которые frontend получил от VK ID SDK.
+type VKWidgetLoginInput struct {
+	Code         string
+	DeviceID     string
+	CodeVerifier string
+	RedirectURI  string
+}
+
 // TelegramAuthConfig хранит параметры серверной проверки Telegram Login Widget.
 type TelegramAuthConfig struct {
 	BotToken   string
@@ -229,14 +237,14 @@ func (s *Service) Logout(ctx context.Context, accessToken string) error {
 	return nil
 }
 
-// LoginWithVKWidget проверяет code и device_id от VK ID One Tap и открывает локальную сессию.
+// LoginWithVKWidget проверяет code, device_id и PKCE verifier от VK ID One Tap и открывает локальную сессию.
 // Email от VK может отсутствовать, поэтому пользователь создаётся и без email.
-func (s *Service) LoginWithVKWidget(ctx context.Context, code string, deviceID string, metadata SessionMetadata) (AuthResult, error) {
+func (s *Service) LoginWithVKWidget(ctx context.Context, input VKWidgetLoginInput, metadata SessionMetadata) (AuthResult, error) {
 	if !s.vkWidgetConfigured() {
 		return AuthResult{}, ErrOAuthNotConfigured
 	}
 
-	profile, err := fetchVKWidgetProfile(ctx, s.vkOAuth, code, deviceID)
+	profile, err := fetchVKWidgetProfile(ctx, s.vkOAuth, input)
 	if err != nil {
 		return AuthResult{}, oauthProviderError(err)
 	}

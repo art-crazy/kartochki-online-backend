@@ -238,7 +238,12 @@ func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.authService.LoginWithVKWidget(r.Context(), req.Code, req.DeviceId, sessionMetadataFromRequest(r))
+	result, err := h.authService.LoginWithVKWidget(r.Context(), auth.VKWidgetLoginInput{
+		Code:         req.Code,
+		DeviceID:     req.DeviceId,
+		CodeVerifier: req.CodeVerifier,
+		RedirectURI:  req.RedirectUri,
+	}, sessionMetadataFromRequest(r))
 	if err != nil {
 		if h.writeWidgetOAuthError(w, r, err) {
 			return
@@ -374,6 +379,12 @@ func validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) []openapi.ErrorDe
 	}
 	if strings.TrimSpace(req.DeviceId) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "field is required"})
+	}
+	if strings.TrimSpace(req.CodeVerifier) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "field is required"})
+	}
+	if strings.TrimSpace(req.RedirectUri) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
 	}
 
 	return details

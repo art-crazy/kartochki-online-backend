@@ -62,11 +62,13 @@ func decodeVKUserID(raw json.RawMessage) (string, error) {
 }
 
 // fetchVKWidgetProfile проверяет короткий code от VK ID One Tap на стороне backend.
-// device_id обязателен для VK ID: без него провайдер не обменяет code на token.
-func fetchVKWidgetProfile(ctx context.Context, cfg OAuthProviderConfig, code string, deviceID string) (VKOAuthProfile, error) {
-	code = strings.TrimSpace(code)
-	deviceID = strings.TrimSpace(deviceID)
-	if code == "" || deviceID == "" {
+// VK ID связывает code с device_id, redirect_uri и PKCE verifier, поэтому все эти поля должны совпасть с frontend-настройкой SDK.
+func fetchVKWidgetProfile(ctx context.Context, cfg OAuthProviderConfig, input VKWidgetLoginInput) (VKOAuthProfile, error) {
+	code := strings.TrimSpace(input.Code)
+	deviceID := strings.TrimSpace(input.DeviceID)
+	codeVerifier := strings.TrimSpace(input.CodeVerifier)
+	redirectURI := strings.TrimSpace(input.RedirectURI)
+	if code == "" || deviceID == "" || codeVerifier == "" || redirectURI == "" {
 		return VKOAuthProfile{}, ErrOAuthTokenInvalid
 	}
 
@@ -76,6 +78,8 @@ func fetchVKWidgetProfile(ctx context.Context, cfg OAuthProviderConfig, code str
 	form.Set("client_id", strings.TrimSpace(cfg.ClientID))
 	form.Set("client_secret", strings.TrimSpace(cfg.ClientSecret))
 	form.Set("device_id", deviceID)
+	form.Set("code_verifier", codeVerifier)
+	form.Set("redirect_uri", redirectURI)
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, vkWidgetTokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
