@@ -1,4 +1,69 @@
 paths:
+  /api/v1/auth/vk/oauth:
+    post:
+      summary: Войти через VK OAuth 2.0 (Authorization Code + PKCE)
+      description: |
+        Frontend завершает стандартный VK OAuth 2.0 Authorization Code + PKCE flow и отправляет
+        `code`, `code_verifier` и `redirect_uri` на backend.
+        Backend обменивает code на токен у VK ID, загружает профиль, находит или создаёт пользователя
+        и открывает локальную сессию. Device ID не требуется — это стандартный PKCE flow.
+      operationId: loginWithVkOAuth
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/VkOAuthLoginRequest"
+      responses:
+        "200":
+          description: Вход через VK ID завершён, локальная сессия создана
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Невалидные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: VK ID отклонил code или code_verifier
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Email уже связан с другим способом входа
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: VK ID недоступен или вернул неожиданный ответ
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "501":
+          description: Вход через VK OAuth пока не настроен
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
   /api/v1/auth/vk/widget:
     post:
       summary: Войти через VK ID One Tap

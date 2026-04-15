@@ -263,6 +263,36 @@ func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
+// VKOAuth завершает стандартный VK OAuth 2.0 Authorization Code + PKCE flow и создаёт локальную сессию backend.
+func (h AuthHandler) VKOAuth(w http.ResponseWriter, r *http.Request) {
+	var req openapi.VkOAuthLoginRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		return
+	}
+
+	if details := h.validateVKOAuthRequest(req); len(details) > 0 {
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "vk oauth payload is invalid", details...)
+		return
+	}
+
+	result, err := h.authService.LoginWithVKOAuth(r.Context(), auth.VKOAuthLoginInput{
+		Code:         req.Code,
+		CodeVerifier: req.CodeVerifier,
+		RedirectURI:  req.RedirectUri,
+	}, sessionMetadataFromRequest(r))
+	if err != nil {
+		if h.writeWidgetOAuthError(w, r, err) {
+			return
+		}
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "failed to login with vk oauth")
+		return
+	}
+
+	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
+}
+
 // YandexWidget завершает вход по access token от виджета Яндекс ID и создаёт локальную сессию backend.
 func (h AuthHandler) YandexWidget(w http.ResponseWriter, r *http.Request) {
 	var req openapi.YandexWidgetLoginRequest
@@ -386,6 +416,26 @@ func (h AuthHandler) validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) [
 	}
 	if strings.TrimSpace(req.DeviceId) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "field is required"})
+	}
+	if strings.TrimSpace(req.CodeVerifier) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "field is required"})
+	} else if !isValidPKCEVerifier(req.CodeVerifier) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "must be a valid PKCE verifier"})
+	}
+	if strings.TrimSpace(req.RedirectUri) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
+	} else if !isValidVKRedirectURI(req.RedirectUri, h.frontendURLOrigin) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "must be a valid /auth redirect uri"})
+	}
+
+	return details
+}
+
+func (h AuthHandler) validateVKOAuthRequest(req openapi.VkOAuthLoginRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
+
+	if strings.TrimSpace(req.Code) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "field is required"})
 	}
 	if strings.TrimSpace(req.CodeVerifier) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "field is required"})

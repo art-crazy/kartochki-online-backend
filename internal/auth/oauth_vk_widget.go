@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-const vkWidgetTokenURL = "https://id.vk.com/oauth2/auth"
+// vkTokenURL — единый endpoint VK ID для обмена authorization code на access token.
+// Используется как widget flow, так и стандартным OAuth 2.0 PKCE flow.
+const vkTokenURL = "https://id.vk.com/oauth2/auth"
 
 type vkWidgetTokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -61,6 +63,43 @@ func decodeVKUserID(raw json.RawMessage) (string, error) {
 	return asNumber.String(), nil
 }
 
+// exchangeVKToken отправляет form-параметры на vkTokenURL и возвращает распарсенный ответ.
+// Конкретные поля формы (device_id, client_secret и т.д.) формирует вызывающая сторона.
+func exchangeVKToken(ctx context.Context, form url.Values, callerName string) (vkWidgetTokenResponse, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, vkTokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return vkWidgetTokenResponse{}, fmt.Errorf("create %s token request: %w", callerName, err)
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	response, err := oauthHTTPClient().Do(request)
+	if err != nil {
+		return vkWidgetTokenResponse{}, fmt.Errorf("request %s token: %w", callerName, err)
+	}
+	defer response.Body.Close()
+
+	var tokenResponse vkWidgetTokenResponse
+	if err := json.NewDecoder(response.Body).Decode(&tokenResponse); err != nil {
+		if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnauthorized {
+			return vkWidgetTokenResponse{}, ErrOAuthTokenInvalid
+		}
+
+		return vkWidgetTokenResponse{}, fmt.Errorf("decode %s token: %w", callerName, err)
+	}
+
+	if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnauthorized || tokenResponse.Error != "" {
+		return vkWidgetTokenResponse{}, ErrOAuthTokenInvalid
+	}
+	if response.StatusCode != http.StatusOK {
+		return vkWidgetTokenResponse{}, fmt.Errorf("%s token returned status %d", callerName, response.StatusCode)
+	}
+	if tokenResponse.AccessToken == "" || strings.TrimSpace(tokenResponse.UserID) == "" {
+		return vkWidgetTokenResponse{}, fmt.Errorf("%s token returned incomplete identity", callerName)
+	}
+
+	return tokenResponse, nil
+}
+
 // fetchVKWidgetProfile проверяет короткий code от VK ID One Tap на стороне backend.
 // VK ID связывает code с device_id, redirect_uri и PKCE verifier, поэтому все эти поля должны совпасть с frontend-настройкой SDK.
 func fetchVKWidgetProfile(ctx context.Context, cfg OAuthProviderConfig, input VKWidgetLoginInput) (VKOAuthProfile, error) {
@@ -81,35 +120,9 @@ func fetchVKWidgetProfile(ctx context.Context, cfg OAuthProviderConfig, input VK
 	form.Set("code_verifier", codeVerifier)
 	form.Set("redirect_uri", redirectURI)
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, vkWidgetTokenURL, strings.NewReader(form.Encode()))
+	tokenResponse, err := exchangeVKToken(ctx, form, "vk widget")
 	if err != nil {
-		return VKOAuthProfile{}, fmt.Errorf("create vk widget token request: %w", err)
-	}
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	response, err := oauthHTTPClient().Do(request)
-	if err != nil {
-		return VKOAuthProfile{}, fmt.Errorf("request vk widget token: %w", err)
-	}
-	defer response.Body.Close()
-
-	var tokenResponse vkWidgetTokenResponse
-	if err := json.NewDecoder(response.Body).Decode(&tokenResponse); err != nil {
-		if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnauthorized {
-			return VKOAuthProfile{}, ErrOAuthTokenInvalid
-		}
-
-		return VKOAuthProfile{}, fmt.Errorf("decode vk widget token: %w", err)
-	}
-
-	if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnauthorized || tokenResponse.Error != "" {
-		return VKOAuthProfile{}, ErrOAuthTokenInvalid
-	}
-	if response.StatusCode != http.StatusOK {
-		return VKOAuthProfile{}, fmt.Errorf("vk widget token returned status %d", response.StatusCode)
-	}
-	if tokenResponse.AccessToken == "" || strings.TrimSpace(tokenResponse.UserID) == "" {
-		return VKOAuthProfile{}, fmt.Errorf("vk widget token returned incomplete identity")
+		return VKOAuthProfile{}, err
 	}
 
 	profile, err := fetchVKProfileByAccessToken(ctx, tokenResponse.AccessToken, tokenResponse.UserID)
@@ -169,7 +182,7 @@ func fetchVKProfileByAccessToken(ctx context.Context, accessToken string, userID
 		return VKOAuthProfile{}, fmt.Errorf("vk userinfo returned mismatched user id")
 	}
 
-	name := strings.TrimSpace(strings.TrimSpace(user.FirstName + " " + user.LastName))
+	name := strings.TrimSpace(user.FirstName + " " + user.LastName)
 	if name == "" {
 		name = strings.TrimSpace(user.ScreenName)
 	}

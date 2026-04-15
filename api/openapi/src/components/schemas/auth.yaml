@@ -116,6 +116,27 @@ schemas:
         description: Redirect URI, который frontend передал в VK ID SDK.
         example: https://kartochki-online.ru/auth
 
+  VkOAuthLoginRequest:
+    type: object
+    required:
+      - code
+      - code_verifier
+      - redirect_uri
+    properties:
+      code:
+        type: string
+        description: Authorization code, полученный frontend после завершения VK OAuth 2.0 Authorization Code + PKCE flow.
+        example: vk_oauth_code
+      code_verifier:
+        type: string
+        description: PKCE verifier, который frontend использовал при генерации code_challenge.
+        example: "9f4c2b1a7e8d6c5b3a0f9e8d7c6b5a4f3e2d1c0b"
+      redirect_uri:
+        type: string
+        format: uri
+        description: Redirect URI, который frontend передал при старте авторизации. Должен точно совпасть с тем, что был передан VK.
+        example: https://kartochki-online.ru/auth
+
   YandexWidgetLoginRequest:
     type: object
     required:

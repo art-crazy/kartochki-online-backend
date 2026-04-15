@@ -251,6 +251,21 @@ func (s *Service) Logout(ctx context.Context, accessToken string) error {
 	return nil
 }
 
+// LoginWithVKOAuth обменивает code на токен через стандартный VK OAuth 2.0 Authorization Code + PKCE flow
+// и открывает локальную сессию. Device ID не требуется — это отличие от widget flow.
+func (s *Service) LoginWithVKOAuth(ctx context.Context, input VKOAuthLoginInput, metadata SessionMetadata) (AuthResult, error) {
+	if !s.vkOAuthConfigured() {
+		return AuthResult{}, ErrOAuthNotConfigured
+	}
+
+	profile, err := fetchVKOAuthProfile(ctx, s.vkOAuth, input)
+	if err != nil {
+		return AuthResult{}, oauthProviderError(err)
+	}
+
+	return s.loginOrCreateVKOAuthUser(ctx, profile, metadata)
+}
+
 // LoginWithVKWidget проверяет code, device_id и PKCE verifier от VK ID One Tap и открывает локальную сессию.
 // Email от VK может отсутствовать, поэтому пользователь создаётся и без email.
 func (s *Service) LoginWithVKWidget(ctx context.Context, input VKWidgetLoginInput, metadata SessionMetadata) (AuthResult, error) {
@@ -470,8 +485,9 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
+// vkOAuthConfigured проверяет только client_id — PKCE flow не использует client_secret.
 func (s *Service) vkOAuthConfigured() bool {
-	return s.vkWidgetConfigured()
+	return strings.TrimSpace(s.vkOAuth.ClientID) != ""
 }
 
 func (s *Service) vkWidgetConfigured() bool {

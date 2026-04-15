@@ -381,6 +381,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/auth/vk/oauth:
+    post:
+      summary: Войти через VK OAuth 2.0 (Authorization Code + PKCE)
+      description: |
+        Frontend завершает стандартный VK OAuth 2.0 Authorization Code + PKCE flow и отправляет
+        `code`, `code_verifier` и `redirect_uri` на backend.
+        Backend обменивает code на токен у VK ID, загружает профиль, находит или создаёт пользователя
+        и открывает локальную сессию. Device ID не требуется — это стандартный PKCE flow.
+      operationId: loginWithVkOAuth
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VkOAuthLoginRequest'
+      responses:
+        '200':
+          description: Вход через VK ID завершён, локальная сессия создана
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+            Set-Cookie:
+              description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
+              schema:
+                type: string
+                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Невалидные параметры запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: VK ID отклонил code или code_verifier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email уже связан с другим способом входа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: VK ID недоступен или вернул неожиданный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: Вход через VK OAuth пока не настроен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/auth/vk/widget:
     post:
       summary: Войти через VK ID One Tap
@@ -2159,6 +2223,26 @@ components:
         hash:
           type: string
           example: 7d3f6f8d3df0f70e18b1aabf6b8d2d11fdc4d4ab6f8d9c0d1c2b3a4f5e6d7c8b
+    VkOAuthLoginRequest:
+      type: object
+      required:
+        - code
+        - code_verifier
+        - redirect_uri
+      properties:
+        code:
+          type: string
+          description: Authorization code, полученный frontend после завершения VK OAuth 2.0 Authorization Code + PKCE flow.
+          example: vk_oauth_code
+        code_verifier:
+          type: string
+          description: PKCE verifier, который frontend использовал при генерации code_challenge.
+          example: 9f4c2b1a7e8d6c5b3a0f9e8d7c6b5a4f3e2d1c0b
+        redirect_uri:
+          type: string
+          format: uri
+          description: Redirect URI, который frontend передал при старте авторизации. Должен точно совпасть с тем, что был передан VK.
+          example: https://kartochki-online.ru/auth
     VkWidgetLoginRequest:
       type: object
       required:

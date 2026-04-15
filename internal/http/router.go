@@ -76,6 +76,7 @@ func NewRouter(
 			authRouter.With(authMiddleware.RequireUser).Post("/logout", authHandler.Logout)
 			authRouter.Post("/forgot-password", authHandler.ForgotPassword)
 			authRouter.Post("/reset-password", authHandler.ResetPassword)
+			authRouter.Post("/vk/oauth", authHandler.VKOAuth)
 			authRouter.Post("/vk/widget", authHandler.VKWidget)
 			authRouter.Post("/yandex/widget", authHandler.YandexWidget)
 		})

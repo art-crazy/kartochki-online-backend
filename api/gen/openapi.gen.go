@@ -706,6 +706,18 @@ type UploadImageResponse struct {
 	PreviewUrl string             `json:"preview_url"`
 }
 
+// VkOAuthLoginRequest defines model for VkOAuthLoginRequest.
+type VkOAuthLoginRequest struct {
+	// Code Authorization code, полученный frontend после завершения VK OAuth 2.0 Authorization Code + PKCE flow.
+	Code string `json:"code"`
+
+	// CodeVerifier PKCE verifier, который frontend использовал при генерации code_challenge.
+	CodeVerifier string `json:"code_verifier"`
+
+	// RedirectUri Redirect URI, который frontend передал при старте авторизации. Должен точно совпасть с тем, что был передан VK.
+	RedirectUri string `json:"redirect_uri"`
+}
+
 // VkWidgetLoginRequest defines model for VkWidgetLoginRequest.
 type VkWidgetLoginRequest struct {
 	// Code Code, полученный frontend из события LOGIN_SUCCESS виджета VK ID One Tap.
@@ -791,6 +803,9 @@ type ResetPasswordJSONRequestBody = ResetPasswordRequest
 
 // LoginWithTelegramJSONRequestBody defines body for LoginWithTelegram for application/json ContentType.
 type LoginWithTelegramJSONRequestBody = TelegramLoginRequest
+
+// LoginWithVkOAuthJSONRequestBody defines body for LoginWithVkOAuth for application/json ContentType.
+type LoginWithVkOAuthJSONRequestBody = VkOAuthLoginRequest
 
 // LoginWithVkWidgetJSONRequestBody defines body for LoginWithVkWidget for application/json ContentType.
 type LoginWithVkWidgetJSONRequestBody = VkWidgetLoginRequest
