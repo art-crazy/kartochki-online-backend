@@ -17,14 +17,19 @@ import (
 
 // AuthHandler обслуживает публичные auth-сценарии и маршруты текущего пользователя.
 type AuthHandler struct {
-	authService  *auth.Service
-	secureCookie bool // true в production: кука отправляется только по HTTPS
+	authService       *auth.Service
+	secureCookie      bool   // true в production: кука отправляется только по HTTPS
+	frontendURLOrigin string // ожидаемый origin frontend для OAuth redirect_uri
 }
 
 // NewAuthHandler создаёт обработчик auth endpoint.
 // secureCookie должен быть true в production-окружении.
-func NewAuthHandler(authService *auth.Service, secureCookie bool) AuthHandler {
-	return AuthHandler{authService: authService, secureCookie: secureCookie}
+func NewAuthHandler(authService *auth.Service, secureCookie bool, frontendURL string) AuthHandler {
+	return AuthHandler{
+		authService:       authService,
+		secureCookie:      secureCookie,
+		frontendURLOrigin: normalizeOrigin(frontendURL),
+	}
 }
 
 // Register создаёт пользователя и сразу логинит его в первую сессию.
@@ -234,7 +239,7 @@ func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if details := validateVKWidgetRequest(req); len(details) > 0 {
+	if details := h.validateVKWidgetRequest(req); len(details) > 0 {
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "vk widget payload is invalid", details...)
 		return
 	}
@@ -372,7 +377,7 @@ func validateTelegramLoginRequest(req openapi.TelegramLoginRequest) []openapi.Er
 	return details
 }
 
-func validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) []openapi.ErrorDetail {
+func (h AuthHandler) validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) []openapi.ErrorDetail {
 	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.Code) == "" {
@@ -388,7 +393,7 @@ func validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) []openapi.ErrorDe
 	}
 	if strings.TrimSpace(req.RedirectUri) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
-	} else if !isValidVKRedirectURI(req.RedirectUri) {
+	} else if !isValidVKRedirectURI(req.RedirectUri, h.frontendURLOrigin) {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "must be a valid /auth redirect uri"})
 	}
 
@@ -416,7 +421,7 @@ func isValidPKCEVerifier(value string) bool {
 }
 
 // isValidVKRedirectURI не даёт использовать backend для обмена code, выпущенного под неожиданный redirect URL.
-func isValidVKRedirectURI(value string) bool {
+func isValidVKRedirectURI(value string, expectedOrigin string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(value))
 	if err != nil {
 		return false
@@ -426,12 +431,22 @@ func isValidVKRedirectURI(value string) bool {
 		return false
 	}
 
-	if parsed.Scheme == "https" {
+	origin := normalizeOrigin(parsed.Scheme + "://" + parsed.Host)
+	if expectedOrigin != "" && origin == expectedOrigin {
 		return true
 	}
 
 	// Локальный http нужен только для разработки виджета на localhost.
 	return parsed.Scheme == "http" && strings.HasPrefix(parsed.Host, "localhost:")
+}
+
+func normalizeOrigin(value string) string {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+
+	return parsed.Scheme + "://" + parsed.Host
 }
 
 func validateYandexWidgetRequest(req openapi.YandexWidgetLoginRequest) []openapi.ErrorDetail {
