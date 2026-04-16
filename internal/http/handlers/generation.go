@@ -16,7 +16,10 @@ import (
 	"kartochki-online-backend/internal/http/response"
 )
 
-const maxUploadImageSizeBytes = 15 << 20
+const (
+	maxUploadImageSizeBytes = 15 << 20
+	generationMaxCardCount  = 15
+)
 
 // generationService описывает сценарии generation, которые доступны HTTP-слою.
 type generationService interface {
@@ -227,6 +230,9 @@ func validateCreateGenerationRequest(req openapi.CreateGenerationRequest) []open
 	}
 	if req.CardCount <= 0 {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("card_count"), Message: "must be greater than zero"})
+	}
+	if req.CardCount > generationMaxCardCount {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("card_count"), Message: "must be less than or equal to 15"})
 	}
 	// SourceAssetId — типизированный UUID, нулевой UUID (00000000-...) означает что поле не передано.
 	if req.SourceAssetId == [16]byte{} {

@@ -57,6 +57,9 @@ type Config struct {
 }
 
 var (
+	// generateMaxCardCount задаёт верхнюю границу количества карточек в одном запуске.
+	// Это значение должно совпадать с доменной валидацией и ответом /generate/config.
+	generateMaxCardCount = 15
 	// generateMarketplaces хранит marketplace вместе с aspect ratio и частью prompt.
 	// Добавление нового marketplace должно менять только этот каталог и OpenAPI-ответ.
 	generateMarketplaces = []marketplaceOption{
@@ -79,8 +82,6 @@ var (
 		{ID: "dimensions", Label: "Размеры", promptPart: "product dimensions and measurements diagram"},
 		{ID: "composition", Label: "Состав", promptPart: "product composition and materials"},
 	}
-
-	generateCardCountOptions = []int{3, 5, 7, 10}
 
 	// generateModels хранит доступные AI-модели и цену одной картинки в копейках.
 	// Первая модель считается выбором по умолчанию, если клиент не передал ModelID.
@@ -118,7 +119,7 @@ func (s *Service) GetConfig(_ context.Context) Config {
 		Marketplaces:     marketplacesToCatalog(generateMarketplaces),
 		Styles:           promptCatalogToCatalog(generateStyles),
 		CardTypes:        promptCardTypesToCardTypes(generateCardTypes),
-		CardCountOptions: append([]int(nil), generateCardCountOptions...),
+		CardCountOptions: buildCardCountOptions(generateMaxCardCount),
 		Models:           cloneModelOptions(generateModels),
 	}
 }
@@ -153,4 +154,18 @@ func promptCardTypesToCardTypes(items []promptCardTypeOption) []CardTypeOption {
 
 func cloneModelOptions(items []ModelOption) []ModelOption {
 	return append([]ModelOption(nil), items...)
+}
+
+// buildCardCountOptions строит последовательность значений card_count для формы генерации.
+func buildCardCountOptions(maxCount int) []int {
+	if maxCount <= 0 {
+		return nil
+	}
+
+	options := make([]int, 0, maxCount)
+	for count := 1; count <= maxCount; count++ {
+		options = append(options, count)
+	}
+
+	return options
 }

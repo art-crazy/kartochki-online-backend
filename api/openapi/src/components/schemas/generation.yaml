@@ -86,6 +86,7 @@ schemas:
           $ref: "#/schemas/GenerateCardType"
       card_count_options:
         type: array
+        description: Допустимые значения количества карточек. Сейчас поддерживается диапазон от 1 до 15.
         items:
           type: integer
       models:
@@ -135,6 +136,9 @@ schemas:
         example: [cover, benefits, details]
       card_count:
         type: integer
+        minimum: 1
+        maximum: 15
+        description: Количество карточек для генерации. Поддерживаются значения от 1 до 15.
         example: 5
       source_asset_id:
         type: string

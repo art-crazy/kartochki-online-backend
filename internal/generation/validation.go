@@ -46,7 +46,9 @@ func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (u
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrInvalidStyle
 	}
 
-	if !containsInt(generateCardCountOptions, input.CardCount) {
+	// Разрешаем любой положительный card_count до общего лимита, чтобы фронтенд и API
+	// не зависели от жёстко заданного списка вариантов.
+	if input.CardCount <= 0 || input.CardCount > generateMaxCardCount {
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrInvalidCardCount
 	}
 
@@ -126,15 +128,6 @@ func containsCatalogID(items []promptCatalogOption, target string) bool {
 func containsCardTypeID(items []promptCardTypeOption, target string) bool {
 	for _, item := range items {
 		if item.ID == target {
-			return true
-		}
-	}
-	return false
-}
-
-func containsInt(items []int, target int) bool {
-	for _, item := range items {
-		if item == target {
 			return true
 		}
 	}
