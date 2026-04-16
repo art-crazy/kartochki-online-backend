@@ -197,7 +197,7 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
-	sessionTTL, err := getDuration("AUTH_SESSION_TTL", 30*24*time.Hour)
+	sessionTTL, err := getDuration("AUTH_SESSION_TTL", 90*24*time.Hour)
 	if err != nil {
 		return Config{}, err
 	}
