@@ -2227,6 +2227,7 @@ components:
       type: object
       required:
         - code
+        - device_id
         - code_verifier
         - redirect_uri
       properties:
@@ -2234,6 +2235,10 @@ components:
           type: string
           description: Authorization code, полученный frontend после завершения VK OAuth 2.0 Authorization Code + PKCE flow.
           example: vk_oauth_code
+        device_id:
+          type: string
+          description: Device ID, возвращённый VK в callback URL после завершения авторизации.
+          example: vk_device_id
         code_verifier:
           type: string
           description: PKCE verifier, который frontend использовал при генерации code_challenge.

@@ -711,6 +711,9 @@ type VkOAuthLoginRequest struct {
 	// Code Authorization code, полученный frontend после завершения VK OAuth 2.0 Authorization Code + PKCE flow.
 	Code string `json:"code"`
 
+	// DeviceId Device ID, возвращённый VK в callback URL после завершения авторизации.
+	DeviceId string `json:"device_id"`
+
 	// CodeVerifier PKCE verifier, который frontend использовал при генерации code_challenge.
 	CodeVerifier string `json:"code_verifier"`
 

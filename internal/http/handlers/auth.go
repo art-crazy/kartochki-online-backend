@@ -275,6 +275,7 @@ func (h AuthHandler) VKOAuth(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.authService.LoginWithVKOAuth(r.Context(), auth.VKOAuthLoginInput{
 		Code:         req.Code,
+		DeviceID:     req.DeviceId,
 		CodeVerifier: req.CodeVerifier,
 		RedirectURI:  req.RedirectUri,
 	}, sessionMetadataFromRequest(r))
@@ -431,6 +432,9 @@ func (h AuthHandler) validateVKOAuthRequest(req openapi.VkOAuthLoginRequest) []o
 
 	if strings.TrimSpace(req.Code) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "field is required"})
+	}
+	if strings.TrimSpace(req.DeviceId) == "" {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "field is required"})
 	}
 	if strings.TrimSpace(req.CodeVerifier) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "field is required"})
