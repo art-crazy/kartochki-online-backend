@@ -5,6 +5,7 @@ schemas:
       - id
       - title
       - updated_at
+      - preview_urls
       - canonical_path
     properties:
       id:

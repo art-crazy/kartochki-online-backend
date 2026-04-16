@@ -20,6 +20,41 @@ where user_id = @user_id
   and deleted_at is null
 order by updated_at desc;
 
+-- name: ListCompletedProjectCards :many
+-- Возвращает только готовые карточки по всем проектам пользователя.
+-- Дашборд и страница проекта не должны видеть queued/processing/failed.
+select
+    g.project_id,
+    gc.id,
+    gc.card_type_id,
+    gc.asset_id,
+    a.storage_key
+from generated_cards gc
+join generations g on g.id = gc.generation_id
+join projects p on p.id = g.project_id
+join assets a on a.id = gc.asset_id
+where p.user_id = @user_id
+  and p.deleted_at is null
+  and g.status = 'completed'
+order by g.finished_at desc nulls last, gc.position asc;
+
+-- name: ListCompletedCardsByProjectID :many
+-- Возвращает все готовые карточки одного проекта владельца.
+select
+    gc.id,
+    gc.card_type_id,
+    gc.asset_id,
+    a.storage_key
+from generated_cards gc
+join generations g on g.id = gc.generation_id
+join projects p on p.id = g.project_id
+join assets a on a.id = gc.asset_id
+where g.project_id = @project_id
+  and p.user_id = @user_id
+  and p.deleted_at is null
+  and g.status = 'completed'
+order by g.finished_at desc nulls last, gc.position asc;
+
 -- name: UpdateProject :one
 -- Обновляет поля только у активного проекта.
 -- user_id в WHERE гарантирует, что чужой проект нельзя изменить.

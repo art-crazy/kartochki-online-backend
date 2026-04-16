@@ -371,7 +371,7 @@ type DashboardProject struct {
 	CardCount     *int               `json:"card_count,omitempty"`
 	Id            openapi_types.UUID `json:"id"`
 	MarketplaceId *string            `json:"marketplace_id,omitempty"`
-	PreviewUrls   *[]string          `json:"preview_urls,omitempty"`
+	PreviewUrls   []string           `json:"preview_urls"`
 	Title         string             `json:"title"`
 	UpdatedAt     time.Time          `json:"updated_at"`
 }
@@ -532,6 +532,8 @@ type PatchProjectRequest struct {
 
 // Project defines model for Project.
 type Project struct {
+	// Cards Только готовые карточки проекта. Если карточек нет, массив пустой.
+	Cards              []GeneratedCard    `json:"cards"`
 	CreatedAt          time.Time          `json:"created_at"`
 	Id                 openapi_types.UUID `json:"id"`
 	Marketplace        *string            `json:"marketplace,omitempty"`
@@ -711,11 +713,11 @@ type VkOAuthLoginRequest struct {
 	// Code Authorization code, полученный frontend после завершения VK OAuth 2.0 Authorization Code + PKCE flow.
 	Code string `json:"code"`
 
-	// DeviceId Device ID, возвращённый VK в callback URL после завершения авторизации.
-	DeviceId string `json:"device_id"`
-
 	// CodeVerifier PKCE verifier, который frontend использовал при генерации code_challenge.
 	CodeVerifier string `json:"code_verifier"`
+
+	// DeviceId Device ID, возвращённый VK в callback URL после завершения авторизации.
+	DeviceId string `json:"device_id"`
 
 	// RedirectUri Redirect URI, который frontend передал при старте авторизации. Должен точно совпасть с тем, что был передан VK.
 	RedirectUri string `json:"redirect_uri"`

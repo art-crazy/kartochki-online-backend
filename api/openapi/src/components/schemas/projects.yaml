@@ -53,6 +53,7 @@ schemas:
       - status
       - created_at
       - updated_at
+      - cards
     properties:
       id:
         type: string
@@ -82,6 +83,11 @@ schemas:
       updated_at:
         type: string
         format: date-time
+      cards:
+        type: array
+        description: Только готовые карточки проекта. Если карточек нет, массив пустой.
+        items:
+          $ref: "./generation.yaml#/schemas/GeneratedCard"
 
   ProjectResponse:
     type: object

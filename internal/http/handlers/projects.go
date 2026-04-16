@@ -69,7 +69,7 @@ func (h ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger := h.requestLogger(r)
-		logger.Error().Err(err).Str("user_id", user.ID).Msg("не удалось создать проект")
+		logger.Error().Err(err).Str("user_id", user.ID).Msg("failed to create project")
 		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to create project")
 		return
 	}
@@ -87,7 +87,7 @@ func (h ProjectsHandler) List(w http.ResponseWriter, r *http.Request) {
 	list, err := h.projectService.ListByUser(r.Context(), user.ID)
 	if err != nil {
 		logger := h.requestLogger(r)
-		logger.Error().Err(err).Str("user_id", user.ID).Msg("не удалось загрузить список проектов")
+		logger.Error().Err(err).Str("user_id", user.ID).Msg("failed to load projects list")
 		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to load projects")
 		return
 	}
@@ -111,7 +111,7 @@ func (h ProjectsHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger := h.requestLogger(r)
-		logger.Error().Err(err).Str("user_id", user.ID).Str("project_id", projectID).Msg("не удалось загрузить проект")
+		logger.Error().Err(err).Str("user_id", user.ID).Str("project_id", projectID).Msg("failed to load project")
 		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to load project")
 		return
 	}
@@ -154,7 +154,7 @@ func (h ProjectsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger := h.requestLogger(r)
-		logger.Error().Err(err).Str("user_id", user.ID).Str("project_id", projectID).Msg("не удалось обновить проект")
+		logger.Error().Err(err).Str("user_id", user.ID).Str("project_id", projectID).Msg("failed to update project")
 		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to update project")
 		return
 	}
@@ -177,7 +177,7 @@ func (h ProjectsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger := h.requestLogger(r)
-		logger.Error().Err(err).Str("user_id", user.ID).Str("project_id", projectID).Msg("не удалось удалить проект")
+		logger.Error().Err(err).Str("user_id", user.ID).Str("project_id", projectID).Msg("failed to delete project")
 		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to delete project")
 		return
 	}
@@ -250,88 +250,23 @@ func validateProjectFields(title string, marketplace string, productName string,
 func writeProjectDomainError(w http.ResponseWriter, r *http.Request, err error) bool {
 	switch {
 	case errors.Is(err, projects.ErrTitleRequired):
-		response.WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"validation_error",
-			"request validation failed",
-			openapi.ErrorDetail{Field: strPtr("title"), Message: "field is required"},
-		)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{Field: strPtr("title"), Message: "field is required"})
 		return true
 	case errors.Is(err, projects.ErrTitleTooLong):
-		response.WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"validation_error",
-			"request validation failed",
-			openapi.ErrorDetail{Field: strPtr("title"), Message: "must be at most 200 characters"},
-		)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{Field: strPtr("title"), Message: "must be at most 200 characters"})
 		return true
 	case errors.Is(err, projects.ErrMarketplaceTooLong):
-		response.WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"validation_error",
-			"request validation failed",
-			openapi.ErrorDetail{Field: strPtr("marketplace"), Message: "must be at most 100 characters"},
-		)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{Field: strPtr("marketplace"), Message: "must be at most 100 characters"})
 		return true
 	case errors.Is(err, projects.ErrProductNameTooLong):
-		response.WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"validation_error",
-			"request validation failed",
-			openapi.ErrorDetail{Field: strPtr("product_name"), Message: "must be at most 255 characters"},
-		)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{Field: strPtr("product_name"), Message: "must be at most 255 characters"})
 		return true
 	case errors.Is(err, projects.ErrProductDescriptionTooLong):
-		response.WriteError(
-			w,
-			r,
-			http.StatusBadRequest,
-			"validation_error",
-			"request validation failed",
-			openapi.ErrorDetail{Field: strPtr("product_description"), Message: "must be at most 5000 characters"},
-		)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{Field: strPtr("product_description"), Message: "must be at most 5000 characters"})
 		return true
 	default:
 		return false
 	}
-}
-
-// toProjectContract конвертирует доменный projects.Project в openapi.Project для HTTP-ответа.
-func toProjectContract(project projects.Project) openapi.Project {
-	p := openapi.Project{
-		Id:        mustParseUUID(project.ID),
-		Title:     project.Title,
-		Status:    openapi.ProjectStatus(project.Status),
-		CreatedAt: project.CreatedAt,
-		UpdatedAt: project.UpdatedAt,
-	}
-	if project.Marketplace != "" {
-		p.Marketplace = &project.Marketplace
-	}
-	if project.ProductName != "" {
-		p.ProductName = &project.ProductName
-	}
-	if project.ProductDescription != "" {
-		p.ProductDescription = &project.ProductDescription
-	}
-	return p
-}
-
-func toProjectContracts(list []projects.Project) []openapi.Project {
-	result := make([]openapi.Project, len(list))
-	for i, project := range list {
-		result[i] = toProjectContract(project)
-	}
-
-	return result
 }
 
 // requestLogger возвращает request-scoped logger, чтобы ошибки handler уже содержали request_id и путь.

@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,119 +11,29 @@ import (
 	"kartochki-online-backend/internal/dbgen"
 )
 
-const (
-	recentProjectsLimit = 5
-)
-
-// MaxProjectTitleLength ограничивает длину названия проекта.
-const MaxProjectTitleLength = 200
-
-// MaxMarketplaceLength ограничивает длину идентификатора маркетплейса.
-const MaxMarketplaceLength = 100
-
-// MaxProjectProductNameLength ограничивает длину названия товара внутри проекта.
-const MaxProjectProductNameLength = 255
-
-// MaxProjectDescriptionLength ограничивает длину описания товара внутри проекта.
-const MaxProjectDescriptionLength = 5000
-
-// Project описывает проект пользователя без HTTP-деталей.
-type Project struct {
-	ID                 string
-	UserID             string
-	Title              string
-	Marketplace        string
-	ProductName        string
-	ProductDescription string
-	Status             string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-}
-
-// Dashboard описывает данные для главной страницы приложения.
-type Dashboard struct {
-	Stats          []DashboardStat
-	RecentProjects []DashboardProject
-	AllProjects    []DashboardProject
-	QuickStart     DashboardQuickStart
-}
-
-// DashboardStat описывает один показатель в верхнем блоке дашборда.
-type DashboardStat struct {
-	Key         string
-	Label       string
-	Value       string
-	Description string
-	AccentText  string
-	Progress    *DashboardProgress
-}
-
-// DashboardProgress описывает прогресс по лимиту или квоте.
-type DashboardProgress struct {
-	Value int
-	Max   int
-}
-
-// DashboardProject описывает проект для списков дашборда.
-type DashboardProject struct {
-	ID            string
-	Title         string
-	CardCount     int
-	MarketplaceID string
-	UpdatedAt     time.Time
-	PreviewURLs   []string
-}
-
-// DashboardQuickStart описывает CTA-блок быстрого старта.
-type DashboardQuickStart struct {
-	Title       string
-	Description string
-}
-
-// CreateInput содержит данные для создания проекта.
-type CreateInput struct {
-	UserID             string
-	Title              string
-	Marketplace        string
-	ProductName        string
-	ProductDescription string
-}
-
-// UpdateInput содержит поля для полного обновления проекта.
-type UpdateInput struct {
-	Title              string
-	Marketplace        string
-	ProductName        string
-	ProductDescription string
-}
-
-// PatchInput содержит только те поля проекта, которые клиент действительно хочет изменить.
-// nil означает, что поле нужно оставить без изменений.
-type PatchInput struct {
-	Title              *string
-	Marketplace        *string
-	ProductName        *string
-	ProductDescription *string
-}
-
 // Service управляет сценариями работы с проектами и не знает о деталях HTTP.
 type Service struct {
 	queries *dbgen.Queries
+	storage projectStorage
 }
 
 // NewService создаёт сервис проектов.
-func NewService(queries *dbgen.Queries) *Service {
-	return &Service{queries: queries}
+func NewService(queries *dbgen.Queries, storage projectStorage) *Service {
+	return &Service{queries: queries, storage: storage}
 }
 
 // GetDashboard возвращает данные для `/app` без HTTP-деталей.
-// Здесь собирается бизнес-ответ для дашборда, чтобы handler только проверял доступ
-// и преобразовывал результат в transport-контракт.
 func (s *Service) GetDashboard(ctx context.Context, userID string) (Dashboard, error) {
 	allProjects, err := s.ListByUser(ctx, userID)
 	if err != nil {
 		return Dashboard{}, fmt.Errorf("list projects for dashboard: %w", err)
 	}
+
+	projectCards, err := s.listCompletedCardsByUser(ctx, userID)
+	if err != nil {
+		return Dashboard{}, err
+	}
+	allProjects = attachCardsToProjects(allProjects, projectCards)
 
 	recentProjects := allProjects
 	if len(recentProjects) > recentProjectsLimit {
@@ -136,8 +43,8 @@ func (s *Service) GetDashboard(ctx context.Context, userID string) (Dashboard, e
 	totalProjects := len(allProjects)
 	return Dashboard{
 		Stats:          buildDashboardStats(totalProjects),
-		RecentProjects: toDashboardProjects(recentProjects),
-		AllProjects:    toDashboardProjects(allProjects),
+		RecentProjects: buildDashboardProjects(recentProjects),
+		AllProjects:    buildDashboardProjects(allProjects),
 		QuickStart:     buildQuickStart(totalProjects),
 	}, nil
 }
@@ -192,7 +99,13 @@ func (s *Service) GetByID(ctx context.Context, id string, ownerUserID string) (P
 		return Project{}, fmt.Errorf("get project by id: %w", err)
 	}
 
-	return toProject(row), nil
+	project := toProject(row)
+	project.Cards, err = s.listCompletedCardsByProject(ctx, project.ID, ownerUserID)
+	if err != nil {
+		return Project{}, err
+	}
+
+	return project, nil
 }
 
 // ListByUser возвращает все активные проекты пользователя, отсортированные по дате обновления.
@@ -247,8 +160,6 @@ func (s *Service) Update(ctx context.Context, id string, ownerUserID string, inp
 }
 
 // Patch частично обновляет проект.
-// Сначала сервис читает текущую версию проекта владельца, чтобы не затирать поля,
-// которые не пришли в PATCH-запросе.
 func (s *Service) Patch(ctx context.Context, id string, ownerUserID string, input PatchInput) (Project, error) {
 	current, err := s.GetByID(ctx, id, ownerUserID)
 	if err != nil {
@@ -279,8 +190,6 @@ func (s *Service) Patch(ctx context.Context, id string, ownerUserID string, inpu
 }
 
 // Delete мягко удаляет проект пользователя.
-// Мы не стираем строку физически, чтобы позже не потерять историю генераций,
-// файлов и других связанных сущностей, которые будут ссылаться на проект.
 func (s *Service) Delete(ctx context.Context, id string, ownerUserID string) error {
 	projectID, err := uuid.Parse(id)
 	if err != nil {
@@ -302,109 +211,6 @@ func (s *Service) Delete(ctx context.Context, id string, ownerUserID string) err
 
 	if rows == 0 {
 		return ErrNotFound
-	}
-
-	return nil
-}
-
-func toProject(r dbgen.Project) Project {
-	return Project{
-		ID:                 r.ID.String(),
-		UserID:             r.UserID.String(),
-		Title:              r.Title,
-		Marketplace:        r.Marketplace,
-		ProductName:        r.ProductName,
-		ProductDescription: r.ProductDescription,
-		Status:             r.Status,
-		CreatedAt:          r.CreatedAt.Time,
-		UpdatedAt:          r.UpdatedAt.Time,
-	}
-}
-
-func toProjects(rows []dbgen.Project) []Project {
-	result := make([]Project, len(rows))
-	for i, r := range rows {
-		result[i] = toProject(r)
-	}
-
-	return result
-}
-
-func buildDashboardStats(totalProjects int) []DashboardStat {
-	return []DashboardStat{
-		{
-			Key:         "total_projects",
-			Label:       "Всего проектов",
-			Value:       strconv.Itoa(totalProjects),
-			Description: "проектов создано",
-		},
-	}
-}
-
-func toDashboardProjects(list []Project) []DashboardProject {
-	result := make([]DashboardProject, len(list))
-	for i, p := range list {
-		result[i] = DashboardProject{
-			ID:            p.ID,
-			Title:         p.Title,
-			MarketplaceID: p.Marketplace,
-			UpdatedAt:     p.UpdatedAt,
-		}
-	}
-
-	return result
-}
-
-// buildQuickStart формирует CTA-блок на главной.
-// Когда проектов ещё нет, важно подсказать первый целевой сценарий.
-func buildQuickStart(totalProjects int) DashboardQuickStart {
-	if totalProjects == 0 {
-		return DashboardQuickStart{
-			Title:       "Создайте первый проект",
-			Description: "Загрузите фото товара - мы сгенерируем карточки для маркетплейса",
-		}
-	}
-
-	return DashboardQuickStart{
-		Title:       "Сгенерировать новые карточки",
-		Description: "Загрузите новое фото и получите готовые карточки",
-	}
-}
-
-func normalizeCreateInput(input CreateInput) CreateInput {
-	input.UserID = strings.TrimSpace(input.UserID)
-	input.Title = strings.TrimSpace(input.Title)
-	input.Marketplace = strings.TrimSpace(input.Marketplace)
-	input.ProductName = strings.TrimSpace(input.ProductName)
-	input.ProductDescription = strings.TrimSpace(input.ProductDescription)
-	return input
-}
-
-func normalizeUpdateInput(input UpdateInput) UpdateInput {
-	input.Title = strings.TrimSpace(input.Title)
-	input.Marketplace = strings.TrimSpace(input.Marketplace)
-	input.ProductName = strings.TrimSpace(input.ProductName)
-	input.ProductDescription = strings.TrimSpace(input.ProductDescription)
-	return input
-}
-
-// validateCreateOrUpdateInput держит доменные ограничения в одном месте,
-// чтобы Create и Update не разъезжались по правилам.
-func validateCreateOrUpdateInput(title string, marketplace string, productName string, productDescription string) error {
-	if title == "" {
-		return ErrTitleRequired
-	}
-	if len(title) > MaxProjectTitleLength {
-		return ErrTitleTooLong
-	}
-	if len(marketplace) > MaxMarketplaceLength {
-		return ErrMarketplaceTooLong
-	}
-	if len(productName) > MaxProjectProductNameLength {
-		return ErrProductNameTooLong
-	}
-	if len(productDescription) > MaxProjectDescriptionLength {
-		return ErrProductDescriptionTooLong
 	}
 
 	return nil

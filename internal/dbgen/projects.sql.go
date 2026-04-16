@@ -82,6 +82,114 @@ func (q *Queries) GetProjectByID(ctx context.Context, arg GetProjectByIDParams) 
 	return i, err
 }
 
+const listCompletedCardsByProjectID = `-- name: ListCompletedCardsByProjectID :many
+select
+    gc.id,
+    gc.card_type_id,
+    gc.asset_id,
+    a.storage_key
+from generated_cards gc
+join generations g on g.id = gc.generation_id
+join projects p on p.id = g.project_id
+join assets a on a.id = gc.asset_id
+where g.project_id = $1
+  and p.user_id = $2
+  and p.deleted_at is null
+  and g.status = 'completed'
+order by g.finished_at desc nulls last, gc.position asc
+`
+
+type ListCompletedCardsByProjectIDParams struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+}
+
+type ListCompletedCardsByProjectIDRow struct {
+	ID         uuid.UUID
+	CardTypeID string
+	AssetID    uuid.UUID
+	StorageKey string
+}
+
+// Возвращает все готовые карточки одного проекта владельца.
+func (q *Queries) ListCompletedCardsByProjectID(ctx context.Context, arg ListCompletedCardsByProjectIDParams) ([]ListCompletedCardsByProjectIDRow, error) {
+	rows, err := q.db.Query(ctx, listCompletedCardsByProjectID, arg.ProjectID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCompletedCardsByProjectIDRow
+	for rows.Next() {
+		var i ListCompletedCardsByProjectIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CardTypeID,
+			&i.AssetID,
+			&i.StorageKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCompletedProjectCards = `-- name: ListCompletedProjectCards :many
+select
+    g.project_id,
+    gc.id,
+    gc.card_type_id,
+    gc.asset_id,
+    a.storage_key
+from generated_cards gc
+join generations g on g.id = gc.generation_id
+join projects p on p.id = g.project_id
+join assets a on a.id = gc.asset_id
+where p.user_id = $1
+  and p.deleted_at is null
+  and g.status = 'completed'
+order by g.finished_at desc nulls last, gc.position asc
+`
+
+type ListCompletedProjectCardsRow struct {
+	ProjectID  uuid.UUID
+	ID         uuid.UUID
+	CardTypeID string
+	AssetID    uuid.UUID
+	StorageKey string
+}
+
+// Возвращает только готовые карточки по всем проектам пользователя.
+// Дашборд и страница проекта не должны видеть queued/processing/failed.
+func (q *Queries) ListCompletedProjectCards(ctx context.Context, userID uuid.UUID) ([]ListCompletedProjectCardsRow, error) {
+	rows, err := q.db.Query(ctx, listCompletedProjectCards, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCompletedProjectCardsRow
+	for rows.Next() {
+		var i ListCompletedProjectCardsRow
+		if err := rows.Scan(
+			&i.ProjectID,
+			&i.ID,
+			&i.CardTypeID,
+			&i.AssetID,
+			&i.StorageKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserProjects = `-- name: ListUserProjects :many
 select id, user_id, title, marketplace, product_name, product_description, status, created_at, updated_at, deleted_at from projects
 where user_id = $1

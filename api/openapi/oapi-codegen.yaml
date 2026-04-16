@@ -8,4 +8,4 @@ generate:
   client: false
 output: api/gen/openapi.gen.go
 output-options:
-  skip-prune: false
+  skip-prune: true

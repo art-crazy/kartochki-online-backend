@@ -75,7 +75,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	authService := auth.NewService(db.Pool, queries, asynqClient, logger, cfg.Auth)
 	authHandler := handlers.NewAuthHandler(authService, cfg.App.IsProduction())
 
-	projectService := projects.NewService(queries)
+	projectService := projects.NewService(queries, storageClient)
 	blogService := blog.NewService(queries)
 
 	// Если YOOKASSA_SHOP_ID задан — используем реальный клиент ЮКасса.

@@ -91,11 +91,13 @@ func toDashboardStats(stats []projects.DashboardStat) []openapi.DashboardStat {
 func toDashboardProjects(list []projects.DashboardProject) []openapi.DashboardProject {
 	result := make([]openapi.DashboardProject, len(list))
 	for i, p := range list {
+		previewURLs := p.PreviewURLs
 		id := mustParseUUID(p.ID)
 		proj := openapi.DashboardProject{
 			Id:            id,
 			Title:         p.Title,
 			UpdatedAt:     p.UpdatedAt,
+			PreviewUrls:   previewURLs,
 			CanonicalPath: "/app/projects/" + p.ID,
 		}
 		if p.CardCount > 0 {
@@ -103,10 +105,6 @@ func toDashboardProjects(list []projects.DashboardProject) []openapi.DashboardPr
 		}
 		if p.MarketplaceID != "" {
 			proj.MarketplaceId = &p.MarketplaceID
-		}
-		if len(p.PreviewURLs) > 0 {
-			urls := p.PreviewURLs
-			proj.PreviewUrls = &urls
 		}
 		result[i] = proj
 	}
