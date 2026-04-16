@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 // vkTokenURL — единый endpoint VK ID для обмена authorization code на access token.
@@ -65,7 +68,8 @@ func decodeVKUserID(raw json.RawMessage) (string, error) {
 
 // exchangeVKToken отправляет form-параметры на vkTokenURL и возвращает распарсенный ответ.
 // Конкретные поля формы (device_id, client_secret и т.д.) формирует вызывающая сторона.
-func exchangeVKToken(ctx context.Context, form url.Values, callerName string) (vkWidgetTokenResponse, error) {
+// Сырой ответ VK логируется: на уровне debug при успехе, warn при ошибке — для диагностики OAuth-сбоев.
+func exchangeVKToken(ctx context.Context, log zerolog.Logger, form url.Values, callerName string) (vkWidgetTokenResponse, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, vkTokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return vkWidgetTokenResponse{}, fmt.Errorf("create %s token request: %w", callerName, err)
@@ -78,8 +82,20 @@ func exchangeVKToken(ctx context.Context, form url.Values, callerName string) (v
 	}
 	defer response.Body.Close()
 
+	// Читаем тело целиком, чтобы логировать его независимо от результата декодирования.
+	rawBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return vkWidgetTokenResponse{}, fmt.Errorf("read %s token body: %w", callerName, err)
+	}
+
 	var tokenResponse vkWidgetTokenResponse
-	if err := json.NewDecoder(response.Body).Decode(&tokenResponse); err != nil {
+	if err := json.Unmarshal(rawBody, &tokenResponse); err != nil {
+		log.Warn().
+			Str("caller", callerName).
+			Int("status", response.StatusCode).
+			Str("body", string(rawBody)).
+			Msg("не удалось декодировать ответ VK token")
+
 		if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnauthorized {
 			return vkWidgetTokenResponse{}, ErrOAuthTokenInvalid
 		}
@@ -88,21 +104,46 @@ func exchangeVKToken(ctx context.Context, form url.Values, callerName string) (v
 	}
 
 	if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnauthorized || tokenResponse.Error != "" {
+		log.Warn().
+			Str("caller", callerName).
+			Int("status", response.StatusCode).
+			Str("vk_error", tokenResponse.Error).
+			Str("vk_error_description", tokenResponse.Description).
+			Str("body", string(rawBody)).
+			Msg("VK token вернул ошибку авторизации")
+
 		return vkWidgetTokenResponse{}, ErrOAuthTokenInvalid
 	}
 	if response.StatusCode != http.StatusOK {
+		log.Warn().
+			Str("caller", callerName).
+			Int("status", response.StatusCode).
+			Str("body", string(rawBody)).
+			Msg("VK token вернул неожиданный статус")
+
 		return vkWidgetTokenResponse{}, fmt.Errorf("%s token returned status %d", callerName, response.StatusCode)
 	}
 	if tokenResponse.AccessToken == "" || strings.TrimSpace(tokenResponse.UserID) == "" {
+		log.Warn().
+			Str("caller", callerName).
+			Str("body", string(rawBody)).
+			Msg("VK token вернул неполный identity")
+
 		return vkWidgetTokenResponse{}, fmt.Errorf("%s token returned incomplete identity", callerName)
 	}
+
+	log.Debug().
+		Str("caller", callerName).
+		Int("status", response.StatusCode).
+		Str("body", string(rawBody)).
+		Msg("VK token успешно получен")
 
 	return tokenResponse, nil
 }
 
 // fetchVKWidgetProfile проверяет короткий code от VK ID One Tap на стороне backend.
 // VK ID связывает code с device_id, redirect_uri и PKCE verifier, поэтому все эти поля должны совпасть с frontend-настройкой SDK.
-func fetchVKWidgetProfile(ctx context.Context, cfg OAuthProviderConfig, input VKWidgetLoginInput) (VKOAuthProfile, error) {
+func fetchVKWidgetProfile(ctx context.Context, log zerolog.Logger, cfg OAuthProviderConfig, input VKWidgetLoginInput) (VKOAuthProfile, error) {
 	code := strings.TrimSpace(input.Code)
 	deviceID := strings.TrimSpace(input.DeviceID)
 	codeVerifier := strings.TrimSpace(input.CodeVerifier)
@@ -120,7 +161,7 @@ func fetchVKWidgetProfile(ctx context.Context, cfg OAuthProviderConfig, input VK
 	form.Set("code_verifier", codeVerifier)
 	form.Set("redirect_uri", redirectURI)
 
-	tokenResponse, err := exchangeVKToken(ctx, form, "vk widget")
+	tokenResponse, err := exchangeVKToken(ctx, log, form, "vk widget")
 	if err != nil {
 		return VKOAuthProfile{}, err
 	}

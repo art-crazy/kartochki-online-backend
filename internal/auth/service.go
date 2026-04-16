@@ -258,7 +258,7 @@ func (s *Service) LoginWithVKOAuth(ctx context.Context, input VKOAuthLoginInput,
 		return AuthResult{}, ErrOAuthNotConfigured
 	}
 
-	profile, err := fetchVKOAuthProfile(ctx, s.vkOAuth, input)
+	profile, err := fetchVKOAuthProfile(ctx, s.logger, s.vkOAuth, input)
 	if err != nil {
 		return AuthResult{}, oauthProviderError(err)
 	}
@@ -273,7 +273,7 @@ func (s *Service) LoginWithVKWidget(ctx context.Context, input VKWidgetLoginInpu
 		return AuthResult{}, ErrOAuthNotConfigured
 	}
 
-	profile, err := fetchVKWidgetProfile(ctx, s.vkOAuth, input)
+	profile, err := fetchVKWidgetProfile(ctx, s.logger, s.vkOAuth, input)
 	if err != nil {
 		return AuthResult{}, oauthProviderError(err)
 	}

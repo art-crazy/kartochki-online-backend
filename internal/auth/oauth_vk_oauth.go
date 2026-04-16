@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/url"
 	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 // VKOAuthLoginInput содержит параметры стандартного VK OAuth 2.0 Authorization Code + PKCE flow.
@@ -16,7 +18,7 @@ type VKOAuthLoginInput struct {
 
 // fetchVKOAuthProfile обменивает code на токен через VK ID OAuth 2.0 и загружает профиль пользователя.
 // client_secret не передаётся: PKCE flow использует code_verifier вместо секрета клиента.
-func fetchVKOAuthProfile(ctx context.Context, cfg OAuthProviderConfig, input VKOAuthLoginInput) (VKOAuthProfile, error) {
+func fetchVKOAuthProfile(ctx context.Context, log zerolog.Logger, cfg OAuthProviderConfig, input VKOAuthLoginInput) (VKOAuthProfile, error) {
 	code := strings.TrimSpace(input.Code)
 	codeVerifier := strings.TrimSpace(input.CodeVerifier)
 	redirectURI := strings.TrimSpace(input.RedirectURI)
@@ -31,7 +33,7 @@ func fetchVKOAuthProfile(ctx context.Context, cfg OAuthProviderConfig, input VKO
 	form.Set("code_verifier", codeVerifier)
 	form.Set("redirect_uri", redirectURI)
 
-	tokenResponse, err := exchangeVKToken(ctx, form, "vk oauth")
+	tokenResponse, err := exchangeVKToken(ctx, log, form, "vk oauth")
 	if err != nil {
 		return VKOAuthProfile{}, err
 	}
