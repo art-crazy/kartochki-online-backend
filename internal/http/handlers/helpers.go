@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/mail"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -58,8 +59,13 @@ func isValidEmail(value string) bool {
 }
 
 // setAuthCookie устанавливает HttpOnly-куку с токеном сессии.
+// expiresAt задаёт срок действия куки — браузер удалит её после этого времени.
 // secure должен быть true в production — без этого браузер отправит куку по HTTP.
-func setAuthCookie(w http.ResponseWriter, token string, secure bool) {
+func setAuthCookie(w http.ResponseWriter, token string, expiresAt time.Time, secure bool) {
+	maxAge := int(time.Until(expiresAt).Seconds())
+	if maxAge <= 0 {
+		maxAge = 0
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
@@ -67,6 +73,7 @@ func setAuthCookie(w http.ResponseWriter, token string, secure bool) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   secure,
+		MaxAge:   maxAge,
 	})
 }
 

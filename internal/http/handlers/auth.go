@@ -69,7 +69,7 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusCreated, toAuthResponse(result))
 }
 
@@ -100,7 +100,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -140,7 +140,7 @@ func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -256,7 +256,7 @@ func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -287,7 +287,7 @@ func (h AuthHandler) VKOAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -313,7 +313,7 @@ func (h AuthHandler) YandexWidget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
