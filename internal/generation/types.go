@@ -6,6 +6,11 @@ import "context"
 type ImageGenerateInput struct {
 	// Prompt — текстовое описание желаемого изображения.
 	Prompt string
+	// SourceImageBody содержит байты исходного изображения пользователя.
+	// Если поле пустое, провайдер получает обычный text-to-image запрос.
+	SourceImageBody []byte
+	// SourceImageMIMEType хранит MIME-тип исходника для сборки data URL в multimodal-запросе.
+	SourceImageMIMEType string
 	// AspectRatio — соотношение сторон в формате "W:H", например "3:4".
 	AspectRatio string
 	// ModelID — идентификатор модели в RouterAI, например "google/gemini-2.5-flash-image".

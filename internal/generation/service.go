@@ -27,6 +27,7 @@ type Service struct {
 
 type generationStorage interface {
 	Save(ctx context.Context, storageKey string, body []byte) (storage.SavedFile, error)
+	Read(ctx context.Context, storageKey string) ([]byte, error)
 	CreateZIP(ctx context.Context, targetKey string, files []storage.ArchiveFile) (storage.SavedFile, error)
 	Delete(ctx context.Context, storageKey string) error
 	PublicURL(storageKey string) string

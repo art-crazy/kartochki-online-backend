@@ -61,9 +61,11 @@ type routerAIAdapter struct {
 // GenerateImage делегирует вызов routerai.Client, конвертируя доменный тип входных данных.
 func (a routerAIAdapter) GenerateImage(ctx context.Context, input generation.ImageGenerateInput) ([]byte, error) {
 	return a.client.GenerateImage(ctx, routerai.GenerateImageInput{
-		Prompt:      input.Prompt,
-		AspectRatio: input.AspectRatio,
-		ModelID:     input.ModelID,
+		Prompt:              input.Prompt,
+		SourceImageBody:     input.SourceImageBody,
+		SourceImageMIMEType: input.SourceImageMIMEType,
+		AspectRatio:         input.AspectRatio,
+		ModelID:             input.ModelID,
 	})
 }
 

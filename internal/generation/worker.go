@@ -106,6 +106,10 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 	if err != nil {
 		return fmt.Errorf("get generation for processing: %w", err)
 	}
+	sourceAsset, sourceImageBody, err := s.loadSourceImage(ctx, generationRow.SourceAssetID)
+	if err != nil {
+		return err
+	}
 
 	cardTypes, err := s.queries.ListGenerationCardTypes(ctx, generationID)
 	if err != nil {
@@ -132,9 +136,11 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 		// Prompt собирается из выбранных marketplace, стиля и типа карточки.
 		prompt := buildCardPrompt(generationRow.MarketplaceID, generationRow.StyleID, cardType.CardTypeID)
 		imgBytes, err := s.imageGenerator.GenerateImage(ctx, ImageGenerateInput{
-			Prompt:      prompt,
-			AspectRatio: aspectRatio,
-			ModelID:     generationRow.ModelID,
+			Prompt:              prompt,
+			SourceImageBody:     sourceImageBody,
+			SourceImageMIMEType: sourceAsset.MimeType,
+			AspectRatio:         aspectRatio,
+			ModelID:             generationRow.ModelID,
 		})
 		if err != nil {
 			return fmt.Errorf("generate card image (step %d, type %s): %w", i+1, cardType.CardTypeID, err)
@@ -206,6 +212,26 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 	}
 
 	return nil
+}
+
+// loadSourceImage загружает исходник generation из БД и storage.
+// Дополнительная проверка kind защищает worker от неконсистентных данных в очереди или БД.
+func (s *Service) loadSourceImage(ctx context.Context, assetID uuid.UUID) (dbgen.Asset, []byte, error) {
+	sourceAsset, err := s.queries.GetAssetByID(ctx, assetID)
+	if err != nil {
+		return dbgen.Asset{}, nil, fmt.Errorf("get source asset for processing: %w", err)
+	}
+	if sourceAsset.Kind != "source_image" {
+		return dbgen.Asset{}, nil, fmt.Errorf("asset %s is not a source image", assetID)
+	}
+
+	// Читаем исходник один раз до цикла, чтобы каждая карточка опиралась на одно и то же фото товара.
+	sourceImageBody, err := s.storage.Read(ctx, sourceAsset.StorageKey)
+	if err != nil {
+		return dbgen.Asset{}, nil, fmt.Errorf("read source image for processing: %w", err)
+	}
+
+	return sourceAsset, sourceImageBody, nil
 }
 
 // noopImageGenerator используется, когда ROUTERAI_API_KEY не задан.

@@ -51,6 +51,10 @@ func New(cfg config.RouterAIConfig) *Client {
 type GenerateImageInput struct {
 	// Prompt — текстовое описание желаемого изображения.
 	Prompt string
+	// SourceImageBody содержит байты исходника, который нужно учесть при генерации.
+	SourceImageBody []byte
+	// SourceImageMIMEType хранит MIME-тип исходника для data URL в image_url.
+	SourceImageMIMEType string
 	// AspectRatio — соотношение сторон, например "3:4" для маркетплейс-карточек.
 	// Если пусто, RouterAI использует "1:1" по умолчанию.
 	AspectRatio string
@@ -61,12 +65,17 @@ type GenerateImageInput struct {
 // GenerateImage отправляет запрос к RouterAI и возвращает байты PNG-изображения.
 // Ответ приходит в виде base64 data URL, клиент декодирует его в []byte.
 func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([]byte, error) {
+	content, err := buildMessageContent(input)
+	if err != nil {
+		return nil, err
+	}
+
 	reqBody := chatCompletionRequest{
 		Model: input.ModelID,
 		Messages: []message{
 			{
 				Role:    "user",
-				Content: input.Prompt,
+				Content: content,
 			},
 		},
 		Modalities: []string{"image", "text"},
@@ -148,6 +157,48 @@ func decodeDataURL(dataURL string) ([]byte, error) {
 	return decoded, nil
 }
 
+// buildMessageContent собирает multimodal-content для RouterAI.
+// Текст всегда идёт первым, чтобы модель получила задачу до ссылки на исходник.
+func buildMessageContent(input GenerateImageInput) (any, error) {
+	if len(input.SourceImageBody) == 0 {
+		return input.Prompt, nil
+	}
+
+	dataURL, err := encodeImageDataURL(input.SourceImageBody, input.SourceImageMIMEType)
+	if err != nil {
+		return nil, fmt.Errorf("encode source image for routerai: %w", err)
+	}
+
+	content := []messagePart{
+		{
+			Type: "text",
+			Text: input.Prompt,
+		},
+		{
+			Type: "image_url",
+			ImageURL: &imageURL{
+				URL: dataURL,
+			},
+		},
+	}
+
+	return content, nil
+}
+
+// encodeImageDataURL подготавливает исходник для image_url в OpenAI-совместимом формате.
+func encodeImageDataURL(body []byte, mimeType string) (string, error) {
+	if len(body) == 0 {
+		return "", fmt.Errorf("source image is empty")
+	}
+
+	mimeType = strings.TrimSpace(mimeType)
+	if mimeType == "" {
+		mimeType = "image/png"
+	}
+
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(body)), nil
+}
+
 func truncate(s string, max int) string {
 	if len(s) <= max {
 		return s
@@ -158,15 +209,21 @@ func truncate(s string, max int) string {
 // --- типы запроса/ответа RouterAI (OpenAI-совместимый формат) ---
 
 type chatCompletionRequest struct {
-	Model       string      `json:"model"`
-	Messages    []message   `json:"messages"`
-	Modalities  []string    `json:"modalities"`
+	Model       string       `json:"model"`
+	Messages    []message    `json:"messages"`
+	Modalities  []string     `json:"modalities"`
 	ImageConfig *imageConfig `json:"image_config,omitempty"`
 }
 
 type message struct {
 	Role    string `json:"role"`
-	Content string `json:"content"`
+	Content any    `json:"content"`
+}
+
+type messagePart struct {
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *imageURL `json:"image_url,omitempty"`
 }
 
 type imageConfig struct {

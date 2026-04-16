@@ -97,6 +97,26 @@ func (c *Client) Copy(ctx context.Context, sourceKey string, targetKey string) (
 	return c.Save(ctx, targetKey, body)
 }
 
+// Read читает файл из storage по storage key.
+// Метод нужен worker-ам, когда исходник надо передать внешнему AI-провайдеру.
+func (c *Client) Read(ctx context.Context, storageKey string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	fullPath, err := c.fullPath(storageKey)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := os.ReadFile(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("read storage file: %w", err)
+	}
+
+	return body, nil
+}
+
 // CreateZIP собирает zip-архив из уже сохранённых файлов.
 func (c *Client) CreateZIP(ctx context.Context, targetKey string, files []ArchiveFile) (SavedFile, error) {
 	if err := ctx.Err(); err != nil {
