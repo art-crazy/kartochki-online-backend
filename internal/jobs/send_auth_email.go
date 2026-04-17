@@ -9,7 +9,11 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-const taskTypeSendAuthEmail = "auth:send-email"
+const (
+	taskTypeSendAuthEmail = "auth:send-email"
+	// authEmailMaxRetry даёт worker-у больше шансов пережить краткий сетевой сбой до SMTP.
+	authEmailMaxRetry = 5
+)
 
 const (
 	// AuthEmailKindPasswordReset отправляет письмо со ссылкой для сброса пароля.
@@ -40,7 +44,7 @@ func (c *Client) EnqueueSendAuthEmail(ctx context.Context, payload SendAuthEmail
 		return nil, err
 	}
 
-	task := asynq.NewTask(taskTypeSendAuthEmail, body, append([]asynq.Option{asynq.MaxRetry(3)}, opts...)...)
+	task := asynq.NewTask(taskTypeSendAuthEmail, body, append([]asynq.Option{asynq.MaxRetry(authEmailMaxRetry)}, opts...)...)
 	return c.client.EnqueueContext(ctx, task)
 }
 

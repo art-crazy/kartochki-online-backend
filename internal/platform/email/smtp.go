@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"mime"
 	"mime/quotedprintable"
-	"net"
 	"net/smtp"
 	"net/url"
 	"strings"
@@ -25,8 +23,8 @@ import (
 // Соединение шифруется сразу при подключении — без STARTTLS.
 // Это рекомендуемый режим для большинства современных провайдеров (Resend, Postmark, Mailgun).
 type SMTPSender struct {
-	cfg      config.EmailConfig
-	resetURL string
+	cfg       config.EmailConfig
+	resetURL  string
 	verifyURL string
 }
 
@@ -75,14 +73,9 @@ func (s *SMTPSender) SendPasswordResetEmail(ctx context.Context, toEmail string,
 
 // sendWithTLS устанавливает TLS-соединение и отправляет письмо через SMTP.
 func (s *SMTPSender) sendWithTLS(toEmail string, msg []byte, deadline time.Time) error {
-	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
+	addr := s.smtpAddress()
 
-	conn, err := tls.DialWithDialer(
-		&net.Dialer{Deadline: deadline},
-		"tcp",
-		addr,
-		&tls.Config{ServerName: s.cfg.Host},
-	)
+	conn, err := s.dialSMTPWithTLS(deadline)
 	if err != nil {
 		return fmt.Errorf("dial smtp tls %s: %w", addr, err)
 	}

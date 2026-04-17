@@ -214,7 +214,9 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
-	emailSendTimeout, err := getDuration("AUTH_EMAIL_SEND_TIMEOUT", 30*time.Second)
+	// Даём SMTP чуть больше времени, потому что TLS-коннект и DNS у провайдера
+	// могут кратковременно флапать даже при рабочем канале.
+	emailSendTimeout, err := getDuration("AUTH_EMAIL_SEND_TIMEOUT", 45*time.Second)
 	if err != nil {
 		return Config{}, err
 	}
