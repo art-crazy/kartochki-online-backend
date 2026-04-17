@@ -17,7 +17,8 @@ type EmailSender interface {
 
 	// SendRegistrationVerificationEmail отправляет письмо с одноразовым кодом подтверждения регистрации.
 	// code передаётся в сыром виде, потому что пользователь должен ввести его на втором шаге регистрации.
-	SendRegistrationVerificationEmail(ctx context.Context, toEmail string, code string, expiresIn time.Duration) error
+	// verificationID нужен для fallback-ссылки, которая может завершить flow без поиска локального состояния на frontend.
+	SendRegistrationVerificationEmail(ctx context.Context, toEmail string, verificationID string, code string, expiresIn time.Duration) error
 }
 
 // AuthEmailEnqueuer ставит auth-письма в фоновую очередь.
@@ -28,5 +29,6 @@ type AuthEmailEnqueuer interface {
 	EnqueuePasswordResetEmail(ctx context.Context, userID, email, rawToken string) error
 
 	// EnqueueRegistrationVerificationEmail ставит письмо с кодом подтверждения регистрации в очередь.
-	EnqueueRegistrationVerificationEmail(ctx context.Context, email, code string, expiresIn time.Duration) error
+	// verificationID передаётся в payload, чтобы worker собрал рабочую ссылку подтверждения.
+	EnqueueRegistrationVerificationEmail(ctx context.Context, email, verificationID, code string, expiresIn time.Duration) error
 }

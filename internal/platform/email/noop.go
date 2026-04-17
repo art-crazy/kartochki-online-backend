@@ -36,9 +36,10 @@ func (s *NoopSender) SendPasswordResetEmail(_ context.Context, toEmail string, t
 }
 
 // SendRegistrationVerificationEmail логирует код подтверждения регистрации вместо реальной отправки.
-func (s *NoopSender) SendRegistrationVerificationEmail(_ context.Context, toEmail string, code string, expiresIn time.Duration) error {
+func (s *NoopSender) SendRegistrationVerificationEmail(_ context.Context, toEmail string, verificationID string, code string, expiresIn time.Duration) error {
 	s.logger.Info().
 		Str("to", toEmail).
+		Str("verification_id", verificationID).
 		Str("verification_code", code).
 		Dur("expires_in", expiresIn).
 		Msg("noop email sender: registration verification email (not sent)")

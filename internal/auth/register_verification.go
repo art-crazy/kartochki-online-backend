@@ -88,7 +88,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) (RegisterRe
 	if shouldSendCode {
 		// Письмо отправляем до commit, чтобы при ошибке не оставить в базе flow с кодом,
 		// который пользователь никогда не получит.
-		if err := s.sendRegistrationVerificationEmail(ctx, email, code); err != nil {
+		if err := s.sendRegistrationVerificationEmail(ctx, email, pending.ID.String(), code); err != nil {
 			return RegisterResult{}, err
 		}
 	}
@@ -200,7 +200,7 @@ func (s *Service) ResendRegistrationCode(ctx context.Context, input ResendRegist
 	}
 
 	// Новый код становится активным только вместе с успешной отправкой письма.
-	if err := s.sendRegistrationVerificationEmail(ctx, updated.Email, code); err != nil {
+	if err := s.sendRegistrationVerificationEmail(ctx, updated.Email, updated.ID.String(), code); err != nil {
 		return RegisterResult{}, err
 	}
 

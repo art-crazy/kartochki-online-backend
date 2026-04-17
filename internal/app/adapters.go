@@ -116,7 +116,7 @@ func (w authEmailWorker) HandleSendAuthEmail(ctx context.Context, payload jobs.S
 	case jobs.AuthEmailKindPasswordReset:
 		err = w.sender.SendPasswordResetEmail(sendCtx, payload.Email, payload.RawToken)
 	case jobs.AuthEmailKindRegistrationVerification:
-		err = w.sender.SendRegistrationVerificationEmail(sendCtx, payload.Email, payload.Code, payload.ExpiresIn)
+		err = w.sender.SendRegistrationVerificationEmail(sendCtx, payload.Email, payload.VerificationID, payload.Code, payload.ExpiresIn)
 	default:
 		return fmt.Errorf("unknown auth email kind: %s", payload.Kind)
 	}

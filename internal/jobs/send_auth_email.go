@@ -20,12 +20,13 @@ const (
 
 // SendAuthEmailPayload описывает универсальную задачу отправки auth-письма.
 type SendAuthEmailPayload struct {
-	UserID    string        `json:"user_id"`
-	Kind      string        `json:"kind"`
-	Email     string        `json:"email"`
-	RawToken  string        `json:"raw_token,omitempty"`
-	Code      string        `json:"code,omitempty"`
-	ExpiresIn time.Duration `json:"expires_in,omitempty"`
+	UserID         string        `json:"user_id"`
+	Kind           string        `json:"kind"`
+	Email          string        `json:"email"`
+	RawToken       string        `json:"raw_token,omitempty"`
+	VerificationID string        `json:"verification_id,omitempty"`
+	Code           string        `json:"code,omitempty"`
+	ExpiresIn      time.Duration `json:"expires_in,omitempty"`
 }
 
 // EnqueueSendAuthEmail ставит auth-письмо в очередь Asynq.
@@ -55,12 +56,13 @@ func (c *Client) EnqueuePasswordResetEmail(ctx context.Context, userID, email, r
 }
 
 // EnqueueRegistrationVerificationEmail реализует auth.AuthEmailEnqueuer для письма подтверждения регистрации.
-func (c *Client) EnqueueRegistrationVerificationEmail(ctx context.Context, email, code string, expiresIn time.Duration) error {
+func (c *Client) EnqueueRegistrationVerificationEmail(ctx context.Context, email, verificationID, code string, expiresIn time.Duration) error {
 	_, err := c.EnqueueSendAuthEmail(ctx, SendAuthEmailPayload{
-		Kind:      AuthEmailKindRegistrationVerification,
-		Email:     email,
-		Code:      code,
-		ExpiresIn: expiresIn,
+		Kind:           AuthEmailKindRegistrationVerification,
+		Email:          email,
+		VerificationID: verificationID,
+		Code:           code,
+		ExpiresIn:      expiresIn,
 	})
 	return err
 }

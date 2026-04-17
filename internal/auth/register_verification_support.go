@@ -164,12 +164,14 @@ func (s *Service) ensureRegistrationStartAllowed(ctx context.Context, email stri
 	return nil
 }
 
-func (s *Service) sendRegistrationVerificationEmail(ctx context.Context, email string, code string) error {
+// sendRegistrationVerificationEmail ставит письмо в очередь вместе с verification_id.
+// Это позволяет письму содержать рабочую fallback-ссылку, а не только декоративный код.
+func (s *Service) sendRegistrationVerificationEmail(ctx context.Context, email string, verificationID string, code string) error {
 	if s.emailEnqueuer == nil {
 		return fmt.Errorf("registration email enqueuer is not configured")
 	}
 
-	if err := s.emailEnqueuer.EnqueueRegistrationVerificationEmail(ctx, email, code, registrationVerificationTTL); err != nil {
+	if err := s.emailEnqueuer.EnqueueRegistrationVerificationEmail(ctx, email, verificationID, code, registrationVerificationTTL); err != nil {
 		return fmt.Errorf("enqueue registration verification email: %w", err)
 	}
 

@@ -27,6 +27,7 @@ import (
 type SMTPSender struct {
 	cfg      config.EmailConfig
 	resetURL string
+	verifyURL string
 }
 
 // NewSMTPSender создаёт отправитель писем через SMTP.
@@ -34,8 +35,10 @@ type SMTPSender struct {
 // frontendURL — базовый адрес фронтенда, например "https://kartochki.online".
 // Из него строится ссылка сброса пароля: frontendURL + "/reset-password?token=…".
 func NewSMTPSender(cfg config.EmailConfig, frontendURL string) *SMTPSender {
-	resetURL := strings.TrimRight(frontendURL, "/") + "/reset-password"
-	return &SMTPSender{cfg: cfg, resetURL: resetURL}
+	baseURL := strings.TrimRight(frontendURL, "/")
+	resetURL := baseURL + "/reset-password"
+	verifyURL := baseURL + "/verify"
+	return &SMTPSender{cfg: cfg, resetURL: resetURL, verifyURL: verifyURL}
 }
 
 // SendPasswordResetEmail отправляет письмо со ссылкой для сброса пароля.
