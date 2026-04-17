@@ -332,6 +332,7 @@ type CreateCheckoutResponse struct {
 
 // CreateGenerationRequest defines model for CreateGenerationRequest.
 type CreateGenerationRequest struct {
+	// CardCount Количество карточек для генерации. Поддерживаются значения от 1 до 15.
 	CardCount     int      `json:"card_count"`
 	CardTypeIds   []string `json:"card_type_ids"`
 	MarketplaceId string   `json:"marketplace_id"`
@@ -455,6 +456,7 @@ type GenerateCardType struct {
 
 // GenerateConfigResponse defines model for GenerateConfigResponse.
 type GenerateConfigResponse struct {
+	// CardCountOptions Допустимые значения количества карточек. Сейчас поддерживается диапазон от 1 до 15.
 	CardCountOptions []int                 `json:"card_count_options"`
 	CardTypes        []GenerateCardType    `json:"card_types"`
 	Marketplaces     []GenerateMarketplace `json:"marketplaces"`
@@ -627,10 +629,10 @@ type SettingsNotifications struct {
 
 // SettingsProfile defines model for SettingsProfile.
 type SettingsProfile struct {
-	Company *string             `json:"company,omitempty"`
-	Email   openapi_types.Email `json:"email"`
-	Name    string              `json:"name"`
-	Phone   *string             `json:"phone,omitempty"`
+	Company *string              `json:"company,omitempty"`
+	Email   *openapi_types.Email `json:"email,omitempty"`
+	Name    string               `json:"name"`
+	Phone   *string              `json:"phone,omitempty"`
 }
 
 // SettingsResponse defines model for SettingsResponse.

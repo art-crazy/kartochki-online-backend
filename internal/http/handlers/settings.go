@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rs/zerolog"
 	openapi_types "github.com/oapi-codegen/runtime/types"
+	"github.com/rs/zerolog"
 
 	openapi "kartochki-online-backend/api/gen"
 	"kartochki-online-backend/internal/auth"
@@ -99,18 +99,7 @@ func (h SettingsHandler) PatchProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email := openapi_types.Email(profile.Email)
-	profileResp := openapi.SettingsProfile{
-		Name:  profile.Name,
-		Email: email,
-	}
-	if profile.Phone != "" {
-		profileResp.Phone = &profile.Phone
-	}
-	if profile.Company != "" {
-		profileResp.Company = &profile.Company
-	}
-	response.WriteJSON(w, r, http.StatusOK, profileResp)
+	response.WriteJSON(w, r, http.StatusOK, toSettingsProfileContract(profile))
 }
 
 // PatchDefaults обновляет дефолтные параметры генерации.
@@ -364,18 +353,6 @@ func (h SettingsHandler) writeSettingsError(w http.ResponseWriter, r *http.Reque
 }
 
 func toSettingsResponse(payload settings.Settings) openapi.SettingsResponse {
-	email := openapi_types.Email(payload.Profile.Email)
-	profile := openapi.SettingsProfile{
-		Name:  payload.Profile.Name,
-		Email: email,
-	}
-	if payload.Profile.Phone != "" {
-		profile.Phone = &payload.Profile.Phone
-	}
-	if payload.Profile.Company != "" {
-		profile.Company = &payload.Profile.Company
-	}
-
 	apiKey := openapi.SettingsAPIKey{
 		CanRotate: payload.APIKey.CanRotate,
 	}
@@ -384,7 +361,7 @@ func toSettingsResponse(payload settings.Settings) openapi.SettingsResponse {
 	}
 
 	return openapi.SettingsResponse{
-		Profile: profile,
+		Profile: toSettingsProfileContract(payload.Profile),
 		Defaults: openapi.SettingsDefaults{
 			MarketplaceId:      payload.Defaults.MarketplaceID,
 			CardsPerGeneration: payload.Defaults.CardsPerGeneration,
@@ -395,6 +372,25 @@ func toSettingsResponse(payload settings.Settings) openapi.SettingsResponse {
 		Integrations:  toSettingsIntegrationContracts(payload.Integrations),
 		ApiKey:        apiKey,
 	}
+}
+
+// toSettingsProfileContract собирает профиль настроек в OpenAPI-ответ.
+// Email остаётся опциональным, чтобы битые исторические данные не ломали JSON-ответ.
+func toSettingsProfileContract(profile settings.Profile) openapi.SettingsProfile {
+	result := openapi.SettingsProfile{
+		Name: profile.Name,
+	}
+	if email := contractEmailPtr(profile.Email); email != nil {
+		result.Email = email
+	}
+	if profile.Phone != "" {
+		result.Phone = &profile.Phone
+	}
+	if profile.Company != "" {
+		result.Company = &profile.Company
+	}
+
+	return result
 }
 
 func toNotificationContracts(items []settings.NotificationItem) []openapi.UpdateNotificationItem {
@@ -440,14 +436,27 @@ func toSettingsIntegrationContracts(items []settings.Integration) []openapi.Sett
 			id := mustParseUUID(item.ID)
 			s.Id = &id
 		}
-		if item.AccountEmail != "" {
-			email := openapi_types.Email(item.AccountEmail)
-			s.AccountEmail = &email
+		// Email в snapshot OAuth-аккаунта может отсутствовать или быть невалидным.
+		// В таком случае не роняем весь `/settings`, а просто не отдаём это поле.
+		if email := contractEmailPtr(item.AccountEmail); email != nil {
+			s.AccountEmail = email
 		}
 		result[i] = s
 	}
 
 	return result
+}
+
+// contractEmailPtr возвращает email только если он подходит под OpenAPI-тип.
+// Это защищает JSON-ответ от падения на пустых или повреждённых значениях из БД.
+func contractEmailPtr(value string) *openapi_types.Email {
+	value = strings.TrimSpace(value)
+	if value == "" || !isValidEmail(value) {
+		return nil
+	}
+
+	email := openapi_types.Email(value)
+	return &email
 }
 
 func validateUpdateProfileRequest(req openapi.UpdateProfileRequest) []openapi.ErrorDetail {
@@ -522,4 +531,3 @@ func validateUpdateNotificationsRequest(req openapi.UpdateNotificationsRequest) 
 
 	return details
 }
-
