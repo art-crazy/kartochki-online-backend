@@ -59,6 +59,7 @@ make sqlc
 make migrate-up
 make migrate-down
 make migrate-version
+make blog-sync # вручную синхронизировать content/blog в текущую БД
 make bundle    # собрать api/openapi/openapi.yaml из src/
 make generate  # сгенерировать Go-типы в api/gen/openapi.gen.go
 make check     # проверить кодировку и лимит строк
@@ -68,6 +69,8 @@ make install-git-hooks  # подключить pre-commit проверки из 
 ```
 
 `migrate-*` используют `POSTGRES_DSN` из env или значение по умолчанию из `Makefile`.
+
+`make blog-sync` использует тот же `POSTGRES_DSN` и нужен для локальной разработки или аварийного ручного догона контента. В production синхронизация блога должна выполняться автоматически в пайплайне деплоя.
 
 `make check-file-lines` проверяет, что ручные файлы проекта не превышают 300 строк.
 Старые превышения временно перечислены в `.line-limit-ignore`; новые большие файлы лучше сразу разделять по ответственности.

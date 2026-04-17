@@ -384,7 +384,9 @@ It owns:
 
 Blog runtime data is stored in PostgreSQL, but the editable source of truth for article content lives in repo-managed YAML files under `content/blog/`.
 
-Use `go run ./cmd/blogsync` or `make blog-sync` after migrations to upsert those files into the blog tables. This keeps production reads DB-backed while preserving a reviewable git workflow for article edits.
+Production deploys must always run blog sync as a separate release step after schema migrations and before the release is considered successful. The deployed image must contain both the `blogsync` binary and the `content/blog/` directory so the sync uses exactly the same git revision as the running backend.
+
+For local work and manual recovery, use `go run ./cmd/blogsync` or `make blog-sync` to upsert those files into the blog tables. This keeps production reads DB-backed while preserving a reviewable git workflow for article edits.
 
 `internal/billing` is now used for the `/api/v1/billing/*` surface.
 

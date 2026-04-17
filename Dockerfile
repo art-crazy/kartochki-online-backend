@@ -7,6 +7,7 @@ RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/blogsync ./cmd/blogsync
 RUN CGO_ENABLED=0 GOOS=linux GOBIN=/out go install -tags=postgres github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.3
 
 FROM alpine:3.22
@@ -18,8 +19,10 @@ RUN apk add --no-cache ca-certificates tzdata \
 WORKDIR /app
 
 COPY --from=builder /out/api /app/api
+COPY --from=builder /out/blogsync /app/blogsync
 COPY --from=builder /out/migrate /app/migrate
 COPY --from=builder /src/db/migrations /app/db/migrations
+COPY --from=builder /src/content/blog /app/content/blog
 
 RUN mkdir -p /app/storage && chown -R app:app /app
 
