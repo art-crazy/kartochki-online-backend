@@ -16,7 +16,7 @@ import (
 
 // AuthHandler обслуживает публичные auth-сценарии и маршруты текущего пользователя.
 type AuthHandler struct {
-	authService       *auth.Service
+	authService  *auth.Service
 	secureCookie bool // true в production: кука отправляется только по HTTPS
 }
 
@@ -33,12 +33,12 @@ func NewAuthHandler(authService *auth.Service, secureCookie bool) AuthHandler {
 func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req openapi.RegisterRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateRegisterRequest(req, h.authService.PasswordMinLength()); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "Запрос содержит некорректные данные.", details...)
 		return
 	}
 
@@ -51,23 +51,23 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrEmailAlreadyExists):
-			response.WriteError(w, r, http.StatusConflict, "email_taken", "email is already registered")
+			response.WriteError(w, r, http.StatusConflict, "email_taken", "Пользователь с таким email уже зарегистрирован.")
 		case errors.Is(err, auth.ErrPasswordTooShort):
 			response.WriteError(
 				w,
 				r,
 				http.StatusBadRequest,
 				"validation_error",
-				"request validation failed",
+				"Запрос содержит некорректные данные.",
 				openapi.ErrorDetail{
 					Field:   strPtr("password"),
-					Message: fmt.Sprintf("must be at least %d characters", h.authService.PasswordMinLength()),
+					Message: fmt.Sprintf("Пароль должен содержать не менее %d символов.", h.authService.PasswordMinLength()),
 				},
 			)
 		case errors.Is(err, auth.ErrRegistrationRateLimited):
-			response.WriteError(w, r, http.StatusTooManyRequests, "registration_rate_limited", "too many registration attempts")
+			response.WriteError(w, r, http.StatusTooManyRequests, "registration_rate_limited", "Слишком много попыток регистрации. Попробуйте позже.")
 		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to start registration")
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось начать регистрацию.")
 		}
 		return
 	}
@@ -86,12 +86,12 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req openapi.LoginRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateLoginRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "Запрос содержит некорректные данные.", details...)
 		return
 	}
 
@@ -102,9 +102,9 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrInvalidCredentials):
-			response.WriteError(w, r, http.StatusUnauthorized, "invalid_credentials", "email or password is invalid")
+			response.WriteError(w, r, http.StatusUnauthorized, "invalid_credentials", "Неверный email или пароль.")
 		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to login")
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось выполнить вход.")
 		}
 		return
 	}
@@ -117,12 +117,12 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 	var req openapi.TelegramLoginRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateTelegramLoginRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "Запрос содержит некорректные данные.", details...)
 		return
 	}
 
@@ -138,13 +138,13 @@ func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrTelegramAuthNotConfigured):
-			response.WriteError(w, r, http.StatusNotImplemented, "telegram_not_configured", "telegram auth is not configured yet")
+			response.WriteError(w, r, http.StatusNotImplemented, "telegram_not_configured", "Вход через Telegram ещё не настроен.")
 		case errors.Is(err, auth.ErrTelegramAuthInvalid):
-			response.WriteError(w, r, http.StatusBadRequest, "invalid_telegram_auth", "telegram auth payload is invalid")
+			response.WriteError(w, r, http.StatusBadRequest, "invalid_telegram_auth", "Данные авторизации Telegram некорректны.")
 		case errors.Is(err, auth.ErrTelegramAuthExpired):
-			response.WriteError(w, r, http.StatusBadRequest, "telegram_auth_expired", "telegram auth payload is expired")
+			response.WriteError(w, r, http.StatusBadRequest, "telegram_auth_expired", "Срок действия данных авторизации Telegram истёк.")
 		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to login with telegram")
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось выполнить вход через Telegram.")
 		}
 		return
 	}
@@ -157,16 +157,16 @@ func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	token, ok := authctx.AccessToken(r.Context())
 	if !ok {
-		response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "authorization token is required")
+		response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "Требуется токен авторизации.")
 		return
 	}
 
 	if err := h.authService.Logout(r.Context(), token); err != nil {
 		switch {
 		case errors.Is(err, auth.ErrUnauthorized):
-			response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "authorization token is invalid")
+			response.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "Токен авторизации недействителен.")
 		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to logout")
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось завершить сеанс.")
 		}
 		return
 	}
@@ -195,17 +195,17 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req openapi.ForgotPasswordRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateForgotPasswordRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "Запрос содержит некорректные данные.", details...)
 		return
 	}
 
 	if err := h.authService.ForgotPassword(r.Context(), string(req.Email)); err != nil {
-		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to process password reset request")
+		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось обработать запрос на сброс пароля.")
 		return
 	}
 
@@ -216,21 +216,21 @@ func (h AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req openapi.ResetPasswordRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateResetPasswordRequest(req, h.authService.PasswordMinLength()); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "Запрос содержит некорректные данные.", details...)
 		return
 	}
 
 	if err := h.authService.ResetPassword(r.Context(), req.Token, req.Password); err != nil {
 		switch {
 		case errors.Is(err, auth.ErrPasswordResetTokenInvalid):
-			response.WriteError(w, r, http.StatusBadRequest, "invalid_reset_token", "password reset token is invalid or expired")
+			response.WriteError(w, r, http.StatusBadRequest, "invalid_reset_token", "Токен сброса пароля недействителен или срок его действия истёк.")
 		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to reset password")
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось сбросить пароль.")
 		}
 		return
 	}
@@ -242,12 +242,12 @@ func (h AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 	var req openapi.VkWidgetLoginRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := h.validateVKWidgetRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "vk widget payload is invalid", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "Данные виджета VK некорректны.", details...)
 		return
 	}
 
@@ -261,7 +261,7 @@ func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 		if h.writeWidgetOAuthError(w, r, err) {
 			return
 		}
-		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "failed to login with vk widget")
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "Не удалось выполнить вход через виджет VK.")
 		return
 	}
 
@@ -273,12 +273,12 @@ func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) VKOAuth(w http.ResponseWriter, r *http.Request) {
 	var req openapi.VkOAuthLoginRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := h.validateVKOAuthRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "vk oauth payload is invalid", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "Данные OAuth VK некорректны.", details...)
 		return
 	}
 
@@ -292,7 +292,7 @@ func (h AuthHandler) VKOAuth(w http.ResponseWriter, r *http.Request) {
 		if h.writeWidgetOAuthError(w, r, err) {
 			return
 		}
-		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "failed to login with vk oauth")
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "Не удалось выполнить вход через OAuth VK.")
 		return
 	}
 
@@ -304,12 +304,12 @@ func (h AuthHandler) VKOAuth(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) YandexWidget(w http.ResponseWriter, r *http.Request) {
 	var req openapi.YandexWidgetLoginRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateYandexWidgetRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "yandex widget payload is invalid", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_widget_payload", "Данные виджета Яндекс ID некорректны.", details...)
 		return
 	}
 
@@ -318,7 +318,7 @@ func (h AuthHandler) YandexWidget(w http.ResponseWriter, r *http.Request) {
 		if h.writeWidgetOAuthError(w, r, err) {
 			return
 		}
-		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "failed to login with yandex widget")
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "Не удалось выполнить вход через виджет Яндекс ID.")
 		return
 	}
 
@@ -331,17 +331,17 @@ func validateRegisterRequest(req openapi.RegisterRequest, passwordMinLength int)
 
 	emailStr := strings.TrimSpace(string(req.Email))
 	if emailStr == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "Поле обязательно для заполнения."})
 	} else if !isValidEmail(emailStr) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "must be a valid email"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "Укажите корректный email."})
 	}
 
 	if strings.TrimSpace(req.Password) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "Поле обязательно для заполнения."})
 	} else if len(req.Password) < passwordMinLength {
 		details = append(details, openapi.ErrorDetail{
 			Field:   strPtr("password"),
-			Message: fmt.Sprintf("must be at least %d characters", passwordMinLength),
+			Message: fmt.Sprintf("Пароль должен содержать не менее %d символов.", passwordMinLength),
 		})
 	}
 
@@ -353,13 +353,13 @@ func validateLoginRequest(req openapi.LoginRequest) []openapi.ErrorDetail {
 
 	emailStr := strings.TrimSpace(string(req.Email))
 	if emailStr == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "Поле обязательно для заполнения."})
 	} else if !isValidEmail(emailStr) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "must be a valid email"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "Укажите корректный email."})
 	}
 
 	if strings.TrimSpace(req.Password) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "Поле обязательно для заполнения."})
 	}
 
 	return details
@@ -370,9 +370,9 @@ func validateForgotPasswordRequest(req openapi.ForgotPasswordRequest) []openapi.
 
 	emailStr := strings.TrimSpace(string(req.Email))
 	if emailStr == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "Поле обязательно для заполнения."})
 	} else if !isValidEmail(emailStr) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "must be a valid email"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("email"), Message: "Укажите корректный email."})
 	}
 
 	return details
@@ -382,15 +382,15 @@ func validateResetPasswordRequest(req openapi.ResetPasswordRequest, passwordMinL
 	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.Token) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("token"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("token"), Message: "Поле обязательно для заполнения."})
 	}
 
 	if strings.TrimSpace(req.Password) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("password"), Message: "Поле обязательно для заполнения."})
 	} else if len(req.Password) < passwordMinLength {
 		details = append(details, openapi.ErrorDetail{
 			Field:   strPtr("password"),
-			Message: fmt.Sprintf("must be at least %d characters", passwordMinLength),
+			Message: fmt.Sprintf("Пароль должен содержать не менее %d символов.", passwordMinLength),
 		})
 	}
 
@@ -401,15 +401,15 @@ func validateTelegramLoginRequest(req openapi.TelegramLoginRequest) []openapi.Er
 	var details []openapi.ErrorDetail
 
 	if req.Id <= 0 {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("id"), Message: "must be greater than zero"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("id"), Message: "Значение должно быть больше нуля."})
 	}
 
 	if req.AuthDate <= 0 {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("auth_date"), Message: "must be a valid unix timestamp"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("auth_date"), Message: "Укажите корректный Unix timestamp."})
 	}
 
 	if strings.TrimSpace(req.Hash) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("hash"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("hash"), Message: "Поле обязательно для заполнения."})
 	}
 
 	return details
@@ -419,18 +419,18 @@ func (h AuthHandler) validateVKWidgetRequest(req openapi.VkWidgetLoginRequest) [
 	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.Code) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "Поле обязательно для заполнения."})
 	}
 	if strings.TrimSpace(req.DeviceId) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "Поле обязательно для заполнения."})
 	}
 	if strings.TrimSpace(req.CodeVerifier) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "Поле обязательно для заполнения."})
 	} else if !isValidPKCEVerifier(req.CodeVerifier) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "must be a valid PKCE verifier"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "Укажите корректный PKCE verifier."})
 	}
 	if strings.TrimSpace(req.RedirectUri) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "Поле обязательно для заполнения."})
 	}
 
 	return details
@@ -440,18 +440,18 @@ func (h AuthHandler) validateVKOAuthRequest(req openapi.VkOAuthLoginRequest) []o
 	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.Code) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "Поле обязательно для заполнения."})
 	}
 	if strings.TrimSpace(req.DeviceId) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("device_id"), Message: "Поле обязательно для заполнения."})
 	}
 	if strings.TrimSpace(req.CodeVerifier) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "Поле обязательно для заполнения."})
 	} else if !isValidPKCEVerifier(req.CodeVerifier) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "must be a valid PKCE verifier"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code_verifier"), Message: "Укажите корректный PKCE verifier."})
 	}
 	if strings.TrimSpace(req.RedirectUri) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("redirect_uri"), Message: "Поле обязательно для заполнения."})
 	}
 
 	return details
@@ -481,7 +481,7 @@ func validateYandexWidgetRequest(req openapi.YandexWidgetLoginRequest) []openapi
 	var details []openapi.ErrorDetail
 
 	if strings.TrimSpace(req.AccessToken) == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("access_token"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("access_token"), Message: "Поле обязательно для заполнения."})
 	}
 
 	return details
@@ -490,11 +490,11 @@ func validateYandexWidgetRequest(req openapi.YandexWidgetLoginRequest) []openapi
 func (h AuthHandler) writeWidgetOAuthError(w http.ResponseWriter, r *http.Request, err error) bool {
 	switch {
 	case errors.Is(err, auth.ErrOAuthNotConfigured):
-		response.WriteError(w, r, http.StatusNotImplemented, "provider_not_configured", "oauth provider is not configured")
+		response.WriteError(w, r, http.StatusNotImplemented, "provider_not_configured", "Провайдер OAuth не настроен.")
 	case errors.Is(err, auth.ErrOAuthTokenInvalid):
-		response.WriteError(w, r, http.StatusUnauthorized, "provider_auth_failed", "provider rejected widget payload")
+		response.WriteError(w, r, http.StatusUnauthorized, "provider_auth_failed", "Провайдер отклонил данные авторизации.")
 	case errors.Is(err, auth.ErrOAuthProviderError):
-		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "oauth provider returned an unexpected response")
+		response.WriteError(w, r, http.StatusInternalServerError, "oauth_provider_error", "Провайдер OAuth вернул непредвиденный ответ.")
 	default:
 		return false
 	}

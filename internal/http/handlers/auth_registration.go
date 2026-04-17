@@ -17,12 +17,12 @@ import (
 func (h AuthHandler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 	var req openapi.VerifyRegisterRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateVerifyRegisterRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "Запрос содержит некорректные данные.", details...)
 		return
 	}
 
@@ -43,12 +43,12 @@ func (h AuthHandler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 func (h AuthHandler) ResendRegisterCode(w http.ResponseWriter, r *http.Request) {
 	var req openapi.ResendRegisterCodeRequest
 	if err := decodeJSON(r, &req); err != nil {
-		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		response.WriteError(w, r, http.StatusBadRequest, "invalid_json", "Тело запроса должно быть корректным JSON.")
 		return
 	}
 
 	if details := validateResendRegisterCodeRequest(req); len(details) > 0 {
-		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", details...)
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "Запрос содержит некорректные данные.", details...)
 		return
 	}
 
@@ -74,14 +74,14 @@ func validateVerifyRegisterRequest(req openapi.VerifyRegisterRequest) []openapi.
 	var details []openapi.ErrorDetail
 
 	if req.VerificationId.String() == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("verification_id"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("verification_id"), Message: "Поле обязательно для заполнения."})
 	}
 
 	code := strings.TrimSpace(req.Code)
 	if code == "" {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "field is required"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "Поле обязательно для заполнения."})
 	} else if !isSixDigitCode(code) {
-		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "must contain exactly 6 digits"})
+		details = append(details, openapi.ErrorDetail{Field: strPtr("code"), Message: "Код должен состоять ровно из 6 цифр."})
 	}
 
 	return details
@@ -89,7 +89,7 @@ func validateVerifyRegisterRequest(req openapi.VerifyRegisterRequest) []openapi.
 
 func validateResendRegisterCodeRequest(req openapi.ResendRegisterCodeRequest) []openapi.ErrorDetail {
 	if req.VerificationId.String() == "" {
-		return []openapi.ErrorDetail{{Field: strPtr("verification_id"), Message: "field is required"}}
+		return []openapi.ErrorDetail{{Field: strPtr("verification_id"), Message: "Поле обязательно для заполнения."}}
 	}
 	return nil
 }
@@ -111,35 +111,35 @@ func isSixDigitCode(value string) bool {
 func writeRegisterVerificationError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, auth.ErrVerificationNotFound):
-		response.WriteError(w, r, http.StatusNotFound, "verification_not_found", "registration verification was not found")
+		response.WriteError(w, r, http.StatusNotFound, "verification_not_found", "Регистрация с указанным кодом подтверждения не найдена.")
 	case errors.Is(err, auth.ErrVerificationCodeInvalid):
-		response.WriteError(w, r, http.StatusUnauthorized, "invalid_verification_code", "verification code is invalid")
+		response.WriteError(w, r, http.StatusUnauthorized, "invalid_verification_code", "Указан неверный код подтверждения.")
 	case errors.Is(err, auth.ErrVerificationCodeExpired):
-		response.WriteError(w, r, http.StatusGone, "verification_expired", "verification code is expired")
+		response.WriteError(w, r, http.StatusGone, "verification_expired", "Срок действия кода подтверждения истёк.")
 	case errors.Is(err, auth.ErrVerificationAttemptsExceeded):
-		response.WriteError(w, r, http.StatusTooManyRequests, "verification_attempts_exceeded", "verification attempts limit is exceeded")
+		response.WriteError(w, r, http.StatusTooManyRequests, "verification_attempts_exceeded", "Превышено допустимое количество попыток подтверждения.")
 	case errors.Is(err, auth.ErrVerificationAlreadyCompleted):
-		response.WriteError(w, r, http.StatusConflict, "already_verified", "registration is already verified")
+		response.WriteError(w, r, http.StatusConflict, "already_verified", "Регистрация уже подтверждена.")
 	case errors.Is(err, auth.ErrEmailAlreadyExists):
-		response.WriteError(w, r, http.StatusConflict, "email_taken", "email is already registered")
+		response.WriteError(w, r, http.StatusConflict, "email_taken", "Пользователь с таким email уже зарегистрирован.")
 	default:
-		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to verify registration")
+		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось подтвердить регистрацию.")
 	}
 }
 
 func writeRegisterResendError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, auth.ErrVerificationNotFound):
-		response.WriteError(w, r, http.StatusNotFound, "verification_not_found", "registration verification was not found")
+		response.WriteError(w, r, http.StatusNotFound, "verification_not_found", "Регистрация с указанным кодом подтверждения не найдена.")
 	case errors.Is(err, auth.ErrVerificationAlreadyCompleted):
-		response.WriteError(w, r, http.StatusConflict, "already_verified", "registration is already verified")
+		response.WriteError(w, r, http.StatusConflict, "already_verified", "Регистрация уже подтверждена.")
 	case errors.Is(err, auth.ErrRegistrationResendTooEarly):
-		response.WriteError(w, r, http.StatusTooManyRequests, "resend_too_early", "verification code cannot be resent yet")
+		response.WriteError(w, r, http.StatusTooManyRequests, "resend_too_early", "Код подтверждения пока нельзя отправить повторно.")
 	case errors.Is(err, auth.ErrRegistrationResendLimitExceeded):
-		response.WriteError(w, r, http.StatusTooManyRequests, "resend_limit_exceeded", "verification resend limit is exceeded")
+		response.WriteError(w, r, http.StatusTooManyRequests, "resend_limit_exceeded", "Превышен лимит повторной отправки кода подтверждения.")
 	case errors.Is(err, auth.ErrVerificationCodeExpired):
-		response.WriteError(w, r, http.StatusGone, "verification_expired", "registration verification is expired")
+		response.WriteError(w, r, http.StatusGone, "verification_expired", "Срок действия подтверждения регистрации истёк.")
 	default:
-		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to resend verification code")
+		response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "Не удалось повторно отправить код подтверждения.")
 	}
 }
