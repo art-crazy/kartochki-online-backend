@@ -70,6 +70,7 @@ func (c AppConfig) IsProduction() bool {
 
 // EmailConfig хранит настройки SMTP-отправителя писем.
 // При пустом Host приложение использует NoopSender (только логирование).
+// ReplyTo необязателен: если пуст, заголовок Reply-To не добавляется.
 type EmailConfig struct {
 	Host        string
 	Port        int
@@ -77,6 +78,7 @@ type EmailConfig struct {
 	Password    string
 	FromAddress string
 	FromName    string
+	ReplyTo     string
 }
 
 // HTTPConfig описывает настройки HTTP-сервера.
@@ -275,6 +277,7 @@ func loadFromEnv() (Config, error) {
 			Password:    getEnv("SMTP_PASSWORD", ""),
 			FromAddress: getEnv("EMAIL_FROM", ""),
 			FromName:    getEnv("EMAIL_FROM_NAME", "kartochki.online"),
+			ReplyTo:     getEnv("EMAIL_REPLY_TO", ""),
 		},
 		YooKassa: YooKassaConfig{
 			ShopID:        getEnv("YOOKASSA_SHOP_ID", ""),

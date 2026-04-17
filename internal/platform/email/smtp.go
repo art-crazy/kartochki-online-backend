@@ -51,7 +51,7 @@ func (s *SMTPSender) SendPasswordResetEmail(ctx context.Context, toEmail string,
 		return fmt.Errorf("render password reset email: %w", err)
 	}
 
-	msg, err := buildMIMEMessage(s.cfg.FromAddress, s.cfg.FromName, toEmail, subject, plainText, htmlText)
+	msg, err := buildMIMEMessage(s.cfg.FromAddress, s.cfg.FromName, toEmail, s.cfg.ReplyTo, subject, plainText, htmlText)
 	if err != nil {
 		return fmt.Errorf("build mime message: %w", err)
 	}
@@ -125,7 +125,8 @@ func (s *SMTPSender) sendWithTLS(toEmail string, msg []byte, deadline time.Time)
 // Обе части — plain-text и HTML — кодируются в quoted-printable,
 // что гарантирует корректную передачу UTF-8 и длинных строк по RFC 2045.
 // Граница (boundary) генерируется случайно, чтобы не совпасть с телом письма.
-func buildMIMEMessage(fromAddr, fromName, toEmail, subject, plainText, htmlText string) ([]byte, error) {
+// replyTo — необязательный адрес для ответов; если пуст, заголовок не добавляется.
+func buildMIMEMessage(fromAddr, fromName, toEmail, replyTo, subject, plainText, htmlText string) ([]byte, error) {
 	boundary, err := randomBoundary()
 	if err != nil {
 		return nil, fmt.Errorf("generate mime boundary: %w", err)
@@ -136,6 +137,9 @@ func buildMIMEMessage(fromAddr, fromName, toEmail, subject, plainText, htmlText 
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "From: %s <%s>\r\n", encodedFrom, fromAddr)
 	fmt.Fprintf(&buf, "To: %s\r\n", toEmail)
+	if replyTo != "" {
+		fmt.Fprintf(&buf, "Reply-To: %s\r\n", replyTo)
+	}
 	fmt.Fprintf(&buf, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject))
 	buf.WriteString("MIME-Version: 1.0\r\n")
 	fmt.Fprintf(&buf, "Content-Type: multipart/alternative; boundary=\"%s\"\r\n", boundary)
@@ -197,6 +201,9 @@ var passwordResetPlainTmpl = template.Must(template.New("reset_plain").Parse(
 {{ .ResetLink }}
 
 Ссылка действительна 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.
+
+---
+Вы получили это письмо, потому что зарегистрированы на {{ .ServiceName }}.
 `))
 
 var passwordResetHTMLTmpl = template.Must(template.New("reset_html").Parse(
@@ -214,6 +221,11 @@ var passwordResetHTMLTmpl = template.Must(template.New("reset_html").Parse(
   </p>
   <p style="color:#666;font-size:13px">Ссылка действительна 1 час.<br>
   Если вы не запрашивали сброс — проигнорируйте это письмо.</p>
+  <p style="color:#666;font-size:13px">Если кнопка не работает, скопируйте ссылку в браузер:<br>
+  <a href="{{ .ResetLink }}" style="color:#2563eb;word-break:break-all">{{ .ResetLink }}</a></p>
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+  <p style="color:#aaa;font-size:12px">Вы получили это письмо, потому что зарегистрированы на <strong>{{ .ServiceName }}</strong>.<br>
+  Если это ошибка — просто проигнорируйте письмо.</p>
 </body>
 </html>
 `))
