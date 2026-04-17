@@ -70,6 +70,7 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_FROM_NAME: ${{ secrets.EMAIL_FROM_NAME }}
+          EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           YOOKASSA_SHOP_ID: ${{ secrets.YOOKASSA_SHOP_ID }}
           YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
           YOOKASSA_WEBHOOK_SECRET: ${{ secrets.YOOKASSA_WEBHOOK_SECRET }}
@@ -95,6 +96,7 @@ jobs:
             printf 'SMTP_PASSWORD=%s\n' "$SMTP_PASSWORD"
             printf 'EMAIL_FROM=%s\n' "$EMAIL_FROM"
             printf 'EMAIL_FROM_NAME=%s\n' "$EMAIL_FROM_NAME"
+            printf 'EMAIL_REPLY_TO=%s\n' "$EMAIL_REPLY_TO"
             printf 'YOOKASSA_SHOP_ID=%s\n' "$YOOKASSA_SHOP_ID"
             printf 'YOOKASSA_SECRET_KEY=%s\n' "$YOOKASSA_SECRET_KEY"
             printf 'YOOKASSA_WEBHOOK_SECRET=%s\n' "$YOOKASSA_WEBHOOK_SECRET"
