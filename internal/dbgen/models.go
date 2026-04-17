@@ -197,6 +197,31 @@ type Payment struct {
 	CreatedAt         pgtype.Timestamptz
 }
 
+// Неподтверждённые регистрации по email/паролю до ввода одноразового кода.
+type PendingRegistration struct {
+	ID           uuid.UUID
+	Email        string
+	Name         string
+	PasswordHash string
+	// Хэш одноразового кода из письма. Сырой код в базе не хранится.
+	VerificationCodeHash  string
+	VerificationExpiresAt pgtype.Timestamptz
+	// Момент, раньше которого повторная отправка кода запрещена.
+	ResendAvailableAt pgtype.Timestamptz
+	// Количество неверных попыток ввода кода для текущего flow.
+	AttemptCount int32
+	// Количество уже отправленных кодов в рамках одного flow.
+	ResendCount int32
+	// Состояние flow: pending, verified, expired или blocked.
+	Status           string
+	LastEmailSentAt  pgtype.Timestamptz
+	CreatedIpAddress string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	// Когда flow был завершён подтверждением или финально закрыт.
+	CompletedAt pgtype.Timestamptz
+}
+
 // Тарифные планы, которые backend показывает на странице billing.
 type Plan struct {
 	ID                 uuid.UUID

@@ -1,6 +1,9 @@
 package auth
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // EmailSender отправляет письма пользователям.
 //
@@ -11,13 +14,19 @@ type EmailSender interface {
 	//
 	// token — сырой токен, который нужно встроить в URL на frontend.
 	SendPasswordResetEmail(ctx context.Context, toEmail string, token string) error
+
+	// SendRegistrationVerificationEmail отправляет письмо с одноразовым кодом подтверждения регистрации.
+	// code передаётся в сыром виде, потому что пользователь должен ввести его на втором шаге регистрации.
+	SendRegistrationVerificationEmail(ctx context.Context, toEmail string, code string, expiresIn time.Duration) error
 }
 
-// PasswordResetEmailEnqueuer ставит задачу отправки письма сброса пароля в фоновую очередь.
+// AuthEmailEnqueuer ставит auth-письма в фоновую очередь.
 //
 // Через этот интерфейс auth-сервис не зависит от конкретного брокера задач.
-type PasswordResetEmailEnqueuer interface {
-	// EnqueuePasswordResetEmail ставит письмо в очередь и не ждёт отправки.
-	// userID нужен для структурированного логирования в worker-е.
+type AuthEmailEnqueuer interface {
+	// EnqueuePasswordResetEmail ставит письмо сброса пароля в очередь и не ждёт отправки.
 	EnqueuePasswordResetEmail(ctx context.Context, userID, email, rawToken string) error
+
+	// EnqueueRegistrationVerificationEmail ставит письмо с кодом подтверждения регистрации в очередь.
+	EnqueueRegistrationVerificationEmail(ctx context.Context, email, code string, expiresIn time.Duration) error
 }

@@ -29,7 +29,7 @@ func NewAuthHandler(authService *auth.Service, secureCookie bool) AuthHandler {
 	}
 }
 
-// Register создаёт пользователя и сразу логинит его в первую сессию.
+// Register запускает двухшаговую регистрацию и отправляет код подтверждения на email.
 func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req openapi.RegisterRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -43,10 +43,11 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.authService.Register(r.Context(), auth.RegisterInput{
-		Name:     stringOrEmpty(req.Name),
-		Email:    string(req.Email),
-		Password: req.Password,
-	}, sessionMetadataFromRequest(r))
+		Name:      stringOrEmpty(req.Name),
+		Email:     string(req.Email),
+		Password:  req.Password,
+		IPAddress: clientIPAddress(r),
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, auth.ErrEmailAlreadyExists):
@@ -63,14 +64,22 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 					Message: fmt.Sprintf("must be at least %d characters", h.authService.PasswordMinLength()),
 				},
 			)
+		case errors.Is(err, auth.ErrRegistrationRateLimited):
+			response.WriteError(w, r, http.StatusTooManyRequests, "registration_rate_limited", "too many registration attempts")
 		default:
-			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to register user")
+			response.WriteError(w, r, http.StatusInternalServerError, "internal_error", "failed to start registration")
 		}
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
-	response.WriteJSON(w, r, http.StatusCreated, toAuthResponse(result))
+	response.WriteJSON(w, r, http.StatusCreated, openapi.RegisterPendingResponse{
+		Status:                   result.Status,
+		VerificationId:           mustParseUUID(result.VerificationID),
+		Email:                    openapi_types.Email(result.Email),
+		CodeLength:               result.CodeLength,
+		ResendAvailableInSeconds: result.ResendAvailableInSeconds,
+		ExpiresInSeconds:         result.ExpiresInSeconds,
+	})
 }
 
 // Login создаёт новую сессию по корректной паре email и пароль.

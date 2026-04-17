@@ -17,6 +17,58 @@ schemas:
         format: password
         example: nadezhnyy-parol-123
 
+  RegisterPendingResponse:
+    type: object
+    required:
+      - status
+      - verification_id
+      - email
+      - code_length
+      - resend_available_in_seconds
+      - expires_in_seconds
+    properties:
+      status:
+        type: string
+        example: pending_verification
+      verification_id:
+        type: string
+        format: uuid
+      email:
+        type: string
+        format: email
+        example: ivan@example.com
+      code_length:
+        type: integer
+        example: 6
+      resend_available_in_seconds:
+        type: integer
+        example: 60
+      expires_in_seconds:
+        type: integer
+        example: 600
+
+  VerifyRegisterRequest:
+    type: object
+    required:
+      - verification_id
+      - code
+    properties:
+      verification_id:
+        type: string
+        format: uuid
+      code:
+        type: string
+        example: "123456"
+
+  ResendRegisterCodeRequest:
+    type: object
+    required:
+      - verification_id
+    properties:
+      verification_id:
+        type: string
+        format: uuid
+
   LoginRequest:
     type: object
     required:

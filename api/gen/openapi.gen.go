@@ -569,6 +569,16 @@ type PurchaseAddonResponse struct {
 	CheckoutUrl string `json:"checkout_url"`
 }
 
+// RegisterPendingResponse defines model for RegisterPendingResponse.
+type RegisterPendingResponse struct {
+	CodeLength               int                 `json:"code_length"`
+	Email                    openapi_types.Email `json:"email"`
+	ExpiresInSeconds         int                 `json:"expires_in_seconds"`
+	ResendAvailableInSeconds int                 `json:"resend_available_in_seconds"`
+	Status                   string              `json:"status"`
+	VerificationId           openapi_types.UUID  `json:"verification_id"`
+}
+
 // RegisterRequest defines model for RegisterRequest.
 type RegisterRequest struct {
 	Email    openapi_types.Email `json:"email"`
@@ -581,6 +591,11 @@ type RelatedBlogPost struct {
 	CanonicalPath string `json:"canonical_path"`
 	Slug          string `json:"slug"`
 	Title         string `json:"title"`
+}
+
+// ResendRegisterCodeRequest defines model for ResendRegisterCodeRequest.
+type ResendRegisterCodeRequest struct {
+	VerificationId openapi_types.UUID `json:"verification_id"`
 }
 
 // ResetPasswordRequest defines model for ResetPasswordRequest.
@@ -710,6 +725,12 @@ type UploadImageResponse struct {
 	PreviewUrl string             `json:"preview_url"`
 }
 
+// VerifyRegisterRequest defines model for VerifyRegisterRequest.
+type VerifyRegisterRequest struct {
+	Code           string             `json:"code"`
+	VerificationId openapi_types.UUID `json:"verification_id"`
+}
+
 // VkOAuthLoginRequest defines model for VkOAuthLoginRequest.
 type VkOAuthLoginRequest struct {
 	// Code Authorization code, полученный frontend после завершения VK OAuth 2.0 Authorization Code + PKCE flow.
@@ -804,6 +825,12 @@ type LoginAuthUserJSONRequestBody = LoginRequest
 
 // RegisterAuthUserJSONRequestBody defines body for RegisterAuthUser for application/json ContentType.
 type RegisterAuthUserJSONRequestBody = RegisterRequest
+
+// ResendRegisterAuthCodeJSONRequestBody defines body for ResendRegisterAuthCode for application/json ContentType.
+type ResendRegisterAuthCodeJSONRequestBody = ResendRegisterCodeRequest
+
+// VerifyRegisterAuthUserJSONRequestBody defines body for VerifyRegisterAuthUser for application/json ContentType.
+type VerifyRegisterAuthUserJSONRequestBody = VerifyRegisterRequest
 
 // ResetPasswordJSONRequestBody defines body for ResetPassword for application/json ContentType.
 type ResetPasswordJSONRequestBody = ResetPasswordRequest

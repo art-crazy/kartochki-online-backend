@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -106,4 +107,14 @@ func decodeJSON(r *http.Request, dst any) error {
 	}
 
 	return nil
+}
+
+// clientIPAddress извлекает IP без порта после chi.RealIP middleware.
+func clientIPAddress(r *http.Request) string {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil {
+		return host
+	}
+
+	return strings.TrimSpace(r.RemoteAddr)
 }

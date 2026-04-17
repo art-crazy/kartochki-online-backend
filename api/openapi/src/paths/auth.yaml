@@ -208,7 +208,7 @@ paths:
   /api/v1/auth/register:
     post:
       summary: Регистрация по email и паролю
-      description: Создаёт нового пользователя и сразу открывает первую сессию.
+      description: Создаёт неподтверждённую регистрацию и отправляет одноразовый код на email.
       operationId: registerAuthUser
       tags:
         - Auth
@@ -220,21 +220,16 @@ paths:
               $ref: "../components/schemas/auth.yaml#/schemas/RegisterRequest"
       responses:
         "201":
-          description: Пользователь создан и сразу авторизован
+          description: Регистрация начата, ожидается подтверждение email
           headers:
             X-Request-ID:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
-            Set-Cookie:
-              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
-              schema:
-                type: string
-                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
           content:
             application/json:
               schema:
-                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+                $ref: "../components/schemas/auth.yaml#/schemas/RegisterPendingResponse"
         "400":
           description: Ошибка валидации входных данных
           headers:
@@ -253,6 +248,148 @@ paths:
               description: Идентификатор запроса для поиска в логах.
               schema:
                 type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "429":
+          description: Слишком много запусков регистрации или отправок кода
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Не удалось создать pending-регистрацию или отправить письмо
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/register/verify:
+    post:
+      summary: Подтвердить регистрацию кодом из письма
+      description: Проверяет одноразовый код, создаёт пользователя и открывает сессию.
+      operationId: verifyRegisterAuthUser
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/VerifyRegisterRequest"
+      responses:
+        "200":
+          description: Email подтверждён, пользователь авторизован
+          headers:
+            X-Request-ID:
+              description: Идентификатор запроса для поиска в логах.
+              schema:
+                type: string
+            Set-Cookie:
+              description: "Устанавливает HttpOnly-куку auth_token с токеном сессии."
+              schema:
+                type: string
+                example: "auth_token=<token>; HttpOnly; SameSite=Lax; Path=/"
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/AuthResponse"
+        "400":
+          description: Неверный формат verification_id или кода
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: Код подтверждения неверный
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "404":
+          description: Pending-регистрация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Регистрация уже подтверждена или email успел заняться
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "410":
+          description: Код истёк, регистрацию нужно начать заново
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "429":
+          description: Лимит попыток ввода кода превышен
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка сервера
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+
+  /api/v1/auth/register/resend:
+    post:
+      summary: Повторно отправить код подтверждения регистрации
+      description: Выпускает новый код для действующего flow и отправляет письмо повторно.
+      operationId: resendRegisterAuthCode
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../components/schemas/auth.yaml#/schemas/ResendRegisterCodeRequest"
+      responses:
+        "200":
+          description: Новый код отправлен
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/auth.yaml#/schemas/RegisterPendingResponse"
+        "400":
+          description: Неверный формат запроса
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "404":
+          description: Pending-регистрация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "409":
+          description: Регистрация уже подтверждена
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "410":
+          description: Flow истёк, регистрацию нужно начать заново
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "429":
+          description: Запрос слишком рано или лимит отправок превышен
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Не удалось отправить письмо
           content:
             application/json:
               schema:

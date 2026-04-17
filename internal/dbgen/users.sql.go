@@ -52,6 +52,48 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
+const createVerifiedUser = `-- name: CreateVerifiedUser :one
+insert into users (
+    email,
+    password_hash,
+    name,
+    email_verified_at
+) values (
+    $1,
+    $2,
+    $3,
+    now()
+)
+returning id, coalesce(email, '') as email, name, created_at, updated_at
+`
+
+type CreateVerifiedUserParams struct {
+	Email        pgtype.Text
+	PasswordHash pgtype.Text
+	Name         string
+}
+
+type CreateVerifiedUserRow struct {
+	ID        uuid.UUID
+	Email     string
+	Name      string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) CreateVerifiedUser(ctx context.Context, arg CreateVerifiedUserParams) (CreateVerifiedUserRow, error) {
+	row := q.db.QueryRow(ctx, createVerifiedUser, arg.Email, arg.PasswordHash, arg.Name)
+	var i CreateVerifiedUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const deleteUserByID = `-- name: DeleteUserByID :execrows
 delete from users
 where id = $1

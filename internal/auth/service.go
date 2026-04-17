@@ -54,9 +54,10 @@ type AuthResult struct {
 
 // RegisterInput содержит данные для регистрации по email и паролю.
 type RegisterInput struct {
-	Name     string
-	Email    string
-	Password string
+	Name      string
+	Email     string
+	Password  string
+	IPAddress string
 }
 
 // LoginInput содержит данные для входа по email и паролю.
@@ -90,7 +91,7 @@ type TelegramAuthConfig struct {
 type Service struct {
 	queries               *dbgen.Queries
 	pool                  *pgxpool.Pool
-	emailEnqueuer         PasswordResetEmailEnqueuer
+	emailEnqueuer         AuthEmailEnqueuer
 	logger                zerolog.Logger
 	sessionTTL            time.Duration
 	passwordMinLength     int
@@ -101,7 +102,7 @@ type Service struct {
 }
 
 // NewService создаёт auth-сервис с настройками локальных сессий и OAuth-провайдеров.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, emailEnqueuer PasswordResetEmailEnqueuer, logger zerolog.Logger, cfg config.AuthConfig) *Service {
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, emailEnqueuer AuthEmailEnqueuer, logger zerolog.Logger, cfg config.AuthConfig) *Service {
 	return &Service{
 		queries:               queries,
 		pool:                  pool,
@@ -130,54 +131,6 @@ func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, emailEnqueuer Passwo
 // PasswordMinLength возвращает минимальную длину пароля для transport-валидации.
 func (s *Service) PasswordMinLength() int {
 	return s.passwordMinLength
-}
-
-// Register создаёт пользователя, а затем сразу выдаёт ему первую сессию.
-func (s *Service) Register(ctx context.Context, input RegisterInput, metadata SessionMetadata) (AuthResult, error) {
-	email := normalizeEmail(input.Email)
-	if len(input.Password) < s.passwordMinLength {
-		return AuthResult{}, ErrPasswordTooShort
-	}
-
-	passwordHash, err := HashPassword(input.Password)
-	if err != nil {
-		return AuthResult{}, fmt.Errorf("hash password: %w", err)
-	}
-
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return AuthResult{}, fmt.Errorf("begin auth register tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	txQueries := s.queries.WithTx(tx)
-	user, err := txQueries.CreateUser(ctx, dbgen.CreateUserParams{
-		Email:        pgtype.Text{String: email, Valid: true},
-		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
-		Name:         strings.TrimSpace(input.Name),
-	})
-	if err != nil {
-		if isUniqueViolation(err) {
-			return AuthResult{}, ErrEmailAlreadyExists
-		}
-
-		return AuthResult{}, fmt.Errorf("create user: %w", err)
-	}
-
-	result, err := s.createSessionForUser(ctx, txQueries, User{
-		ID:    user.ID.String(),
-		Name:  strings.TrimSpace(user.Name),
-		Email: user.Email,
-	}, metadata)
-	if err != nil {
-		return AuthResult{}, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return AuthResult{}, fmt.Errorf("commit auth register tx: %w", err)
-	}
-
-	return result, nil
 }
 
 // Login проверяет пароль и создаёт новую сессию.

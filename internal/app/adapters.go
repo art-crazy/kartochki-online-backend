@@ -19,7 +19,7 @@ import (
 
 // Статические проверки соответствия адаптеров своим интерфейсам.
 // Компилятор сообщит об ошибке, если сигнатура метода разойдётся с интерфейсом.
-var _ jobs.SendPasswordResetEmailHandler = authEmailWorker{}
+var _ jobs.SendAuthEmailHandler = authEmailWorker{}
 var _ billing.CheckoutProvider = yookassaCheckoutAdapter{}
 var _ handlers.WebhookSignatureVerifier = (*yookassa.Client)(nil)
 var _ generation.ImageGenerator = routerAIAdapter{}
@@ -98,7 +98,7 @@ func (a yookassaCheckoutAdapter) CreateAddonCheckout(ctx context.Context, input 
 	})
 }
 
-// authEmailWorker адаптирует auth.EmailSender к интерфейсу jobs.SendPasswordResetEmailHandler.
+// authEmailWorker адаптирует auth.EmailSender к worker-контракту auth-писем.
 // Обёртка живёт в app-пакете, чтобы ни auth, ни jobs не зависели друг от друга.
 type authEmailWorker struct {
 	sender      auth.EmailSender
@@ -106,25 +106,25 @@ type authEmailWorker struct {
 	logger      zerolog.Logger
 }
 
-// HandleSendPasswordResetEmail вызывается Asynq worker-ом при обработке задачи отправки письма.
-// При ошибке возвращает её явно: Asynq повторит задачу согласно MaxRetry.
-func (w authEmailWorker) HandleSendPasswordResetEmail(ctx context.Context, payload jobs.SendPasswordResetEmailPayload) error {
+// HandleSendAuthEmail вызывается Asynq worker-ом при обработке auth-письма.
+func (w authEmailWorker) HandleSendAuthEmail(ctx context.Context, payload jobs.SendAuthEmailPayload) error {
 	sendCtx, cancel := context.WithTimeout(ctx, w.sendTimeout)
 	defer cancel()
 
-	if err := w.sender.SendPasswordResetEmail(sendCtx, payload.Email, payload.RawToken); err != nil {
-		w.logger.Error().Err(err).
-			Str("user_id", payload.UserID).
-			Str("email", payload.Email).
-			Msg("worker: не удалось отправить письмо для сброса пароля")
+	var err error
+	switch payload.Kind {
+	case jobs.AuthEmailKindPasswordReset:
+		err = w.sender.SendPasswordResetEmail(sendCtx, payload.Email, payload.RawToken)
+	case jobs.AuthEmailKindRegistrationVerification:
+		err = w.sender.SendRegistrationVerificationEmail(sendCtx, payload.Email, payload.Code, payload.ExpiresIn)
+	default:
+		return fmt.Errorf("unknown auth email kind: %s", payload.Kind)
+	}
+	if err != nil {
+		w.logger.Error().Err(err).Str("user_id", payload.UserID).Str("email", payload.Email).Str("kind", payload.Kind).Msg("worker: не удалось отправить auth-письмо")
 		return err
 	}
-
-	w.logger.Info().
-		Str("user_id", payload.UserID).
-		Str("email", payload.Email).
-		Msg("worker: письмо для сброса пароля отправлено")
-
+	w.logger.Info().Str("user_id", payload.UserID).Str("email", payload.Email).Str("kind", payload.Kind).Msg("worker: auth-письмо отправлено")
 	return nil
 }
 

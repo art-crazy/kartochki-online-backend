@@ -10,6 +10,20 @@ insert into users (
 )
 returning id, coalesce(email, '') as email, name, created_at, updated_at;
 
+-- name: CreateVerifiedUser :one
+insert into users (
+    email,
+    password_hash,
+    name,
+    email_verified_at
+) values (
+    $1,
+    $2,
+    $3,
+    now()
+)
+returning id, coalesce(email, '') as email, name, created_at, updated_at;
+
 -- name: GetLoginUserByEmail :one
 select
     id,

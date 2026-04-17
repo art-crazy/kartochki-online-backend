@@ -3,6 +3,7 @@ package email
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -31,6 +32,16 @@ func (s *NoopSender) SendPasswordResetEmail(_ context.Context, toEmail string, t
 		Str("to", toEmail).
 		Str("reset_token", token).
 		Msg("noop email sender: password reset email (not sent)")
+	return nil
+}
+
+// SendRegistrationVerificationEmail логирует код подтверждения регистрации вместо реальной отправки.
+func (s *NoopSender) SendRegistrationVerificationEmail(_ context.Context, toEmail string, code string, expiresIn time.Duration) error {
+	s.logger.Info().
+		Str("to", toEmail).
+		Str("verification_code", code).
+		Dur("expires_in", expiresIn).
+		Msg("noop email sender: registration verification email (not sent)")
 	return nil
 }
 

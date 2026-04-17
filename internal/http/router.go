@@ -71,6 +71,8 @@ func NewRouter(
 			authRouter.Use(authRateLimiter.Middleware())
 
 			authRouter.Post("/register", authHandler.Register)
+			authRouter.Post("/register/verify", authHandler.VerifyRegister)
+			authRouter.Post("/register/resend", authHandler.ResendRegisterCode)
 			authRouter.Post("/login", authHandler.Login)
 			authRouter.Post("/telegram/login", authHandler.TelegramLogin)
 			authRouter.With(authMiddleware.RequireUser).Post("/logout", authHandler.Logout)
