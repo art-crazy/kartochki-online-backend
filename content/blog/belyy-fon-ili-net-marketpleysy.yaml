@@ -1,0 +1,45 @@
+slug: belyy-fon-ili-net-marketpleysy
+title: "Белый фон или нет: что лучше работает на маркетплейсах в 2025"
+excerpt: Когда белый фон обязателен, а когда lifestyle-съемка выигрывает по конверсии.
+seo_title: Белый фон для карточек товаров
+seo_description: Сравниваем белый фон и lifestyle-съемку для карточек товара на маркетплейсах.
+status: published
+published_at: 2025-03-14T09:00:00Z
+categories:
+  - slug: photos
+    label: Фото и дизайн
+  - slug: conversion
+    label: Конверсия
+tags:
+  - slug: white-background
+    label: Белый фон
+  - slug: lifestyle
+    label: Lifestyle
+  - slug: conversion
+    label: Конверсия
+metrics:
+  views_count: 1960
+  reading_time_minutes: 8
+sections:
+  - kind: text
+    title: Где белый фон обязателен
+    level: 2
+    payload:
+      body: |
+        Для главного фото на Ozon и Яндекс Маркете белый фон остается базовым стандартом.
+        На Wildberries он не обязателен, но все равно часто упрощает восприятие товара в выдаче.
+  - kind: list
+    title: Когда lifestyle полезен
+    level: 2
+    payload:
+      items:
+        - Для дополнительных фото.
+        - Для одежды, декора и товаров с эмоциональной подачей.
+        - Для демонстрации масштаба и сценария использования.
+  - kind: callout
+    title: Практика
+    level: 2
+    payload:
+      tone: info
+      title: Лучший компромисс
+      text: Главное фото держите нейтральным, а сюжет и атмосферу переносите в дополнительные слайды.

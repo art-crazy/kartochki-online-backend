@@ -1,0 +1,41 @@
+slug: kak-snyat-tovar-na-telefon-dlya-ozon
+title: "Как снять товар на телефон для Ozon: пошаговая инструкция"
+excerpt: Практический чеклист по свету, ракурсам и подготовке фото без отдельного фотографа.
+seo_title: Как снять товар на телефон для Ozon
+seo_description: Пошаговая инструкция по съемке товара на смартфон для карточки Ozon.
+status: published
+published_at: 2025-02-20T09:00:00Z
+categories:
+  - slug: ozon
+    label: Ozon
+  - slug: photos
+    label: Фото и дизайн
+tags:
+  - slug: ozon
+    label: Ozon
+  - slug: smartphone-shooting
+    label: Съемка на телефон
+  - slug: photos
+    label: Фото
+metrics:
+  views_count: 1730
+  reading_time_minutes: 5
+sections:
+  - kind: steps
+    title: Подготовка к съемке
+    level: 2
+    payload:
+      steps:
+        - title: Поставьте мягкий свет
+          description: Свет из окна или через рассеиватель почти всегда лучше жесткой лампы сверху.
+        - title: Снимайте на чистом фоне
+          description: Так проще потом быстро удалить фон и сделать главную карточку под Ozon.
+        - title: Снимите несколько ракурсов
+          description: Нужны фронтальный кадр, 3/4, детали и масштаб.
+  - kind: callout
+    title: Совет
+    level: 2
+    payload:
+      tone: tip
+      title: Не зумьте камерой
+      text: Лучше подойти ближе и оставить исходное качество, чем использовать цифровой зум и терять детализацию.

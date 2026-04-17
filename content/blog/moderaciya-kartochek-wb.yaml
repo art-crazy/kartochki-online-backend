@@ -1,0 +1,39 @@
+slug: moderaciya-kartochek-wb
+title: "Модерация карточек WB: почему отклоняют и как пройти с первого раза"
+excerpt: Короткий чеклист по причинам отклонения карточек и безопасной подготовке материалов.
+seo_title: Модерация карточек Wildberries
+seo_description: Почему карточки на Wildberries отклоняют и как пройти модерацию без повторных загрузок.
+status: published
+published_at: 2025-02-12T09:00:00Z
+categories:
+  - slug: wildberries
+    label: Wildberries
+  - slug: marketplace-guides
+    label: Маркетплейсы
+tags:
+  - slug: wildberries
+    label: Wildberries
+  - slug: moderation
+    label: Модерация
+  - slug: checklist
+    label: Чеклист
+metrics:
+  views_count: 1620
+  reading_time_minutes: 6
+sections:
+  - kind: list
+    title: Из-за чего чаще всего отклоняют
+    level: 2
+    payload:
+      items:
+        - Неправильное соотношение сторон.
+        - Плохое качество фото.
+        - Лишние надписи и перегруженное главное фото.
+        - Несоответствие изображения товару.
+  - kind: callout
+    title: Лучший подход
+    level: 2
+    payload:
+      tone: info
+      title: Проверка перед загрузкой
+      text: Держите отдельный внутренний чеклист перед публикацией. Это дешевле, чем повторная модерация и потерянный трафик.

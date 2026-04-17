@@ -1,0 +1,47 @@
+slug: razmery-kartochek-wildberries-2025
+title: "Размеры карточек Wildberries 2025: таблица для всех категорий"
+excerpt: Актуальные размеры и параметры изображений для карточек Wildberries без гаданий и ошибок.
+seo_title: Размеры карточек Wildberries 2025
+seo_description: Таблица размеров и параметров изображений для карточек Wildberries в 2025 году.
+status: published
+published_at: 2025-03-21T09:00:00Z
+categories:
+  - slug: wildberries
+    label: Wildberries
+  - slug: marketplace-guides
+    label: Маркетплейсы
+tags:
+  - slug: wildberries
+    label: Wildberries
+  - slug: sizes
+    label: Размеры
+  - slug: photo-requirements
+    label: Требования к фото
+metrics:
+  views_count: 2540
+  reading_time_minutes: 5
+sections:
+  - kind: text
+    title: Базовое правило
+    level: 2
+    payload:
+      body: |
+        Для Wildberries самым безопасным остается вертикальный формат 2:3.
+        Ошибка в пропорции чаще бьет по качеству карточки сильнее, чем небольшой недобор по пикселям.
+  - kind: table
+    title: Таблица размеров
+    level: 2
+    payload:
+      head: ["Параметр", "Минимум", "Рекомендуется"]
+      rows:
+        - ["Ширина", "900 px", "1000 px"]
+        - ["Высота", "1200 px", "1500 px"]
+        - ["Соотношение сторон", "2:3", "2:3"]
+        - ["Вес файла", "до 8 МБ", "до 3 МБ"]
+  - kind: callout
+    title: Важно
+    level: 2
+    payload:
+      tone: warn
+      title: Не растягивайте квадрат
+      text: Квадратное изображение, растянутое под 2:3, чаще выглядит хуже, чем аккуратно пересобранная отдельная версия.

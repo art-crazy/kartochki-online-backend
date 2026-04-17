@@ -1,0 +1,45 @@
+slug: seo-kartochki-wb-bez-reklamy
+title: "SEO-оптимизация карточки WB: как попасть в топ без рекламы"
+excerpt: Ключевые слова, структура контента и сигналы карточки, которые влияют на поиск Wildberries.
+seo_title: SEO карточки Wildberries
+seo_description: Как оптимизировать карточку Wildberries под поиск и не слить релевантность.
+status: published
+published_at: 2025-02-28T09:00:00Z
+categories:
+  - slug: seo
+    label: SEO карточки
+  - slug: wildberries
+    label: Wildberries
+tags:
+  - slug: seo
+    label: SEO
+  - slug: wildberries
+    label: Wildberries
+  - slug: keywords
+    label: Ключевые слова
+metrics:
+  views_count: 1890
+  reading_time_minutes: 9
+sections:
+  - kind: text
+    title: Что влияет на поиск
+    level: 2
+    payload:
+      body: |
+        Для поиска важны не только слова в названии. На выдачу влияет связка из релевантности, поведения пользователей и качества карточки.
+  - kind: list
+    title: Минимальный SEO-чеклист
+    level: 2
+    payload:
+      items:
+        - Главное ключевое слово в начале названия.
+        - Характеристики заполнены без пустых полей.
+        - Фото и инфографика совпадают с интентом запроса.
+        - Описание отвечает на частые вопросы покупателя.
+  - kind: callout
+    title: Не делайте так
+    level: 2
+    payload:
+      tone: warn
+      title: Спам ключами
+      text: Переспам в названии и описании не помогает. Чаще он ухудшает читаемость и бьет по конверсии.

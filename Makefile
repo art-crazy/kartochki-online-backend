@@ -34,6 +34,10 @@ tidy:
 build:
 	go build ./...
 
+.PHONY: blog-sync
+blog-sync:
+	go run ./cmd/blogsync
+
 .PHONY: check-file-lines
 check-file-lines:
 	go run ./tools/check-file-lines

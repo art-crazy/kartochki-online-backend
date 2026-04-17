@@ -1,0 +1,65 @@
+slug: infografika-dlya-ozon-conversion
+title: Как сделать инфографику для Ozon, которая увеличивает конверсию
+excerpt: Разбираем структуру инфографики, приоритеты смысла и типовые ошибки на карточке товара.
+seo_title: Инфографика для Ozon
+seo_description: Практический разбор инфографики для Ozon с примерами блоков и ошибок.
+status: published
+published_at: 2025-03-28T09:00:00Z
+categories:
+  - slug: infographics
+    label: Инфографика
+  - slug: ozon
+    label: Ozon
+tags:
+  - slug: ozon
+    label: Ozon
+  - slug: infographics
+    label: Инфографика
+  - slug: conversion
+    label: Конверсия
+metrics:
+  views_count: 3110
+  reading_time_minutes: 7
+sections:
+  - kind: text
+    title: Зачем Ozon-инфографике структура
+    level: 2
+    payload:
+      body: |
+        На карточке покупатель считывает только несколько сообщений.
+        Поэтому лучший результат дают не красивые элементы сами по себе, а четкий порядок: главное преимущество, подтверждение, детали.
+  - kind: list
+    title: Что показать на первых экранах
+    level: 2
+    payload:
+      items:
+        - Главное преимущество товара.
+        - Размер, комплект или объем.
+        - Сценарий использования.
+        - Один сильный аргумент доверия.
+  - kind: callout
+    title: Ошибка
+    level: 2
+    payload:
+      tone: warn
+      title: Слишком много текста
+      text: Если текст занимает половину карточки, пользователь перестает различать главное и просто пролистывает товар.
+  - kind: cards
+    title: Рабочая структура
+    level: 2
+    payload:
+      cards:
+        - title: Экран 1
+          tone: accent
+          meta:
+            - label: Цель
+              value: Зацепить вниманием
+            - label: Что показать
+              value: 1 главный оффер
+        - title: Экран 2
+          tone: neutral
+          meta:
+            - label: Цель
+              value: Уточнить выгоду
+            - label: Что показать
+              value: Размеры, материал, комплектация

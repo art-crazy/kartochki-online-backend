@@ -1,0 +1,50 @@
+slug: rich-content-ozon-zachem-nuzhen
+title: "Rich-контент на Ozon: что это и зачем он нужен каждому продавцу"
+excerpt: Объясняем, когда rich-контент действительно помогает и какие блоки дают реальную пользу.
+seo_title: Rich-контент на Ozon
+seo_description: Что такое rich-контент на Ozon, где он помогает и как его внедрять без лишней сложности.
+status: published
+published_at: 2025-01-28T09:00:00Z
+categories:
+  - slug: ozon
+    label: Ozon
+  - slug: infographics
+    label: Инфографика
+tags:
+  - slug: ozon
+    label: Ozon
+  - slug: rich-content
+    label: Rich-контент
+  - slug: infographics
+    label: Инфографика
+metrics:
+  views_count: 1480
+  reading_time_minutes: 8
+sections:
+  - kind: text
+    title: Когда rich-контент оправдан
+    level: 2
+    payload:
+      body: |
+        Rich-контент полезен там, где товар сложно объяснить одним набором фото.
+        Он особенно хорошо работает для сложных категорий, где покупателю нужна логика выбора, а не только картинка.
+  - kind: cards
+    title: Что можно показать
+    level: 2
+    payload:
+      cards:
+        - title: Сравнение моделей
+          tone: accent
+          meta:
+            - label: Когда полезно
+              value: Если есть линейка товаров
+        - title: Сценарий использования
+          tone: neutral
+          meta:
+            - label: Когда полезно
+              value: Если продукт требует объяснения
+        - title: Разбор комплектации
+          tone: neutral
+          meta:
+            - label: Когда полезно
+              value: Если много элементов в наборе
