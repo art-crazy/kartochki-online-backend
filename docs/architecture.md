@@ -537,6 +537,13 @@ Rules:
 - group config by subsystem
 - parse values into typed config structs at startup
 
+For shared auth cookies:
+
+- `AUTH_COOKIE_DOMAIN` is the source of truth for the `Domain` attribute of `auth_token`
+- the HTTP layer must receive this value from config via `internal/app`, not hardcode production domains in handlers
+- the value must be a plain hostname without scheme, path, or port
+- for local development on `localhost` or IP addresses, the backend should omit `Domain` and use a host-only cookie
+
 The current skeleton already follows this direction.
 
 ## What Not To Do Early

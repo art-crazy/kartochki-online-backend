@@ -144,7 +144,7 @@ paths:
               description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
               schema:
                 type: string
-                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
+                example: auth_token=<token>; Domain=kartochki-online.ru; Path=/; HttpOnly; Secure; SameSite=Lax
           content:
             application/json:
               schema:
@@ -272,7 +272,7 @@ paths:
               description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
               schema:
                 type: string
-                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
+                example: auth_token=<token>; Domain=kartochki-online.ru; Path=/; HttpOnly; Secure; SameSite=Lax
           content:
             application/json:
               schema:
@@ -328,7 +328,7 @@ paths:
               description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
               schema:
                 type: string
-                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
+                example: auth_token=<token>; Domain=kartochki-online.ru; Path=/; HttpOnly; Secure; SameSite=Lax
           content:
             application/json:
               schema:
@@ -399,7 +399,7 @@ paths:
               description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
               schema:
                 type: string
-                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
+                example: auth_token=<token>; Domain=kartochki-online.ru; Path=/; HttpOnly; Secure; SameSite=Lax
           content:
             application/json:
               schema:
@@ -448,7 +448,7 @@ paths:
               description: Сбрасывает куку auth_token (Max-Age=0).
               schema:
                 type: string
-                example: auth_token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0
+                example: auth_token=; Domain=kartochki-online.ru; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0
           content:
             application/json:
               schema:
@@ -607,7 +607,7 @@ paths:
               description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
               schema:
                 type: string
-                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
+                example: auth_token=<token>; Domain=kartochki-online.ru; Path=/; HttpOnly; Secure; SameSite=Lax
           content:
             application/json:
               schema:
@@ -671,7 +671,7 @@ paths:
               description: Устанавливает HttpOnly-куку auth_token с токеном сессии.
               schema:
                 type: string
-                example: auth_token=<token>; HttpOnly; SameSite=Lax; Path=/
+                example: auth_token=<token>; Domain=kartochki-online.ru; Path=/; HttpOnly; Secure; SameSite=Lax
           content:
             application/json:
               schema:

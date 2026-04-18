@@ -16,16 +16,15 @@ import (
 
 // AuthHandler обслуживает публичные auth-сценарии и маршруты текущего пользователя.
 type AuthHandler struct {
-	authService  *auth.Service
-	secureCookie bool // true в production: кука отправляется только по HTTPS
+	authService      *auth.Service
+	authCookieDomain string
 }
 
 // NewAuthHandler создаёт обработчик auth endpoint.
-// secureCookie должен быть true в production-окружении.
-func NewAuthHandler(authService *auth.Service, secureCookie bool) AuthHandler {
+func NewAuthHandler(authService *auth.Service, authCookieDomain string) AuthHandler {
 	return AuthHandler{
-		authService:  authService,
-		secureCookie: secureCookie,
+		authService:      authService,
+		authCookieDomain: authCookieDomain,
 	}
 }
 
@@ -109,7 +108,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.authCookieDomain)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -149,7 +148,7 @@ func (h AuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.authCookieDomain)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -171,7 +170,7 @@ func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clearAuthCookie(w, h.secureCookie)
+	clearAuthCookie(w, h.authCookieDomain)
 	response.WriteJSON(w, r, http.StatusOK, openapi.StatusResponse{Status: openapi.StatusResponseStatusLoggedOut})
 }
 
@@ -265,7 +264,7 @@ func (h AuthHandler) VKWidget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.authCookieDomain)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -296,7 +295,7 @@ func (h AuthHandler) VKOAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.authCookieDomain)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 
@@ -322,7 +321,7 @@ func (h AuthHandler) YandexWidget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.secureCookie)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.authCookieDomain)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 

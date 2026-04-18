@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -57,15 +58,26 @@ type YooKassaConfig struct {
 
 // AppConfig хранит общие параметры приложения.
 type AppConfig struct {
-	Name        string
-	Env         string
-	FrontendURL string
+	Name         string
+	Env          string
+	FrontendURL  string
+	CookieDomain string
 }
 
 // IsProduction возвращает true, если приложение запущено в production-окружении.
 // Используется для включения флагов безопасности, например Secure на куках.
 func (c AppConfig) IsProduction() bool {
 	return c.Env == "production"
+}
+
+// AuthCookieDomain возвращает домен, на который нужно ставить auth cookie.
+// Для localhost и IP возвращаем пустую строку, чтобы браузер создал host-only cookie.
+func (c AppConfig) AuthCookieDomain() string {
+	domain := normalizeCookieDomain(c.CookieDomain)
+	if isLocalCookieHost(domain) {
+		return ""
+	}
+	return domain
 }
 
 // EmailConfig хранит настройки SMTP-отправителя писем.
@@ -243,9 +255,10 @@ func loadFromEnv() (Config, error) {
 
 	cfg := Config{
 		App: AppConfig{
-			Name:        getEnv("APP_NAME", "kartochki-online-backend"),
-			Env:         getEnv("APP_ENV", "local"),
-			FrontendURL: getEnv("FRONTEND_URL", "http://localhost:3000"),
+			Name:         getEnv("APP_NAME", "kartochki-online-backend"),
+			Env:          getEnv("APP_ENV", "local"),
+			FrontendURL:  getEnv("FRONTEND_URL", "http://localhost:3000"),
+			CookieDomain: normalizeCookieDomain(getEnv("AUTH_COOKIE_DOMAIN", deriveCookieDomain(getEnv("FRONTEND_URL", "http://localhost:3000")))),
 		},
 		HTTP: HTTPConfig{
 			Host:               getEnv("HTTP_HOST", "0.0.0.0"),
@@ -419,6 +432,14 @@ func validate(cfg Config) error {
 		return fmt.Errorf("FRONTEND_URL must be an https origin in production")
 	}
 
+	if cfg.App.IsProduction() && cfg.App.AuthCookieDomain() == "" {
+		return fmt.Errorf("AUTH_COOKIE_DOMAIN must not be empty in production")
+	}
+
+	if rawCookieDomain := normalizeCookieDomain(cfg.App.CookieDomain); rawCookieDomain != "" && !isLocalCookieHost(rawCookieDomain) && !isCookieDomain(rawCookieDomain) {
+		return fmt.Errorf("AUTH_COOKIE_DOMAIN must be a plain hostname without scheme, path, or port")
+	}
+
 	if cfg.Postgres.DSN == "" {
 		return fmt.Errorf("POSTGRES_DSN must not be empty")
 	}
@@ -519,4 +540,41 @@ func isHTTPSOrigin(value string) bool {
 	}
 
 	return parsed.Scheme == "https" && parsed.Host != "" && parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""
+}
+
+func deriveCookieDomain(frontendURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(frontendURL))
+	if err != nil {
+		return ""
+	}
+
+	return normalizeCookieDomain(parsed.Hostname())
+}
+
+func normalizeCookieDomain(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, ".")
+	value = strings.TrimSuffix(value, ".")
+	return strings.ToLower(value)
+}
+
+func isCookieDomain(value string) bool {
+	if value == "" {
+		return false
+	}
+
+	if strings.Contains(value, "/") || strings.Contains(value, ":") || strings.Contains(value, "://") {
+		return false
+	}
+
+	return value == strings.TrimSpace(value)
+}
+
+func isLocalCookieHost(value string) bool {
+	if value == "" || value == "localhost" {
+		return true
+	}
+
+	parsedIP := net.ParseIP(value)
+	return parsedIP != nil
 }

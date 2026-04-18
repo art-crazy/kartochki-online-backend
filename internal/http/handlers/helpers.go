@@ -61,35 +61,44 @@ func isValidEmail(value string) bool {
 
 // setAuthCookie устанавливает HttpOnly-куку с токеном сессии.
 // expiresAt задаёт срок действия куки — браузер удалит её после этого времени.
-// secure должен быть true в production — без этого браузер отправит куку по HTTP.
-func setAuthCookie(w http.ResponseWriter, token string, expiresAt time.Time, secure bool) {
+// Domain указываем на корневой домен, чтобы auth_token был доступен на всех поддоменах сайта.
+func setAuthCookie(w http.ResponseWriter, token string, expiresAt time.Time, domain string) {
 	maxAge := int(time.Until(expiresAt).Seconds())
 	if maxAge <= 0 {
 		maxAge = 0
 	}
-	http.SetCookie(w, &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   secure,
+		Secure:   true,
 		MaxAge:   maxAge,
-	})
+	}
+	if domain != "" {
+		cookie.Domain = domain
+	}
+	http.SetCookie(w, cookie)
 }
 
 // clearAuthCookie сбрасывает куку auth_token при logout.
 // Max-Age=0 — стандартный способ удаления куки по RFC 6265.
-func clearAuthCookie(w http.ResponseWriter, secure bool) {
-	http.SetCookie(w, &http.Cookie{
+// При удалении повторяем тот же Domain, иначе браузер не удалит установленную cookie.
+func clearAuthCookie(w http.ResponseWriter, domain string) {
+	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   secure,
+		Secure:   true,
 		MaxAge:   0,
-	})
+	}
+	if domain != "" {
+		cookie.Domain = domain
+	}
+	http.SetCookie(w, cookie)
 }
 
 // decodeJSON десериализует JSON-тело запроса в dst.
