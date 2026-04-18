@@ -73,7 +73,11 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		emailSender = email.NewNoopSender(logger)
 	}
 	authService := auth.NewService(db.Pool, queries, asynqClient, logger, cfg.Auth)
-	authHandler := handlers.NewAuthHandler(authService, cfg.App.AuthCookieDomain())
+	authCookieConfig := cfg.App.AuthCookieConfig()
+	authHandler := handlers.NewAuthHandler(authService, handlers.CookieConfig{
+		Domain: authCookieConfig.Domain,
+		Secure: authCookieConfig.Secure,
+	})
 
 	projectService := projects.NewService(queries, storageClient)
 	blogService := blog.NewService(queries)

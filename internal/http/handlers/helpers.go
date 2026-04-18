@@ -16,6 +16,12 @@ import (
 	"kartochki-online-backend/internal/http/response"
 )
 
+// CookieConfig описывает, как HTTP-слой должен выставлять auth cookie.
+type CookieConfig struct {
+	Domain string
+	Secure bool
+}
+
 // strPtr возвращает указатель на строку — нужен для заполнения openapi.ErrorDetail.Field,
 // которое является *string из-за omitempty в OpenAPI-схеме.
 func strPtr(s string) *string {
@@ -61,8 +67,9 @@ func isValidEmail(value string) bool {
 
 // setAuthCookie устанавливает HttpOnly-куку с токеном сессии.
 // expiresAt задаёт срок действия куки — браузер удалит её после этого времени.
-// Domain указываем на корневой домен, чтобы auth_token был доступен на всех поддоменах сайта.
-func setAuthCookie(w http.ResponseWriter, token string, expiresAt time.Time, domain string) {
+// Domain нужен для общей авторизации между поддоменами, а Secure включаем только там, где cookie реально
+// может вернуться обратно по HTTPS.
+func setAuthCookie(w http.ResponseWriter, token string, expiresAt time.Time, cfg CookieConfig) {
 	maxAge := int(time.Until(expiresAt).Seconds())
 	if maxAge <= 0 {
 		maxAge = 0
@@ -73,11 +80,11 @@ func setAuthCookie(w http.ResponseWriter, token string, expiresAt time.Time, dom
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   true,
+		Secure:   cfg.Secure,
 		MaxAge:   maxAge,
 	}
-	if domain != "" {
-		cookie.Domain = domain
+	if cfg.Domain != "" {
+		cookie.Domain = cfg.Domain
 	}
 	http.SetCookie(w, cookie)
 }
@@ -85,18 +92,18 @@ func setAuthCookie(w http.ResponseWriter, token string, expiresAt time.Time, dom
 // clearAuthCookie сбрасывает куку auth_token при logout.
 // Max-Age=0 — стандартный способ удаления куки по RFC 6265.
 // При удалении повторяем тот же Domain, иначе браузер не удалит установленную cookie.
-func clearAuthCookie(w http.ResponseWriter, domain string) {
+func clearAuthCookie(w http.ResponseWriter, cfg CookieConfig) {
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   true,
+		Secure:   cfg.Secure,
 		MaxAge:   0,
 	}
-	if domain != "" {
-		cookie.Domain = domain
+	if cfg.Domain != "" {
+		cookie.Domain = cfg.Domain
 	}
 	http.SetCookie(w, cookie)
 }

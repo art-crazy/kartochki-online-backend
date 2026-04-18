@@ -35,7 +35,7 @@ func (h AuthHandler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.authCookieDomain)
+	setAuthCookie(w, result.Session.AccessToken, result.Session.ExpiresAt, h.authCookieConfig)
 	response.WriteJSON(w, r, http.StatusOK, toAuthResponse(result))
 }
 

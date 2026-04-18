@@ -64,6 +64,12 @@ type AppConfig struct {
 	CookieDomain string
 }
 
+// AuthCookieConfig описывает, как backend должен выставлять auth cookie.
+type AuthCookieConfig struct {
+	Domain string
+	Secure bool
+}
+
 // IsProduction возвращает true, если приложение запущено в production-окружении.
 // Используется для включения флагов безопасности, например Secure на куках.
 func (c AppConfig) IsProduction() bool {
@@ -78,6 +84,15 @@ func (c AppConfig) AuthCookieDomain() string {
 		return ""
 	}
 	return domain
+}
+
+// AuthCookieConfig возвращает итоговые параметры auth cookie для HTTP-слоя.
+// В local по http нельзя принудительно включать Secure, иначе браузер не пришлёт cookie обратно.
+func (c AppConfig) AuthCookieConfig() AuthCookieConfig {
+	return AuthCookieConfig{
+		Domain: c.AuthCookieDomain(),
+		Secure: isHTTPSURL(c.FrontendURL),
+	}
 }
 
 // EmailConfig хранит настройки SMTP-отправителя писем.
@@ -540,6 +555,15 @@ func isHTTPSOrigin(value string) bool {
 	}
 
 	return parsed.Scheme == "https" && parsed.Host != "" && parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""
+}
+
+func isHTTPSURL(value string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return false
+	}
+
+	return parsed.Scheme == "https"
 }
 
 func deriveCookieDomain(frontendURL string) string {

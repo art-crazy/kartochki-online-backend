@@ -543,6 +543,7 @@ For shared auth cookies:
 - the HTTP layer must receive this value from config via `internal/app`, not hardcode production domains in handlers
 - the value must be a plain hostname without scheme, path, or port
 - for local development on `localhost` or IP addresses, the backend should omit `Domain` and use a host-only cookie
+- `Secure` should also come from config-derived runtime rules: enable it for HTTPS environments, but do not force it for local HTTP development
 
 The current skeleton already follows this direction.
 
