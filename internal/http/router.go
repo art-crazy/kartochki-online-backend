@@ -108,6 +108,7 @@ func NewRouter(
 
 			protected.Get("/settings", settingsHandler.Get)
 			protected.Patch("/settings/profile", settingsHandler.PatchProfile)
+			protected.Post("/settings/avatar", settingsHandler.UploadAvatar)
 			protected.Patch("/settings/defaults", settingsHandler.PatchDefaults)
 			protected.Post("/settings/change-password", settingsHandler.ChangePassword)
 			protected.Patch("/settings/notifications", settingsHandler.PatchNotifications)

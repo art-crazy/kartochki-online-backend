@@ -116,6 +116,73 @@ paths:
               schema:
                 $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
 
+  /api/v1/settings/avatar:
+    post:
+      summary: Загрузить аватарку пользователя
+      description: Принимает один файл изображения и переключает профиль на кастомный аватар.
+      operationId: uploadSettingsAvatar
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Аватарка успешно загружена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/settings.yaml#/schemas/SettingsAvatarResponse"
+        "400":
+          description: Файл отсутствует или тип изображения не поддерживается
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при загрузке аватарки
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
   /api/v1/settings/defaults:
     patch:
       summary: Обновить дефолтные настройки генерации

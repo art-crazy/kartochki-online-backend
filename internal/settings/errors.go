@@ -23,4 +23,8 @@ var (
 	ErrCannotRevokeCurrentSession = errors.New("settings current session cannot be revoked")
 	// ErrInvalidConfirmWord возвращается, когда удаление аккаунта подтверждено неверным словом.
 	ErrInvalidConfirmWord = errors.New("settings confirm word is invalid")
+	// ErrAvatarRequired возвращается, когда файл аватара не был передан в запросе.
+	ErrAvatarRequired = errors.New("settings avatar is required")
+	// ErrAvatarTypeNotSupported возвращается, когда тип загруженного файла не поддерживается.
+	ErrAvatarTypeNotSupported = errors.New("settings avatar type is not supported")
 )

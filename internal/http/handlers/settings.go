@@ -24,6 +24,7 @@ type settingsService interface {
 	PasswordMinLength() int
 	Get(ctx context.Context, userID string, currentAccessToken string) (settings.Settings, error)
 	UpdateProfile(ctx context.Context, userID string, input settings.UpdateProfileInput) (settings.Profile, error)
+	UploadAvatar(ctx context.Context, userID string, image settings.UploadedAvatar) (settings.UploadedAvatarResult, error)
 	UpdateDefaults(ctx context.Context, userID string, input settings.UpdateDefaultsInput) (settings.Defaults, error)
 	UpdateNotifications(ctx context.Context, userID string, items []settings.NotificationItem) ([]settings.NotificationItem, error)
 	ChangePassword(ctx context.Context, userID string, currentAccessToken string, currentPassword string, newPassword string) error

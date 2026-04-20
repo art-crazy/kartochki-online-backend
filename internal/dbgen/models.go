@@ -316,4 +316,6 @@ type UserSetting struct {
 	ImageFormat        string
 	CreatedAt          pgtype.Timestamptz
 	UpdatedAt          pgtype.Timestamptz
+	// Пользовательский аватар, загруженный через страницу настроек.
+	AvatarAssetID pgtype.UUID
 }

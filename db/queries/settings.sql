@@ -3,6 +3,7 @@ select
     user_id,
     phone,
     company,
+    avatar_asset_id,
     default_marketplace,
     cards_per_generation,
     image_format,
@@ -17,6 +18,7 @@ insert into user_settings (
     user_id,
     phone,
     company,
+    avatar_asset_id,
     default_marketplace,
     cards_per_generation,
     image_format
@@ -26,16 +28,45 @@ insert into user_settings (
     $3,
     $4,
     $5,
-    $6
+    $6,
+    $7
 )
 on conflict (user_id) do update
 set phone = excluded.phone,
     company = excluded.company,
+    avatar_asset_id = excluded.avatar_asset_id,
     default_marketplace = excluded.default_marketplace,
     cards_per_generation = excluded.cards_per_generation,
     image_format = excluded.image_format,
     updated_at = now()
-returning user_id, phone, company, default_marketplace, cards_per_generation, image_format, created_at, updated_at;
+returning user_id, phone, company, avatar_asset_id, default_marketplace, cards_per_generation, image_format, created_at, updated_at;
+
+-- name: SetUserAvatarAssetID :exec
+insert into user_settings (
+    user_id,
+    avatar_asset_id
+) values (
+    $1,
+    $2
+)
+on conflict (user_id) do update
+set avatar_asset_id = excluded.avatar_asset_id,
+    updated_at = now();
+
+-- name: GetUserAvatarAssetByUserID :one
+select
+    a.id,
+    a.user_id,
+    a.kind,
+    a.storage_key,
+    a.original_filename,
+    a.mime_type,
+    a.size_bytes,
+    a.created_at
+from user_settings us
+join assets a on a.id = us.avatar_asset_id
+where us.user_id = $1
+limit 1;
 
 -- name: ListNotificationPreferencesByUserID :many
 select

@@ -619,6 +619,11 @@ type SettingsAPIKey struct {
 	MaskedValue *string `json:"masked_value,omitempty"`
 }
 
+// SettingsAvatarResponse defines model for SettingsAvatarResponse.
+type SettingsAvatarResponse struct {
+	AvatarUrl string `json:"avatar_url"`
+}
+
 // SettingsDefaults defines model for SettingsDefaults.
 type SettingsDefaults struct {
 	CardsPerGeneration int                    `json:"cards_per_generation"`
@@ -812,6 +817,11 @@ type ListPublicBlogPostsParams struct {
 	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// UploadSettingsAvatarMultipartBody defines parameters for UploadSettingsAvatar.
+type UploadSettingsAvatarMultipartBody struct {
+	File openapi_types.File `json:"file"`
+}
+
 // UploadGenerationImageMultipartBody defines parameters for UploadGenerationImage.
 type UploadGenerationImageMultipartBody struct {
 	File openapi_types.File `json:"file"`
@@ -867,6 +877,9 @@ type PatchProjectJSONRequestBody = PatchProjectRequest
 
 // DeleteSettingsAccountJSONRequestBody defines body for DeleteSettingsAccount for application/json ContentType.
 type DeleteSettingsAccountJSONRequestBody = DeleteAccountRequest
+
+// UploadSettingsAvatarMultipartRequestBody defines body for UploadSettingsAvatar for multipart/form-data ContentType.
+type UploadSettingsAvatarMultipartRequestBody UploadSettingsAvatarMultipartBody
 
 // ChangeSettingsPasswordJSONRequestBody defines body for ChangeSettingsPassword for application/json ContentType.
 type ChangeSettingsPasswordJSONRequestBody = ChangePasswordRequest

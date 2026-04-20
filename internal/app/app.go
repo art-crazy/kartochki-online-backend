@@ -64,6 +64,12 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	)
 	healthHandler := handlers.NewHealthHandler(readiness, logger)
 	queries := dbgen.New(db.Pool)
+	if err := settings.EnsureSchema(context.Background(), db.Pool); err != nil {
+		db.Close()
+		_ = redisClient.Close()
+		_ = asynqClient.Close()
+		return nil, fmt.Errorf("init settings schema: %w", err)
+	}
 	// Если SMTP_HOST задан — используем реальный отправитель.
 	// Иначе NoopSender: токен выводится в лог для локальной разработки.
 	var emailSender auth.EmailSender
@@ -72,7 +78,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	} else {
 		emailSender = email.NewNoopSender(logger)
 	}
-	authService := auth.NewService(db.Pool, queries, asynqClient, logger, cfg.Auth)
+	authService := auth.NewService(db.Pool, queries, storageClient, asynqClient, logger, cfg.Auth)
 	authCookieConfig := cfg.App.AuthCookieConfig()
 	authHandler := handlers.NewAuthHandler(authService, handlers.CookieConfig{
 		Domain: authCookieConfig.Domain,
@@ -112,7 +118,7 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 		generationBillingLimits{billing: billingService},
 		imageGen,
 	)
-	settingsService := settings.NewService(db.Pool, queries, asynqClient, authService.PasswordMinLength())
+	settingsService := settings.NewService(db.Pool, queries, asynqClient, storageClient, authService.PasswordMinLength())
 	dashboardHandler := handlers.NewDashboardHandler(projectService, logger)
 	blogHandler := handlers.NewBlogHandler(blogService, logger)
 	projectsHandler := handlers.NewProjectsHandler(projectService, logger)

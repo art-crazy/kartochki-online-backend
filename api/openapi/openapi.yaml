@@ -1433,6 +1433,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/settings/avatar:
+    post:
+      summary: Загрузить аватарку пользователя
+      description: Принимает один файл изображения и переключает профиль на кастомный аватар.
+      operationId: uploadSettingsAvatar
+      tags:
+        - Settings
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Аватарка успешно загружена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsAvatarResponse'
+        '400':
+          description: Файл отсутствует или тип изображения не поддерживается
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при загрузке аватарки
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/settings/defaults:
     patch:
       summary: Обновить дефолтные настройки генерации
@@ -3779,3 +3846,12 @@ components:
           type: integer
           description: Стоимость одного изображения в копейках. Умножьте на card_count для итоговой цены.
           example: 5
+    SettingsAvatarResponse:
+      type: object
+      required:
+        - avatar_url
+      properties:
+        avatar_url:
+          type: string
+          format: uri
+          example: https://kartochki-online.ru/storage/avatars/user/avatar.jpg

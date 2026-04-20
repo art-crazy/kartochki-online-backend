@@ -87,10 +87,15 @@ type TelegramAuthConfig struct {
 	AuthMaxAge time.Duration
 }
 
+type authStorage interface {
+	PublicURL(storageKey string) string
+}
+
 // Service хранит auth-логику и общее место расширения под OAuth.
 type Service struct {
 	queries               *dbgen.Queries
 	pool                  *pgxpool.Pool
+	storage               authStorage
 	emailEnqueuer         AuthEmailEnqueuer
 	logger                zerolog.Logger
 	sessionTTL            time.Duration
@@ -102,10 +107,11 @@ type Service struct {
 }
 
 // NewService создаёт auth-сервис с настройками локальных сессий и OAuth-провайдеров.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, emailEnqueuer AuthEmailEnqueuer, logger zerolog.Logger, cfg config.AuthConfig) *Service {
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, storage authStorage, emailEnqueuer AuthEmailEnqueuer, logger zerolog.Logger, cfg config.AuthConfig) *Service {
 	return &Service{
 		queries:               queries,
 		pool:                  pool,
+		storage:               storage,
 		emailEnqueuer:         emailEnqueuer,
 		logger:                logger,
 		sessionTTL:            cfg.SessionTTL,
@@ -183,6 +189,11 @@ func (s *Service) WithLatestOAuthAvatar(ctx context.Context, user User) User {
 	userID, err := uuid.Parse(user.ID)
 	if err != nil {
 		s.logger.Warn().Err(err).Str("user_id", user.ID).Msg("не удалось прочитать user id для загрузки аватара")
+		return user
+	}
+
+	if avatarURL := s.customAvatarURL(ctx, s.queries, userID); avatarURL != "" {
+		user.AvatarURL = avatarURL
 		return user
 	}
 

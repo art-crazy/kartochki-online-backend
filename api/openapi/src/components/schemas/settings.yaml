@@ -41,6 +41,16 @@ schemas:
           - webp
         example: png
 
+  SettingsAvatarResponse:
+    type: object
+    required:
+      - avatar_url
+    properties:
+      avatar_url:
+        type: string
+        format: uri
+        example: https://kartochki-online.ru/storage/avatars/user/avatar.jpg
+
   UpdateNotificationItem:
     type: object
     required:

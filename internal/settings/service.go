@@ -16,6 +16,7 @@ import (
 	"kartochki-online-backend/internal/auth"
 	"kartochki-online-backend/internal/dbgen"
 	"kartochki-online-backend/internal/jobs"
+	"kartochki-online-backend/internal/platform/storage"
 )
 
 const (
@@ -108,20 +109,28 @@ type UpdateDefaultsInput struct {
 	Format             string
 }
 
+type avatarStorage interface {
+	Save(ctx context.Context, storageKey string, body []byte) (storage.SavedFile, error)
+	Delete(ctx context.Context, storageKey string) error
+	PublicURL(storageKey string) string
+}
+
 // Service управляет пользовательскими настройками и связанными security-сценариями.
 type Service struct {
 	pool              *pgxpool.Pool
 	queries           *dbgen.Queries
 	jobsClient        *jobs.Client
+	storage           avatarStorage
 	passwordMinLength int
 }
 
 // NewService создаёт сервис настроек поверх sqlc-запросов и очереди фоновых задач.
-func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, jobsClient *jobs.Client, passwordMinLength int) *Service {
+func NewService(pool *pgxpool.Pool, queries *dbgen.Queries, jobsClient *jobs.Client, storage avatarStorage, passwordMinLength int) *Service {
 	return &Service{
 		pool:              pool,
 		queries:           queries,
 		jobsClient:        jobsClient,
+		storage:           storage,
 		passwordMinLength: passwordMinLength,
 	}
 }
@@ -241,6 +250,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, input Update
 		UserID:             uid,
 		Phone:              input.Phone,
 		Company:            input.Company,
+		AvatarAssetID:      currentSettings.AvatarAssetID,
 		DefaultMarketplace: currentSettings.DefaultMarketplace,
 		CardsPerGeneration: currentSettings.CardsPerGeneration,
 		ImageFormat:        currentSettings.ImageFormat,
@@ -300,6 +310,7 @@ func (s *Service) UpdateDefaults(ctx context.Context, userID string, input Updat
 		UserID:             uid,
 		Phone:              currentSettings.Phone,
 		Company:            currentSettings.Company,
+		AvatarAssetID:      currentSettings.AvatarAssetID,
 		DefaultMarketplace: input.MarketplaceID,
 		CardsPerGeneration: int32(input.CardsPerGeneration),
 		ImageFormat:        input.Format,
@@ -590,19 +601,20 @@ func (s *Service) DeleteAccount(ctx context.Context, userID string, confirmWord 
 	return nil
 }
 
-func (s *Service) getOrDefaultUserSettings(ctx context.Context, queries settingsQueries, userID uuid.UUID) (dbgen.UserSetting, error) {
+func (s *Service) getOrDefaultUserSettings(ctx context.Context, queries settingsQueries, userID uuid.UUID) (dbgen.GetUserSettingsByUserIDRow, error) {
 	row, err := queries.GetUserSettingsByUserID(ctx, userID)
 	if err == nil {
 		return row, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return dbgen.UserSetting{}, fmt.Errorf("get user settings: %w", err)
+		return dbgen.GetUserSettingsByUserIDRow{}, fmt.Errorf("get user settings: %w", err)
 	}
 
-	return dbgen.UserSetting{
+	return dbgen.GetUserSettingsByUserIDRow{
 		UserID:             userID,
 		Phone:              "",
 		Company:            "",
+		AvatarAssetID:      pgtype.UUID{},
 		DefaultMarketplace: "",
 		CardsPerGeneration: defaultCardsPerGeneration,
 		ImageFormat:        defaultImageFormat,
@@ -811,5 +823,5 @@ func isUniqueViolation(err error) bool {
 }
 
 type settingsQueries interface {
-	GetUserSettingsByUserID(ctx context.Context, userID uuid.UUID) (dbgen.UserSetting, error)
+	GetUserSettingsByUserID(ctx context.Context, userID uuid.UUID) (dbgen.GetUserSettingsByUserIDRow, error)
 }

@@ -67,6 +67,8 @@ paths:
     $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings"
   /api/v1/settings/profile:
     $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1profile"
+  /api/v1/settings/avatar:
+    $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1avatar"
   /api/v1/settings/defaults:
     $ref: "./paths/settings.yaml#/paths/~1api~1v1~1settings~1defaults"
   /api/v1/settings/change-password:

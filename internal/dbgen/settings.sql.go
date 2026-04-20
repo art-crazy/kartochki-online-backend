@@ -9,6 +9,7 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createAPIKey = `-- name: CreateAPIKey :one
@@ -76,11 +77,44 @@ func (q *Queries) GetActiveAPIKeyByUserID(ctx context.Context, userID uuid.UUID)
 	return i, err
 }
 
+const getUserAvatarAssetByUserID = `-- name: GetUserAvatarAssetByUserID :one
+select
+    a.id,
+    a.user_id,
+    a.kind,
+    a.storage_key,
+    a.original_filename,
+    a.mime_type,
+    a.size_bytes,
+    a.created_at
+from user_settings us
+join assets a on a.id = us.avatar_asset_id
+where us.user_id = $1
+limit 1
+`
+
+func (q *Queries) GetUserAvatarAssetByUserID(ctx context.Context, userID uuid.UUID) (Asset, error) {
+	row := q.db.QueryRow(ctx, getUserAvatarAssetByUserID, userID)
+	var i Asset
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Kind,
+		&i.StorageKey,
+		&i.OriginalFilename,
+		&i.MimeType,
+		&i.SizeBytes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getUserSettingsByUserID = `-- name: GetUserSettingsByUserID :one
 select
     user_id,
     phone,
     company,
+    avatar_asset_id,
     default_marketplace,
     cards_per_generation,
     image_format,
@@ -91,13 +125,26 @@ where user_id = $1
 limit 1
 `
 
-func (q *Queries) GetUserSettingsByUserID(ctx context.Context, userID uuid.UUID) (UserSetting, error) {
+type GetUserSettingsByUserIDRow struct {
+	UserID             uuid.UUID
+	Phone              string
+	Company            string
+	AvatarAssetID      pgtype.UUID
+	DefaultMarketplace string
+	CardsPerGeneration int32
+	ImageFormat        string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) GetUserSettingsByUserID(ctx context.Context, userID uuid.UUID) (GetUserSettingsByUserIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserSettingsByUserID, userID)
-	var i UserSetting
+	var i GetUserSettingsByUserIDRow
 	err := row.Scan(
 		&i.UserID,
 		&i.Phone,
 		&i.Company,
+		&i.AvatarAssetID,
 		&i.DefaultMarketplace,
 		&i.CardsPerGeneration,
 		&i.ImageFormat,
@@ -157,6 +204,29 @@ func (q *Queries) RevokeActiveAPIKeysByUserID(ctx context.Context, userID uuid.U
 	return err
 }
 
+const setUserAvatarAssetID = `-- name: SetUserAvatarAssetID :exec
+insert into user_settings (
+    user_id,
+    avatar_asset_id
+) values (
+    $1,
+    $2
+)
+on conflict (user_id) do update
+set avatar_asset_id = excluded.avatar_asset_id,
+    updated_at = now()
+`
+
+type SetUserAvatarAssetIDParams struct {
+	UserID        uuid.UUID
+	AvatarAssetID pgtype.UUID
+}
+
+func (q *Queries) SetUserAvatarAssetID(ctx context.Context, arg SetUserAvatarAssetIDParams) error {
+	_, err := q.db.Exec(ctx, setUserAvatarAssetID, arg.UserID, arg.AvatarAssetID)
+	return err
+}
+
 const upsertNotificationPreference = `-- name: UpsertNotificationPreference :one
 insert into notification_preferences (
     user_id,
@@ -197,6 +267,7 @@ insert into user_settings (
     user_id,
     phone,
     company,
+    avatar_asset_id,
     default_marketplace,
     cards_per_generation,
     image_format
@@ -206,41 +277,58 @@ insert into user_settings (
     $3,
     $4,
     $5,
-    $6
+    $6,
+    $7
 )
 on conflict (user_id) do update
 set phone = excluded.phone,
     company = excluded.company,
+    avatar_asset_id = excluded.avatar_asset_id,
     default_marketplace = excluded.default_marketplace,
     cards_per_generation = excluded.cards_per_generation,
     image_format = excluded.image_format,
     updated_at = now()
-returning user_id, phone, company, default_marketplace, cards_per_generation, image_format, created_at, updated_at
+returning user_id, phone, company, avatar_asset_id, default_marketplace, cards_per_generation, image_format, created_at, updated_at
 `
 
 type UpsertUserSettingsParams struct {
 	UserID             uuid.UUID
 	Phone              string
 	Company            string
+	AvatarAssetID      pgtype.UUID
 	DefaultMarketplace string
 	CardsPerGeneration int32
 	ImageFormat        string
 }
 
-func (q *Queries) UpsertUserSettings(ctx context.Context, arg UpsertUserSettingsParams) (UserSetting, error) {
+type UpsertUserSettingsRow struct {
+	UserID             uuid.UUID
+	Phone              string
+	Company            string
+	AvatarAssetID      pgtype.UUID
+	DefaultMarketplace string
+	CardsPerGeneration int32
+	ImageFormat        string
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertUserSettings(ctx context.Context, arg UpsertUserSettingsParams) (UpsertUserSettingsRow, error) {
 	row := q.db.QueryRow(ctx, upsertUserSettings,
 		arg.UserID,
 		arg.Phone,
 		arg.Company,
+		arg.AvatarAssetID,
 		arg.DefaultMarketplace,
 		arg.CardsPerGeneration,
 		arg.ImageFormat,
 	)
-	var i UserSetting
+	var i UpsertUserSettingsRow
 	err := row.Scan(
 		&i.UserID,
 		&i.Phone,
 		&i.Company,
+		&i.AvatarAssetID,
 		&i.DefaultMarketplace,
 		&i.CardsPerGeneration,
 		&i.ImageFormat,
