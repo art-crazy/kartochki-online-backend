@@ -8,4 +8,5 @@ tmp/
 dist/
 coverage/
 vendor/
+storage/
 
