@@ -44,10 +44,11 @@ type Settings struct {
 
 // Profile описывает редактируемые поля профиля пользователя.
 type Profile struct {
-	Name    string
-	Email   string
-	Phone   string
-	Company string
+	Name          string
+	Email         string
+	EmailVerified bool
+	Phone         string
+	Company       string
 }
 
 // Defaults описывает значения по умолчанию для будущих генераций.
@@ -183,10 +184,11 @@ func (s *Service) Get(ctx context.Context, userID string, currentAccessToken str
 
 	return Settings{
 		Profile: Profile{
-			Name:    strings.TrimSpace(user.Name),
-			Email:   strings.TrimSpace(user.Email),
-			Phone:   strings.TrimSpace(userSettings.Phone),
-			Company: strings.TrimSpace(userSettings.Company),
+			Name:          strings.TrimSpace(user.Name),
+			Email:         strings.TrimSpace(user.Email),
+			EmailVerified: isEmailVerified(user.PasswordHash, user.EmailVerifiedAt.Valid),
+			Phone:         strings.TrimSpace(userSettings.Phone),
+			Company:       strings.TrimSpace(userSettings.Company),
 		},
 		Defaults: Defaults{
 			MarketplaceID:      strings.TrimSpace(userSettings.DefaultMarketplace),
@@ -219,13 +221,19 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, input Update
 	defer tx.Rollback(ctx)
 
 	txQueries := s.queries.WithTx(tx)
-	_, err = txQueries.GetAuthUserByID(ctx, uid)
+	existingUser, err := txQueries.GetAuthUserByID(ctx, uid)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Profile{}, ErrUserNotFound
 		}
 
 		return Profile{}, fmt.Errorf("get user before profile update: %w", err)
+	}
+
+	// Если email уже подтверждён — игнорируем любые попытки его изменить через этот endpoint.
+	// Смена подтверждённого email требует отдельного flow с верификацией.
+	if isEmailVerified(existingUser.PasswordHash, existingUser.EmailVerifiedAt.Valid) {
+		input.Email = existingUser.Email
 	}
 
 	user, err := txQueries.UpdateUserProfile(ctx, dbgen.UpdateUserProfileParams{
@@ -264,10 +272,11 @@ func (s *Service) UpdateProfile(ctx context.Context, userID string, input Update
 	}
 
 	return Profile{
-		Name:    strings.TrimSpace(user.Name),
-		Email:   strings.TrimSpace(user.Email),
-		Phone:   strings.TrimSpace(settingsRow.Phone),
-		Company: strings.TrimSpace(settingsRow.Company),
+		Name:          strings.TrimSpace(user.Name),
+		Email:         strings.TrimSpace(user.Email),
+		EmailVerified: isEmailVerified(existingUser.PasswordHash, existingUser.EmailVerifiedAt.Valid),
+		Phone:         strings.TrimSpace(settingsRow.Phone),
+		Company:       strings.TrimSpace(settingsRow.Company),
 	}, nil
 }
 
@@ -811,6 +820,13 @@ func nullableText(value string) pgtype.Text {
 	}
 
 	return pgtype.Text{String: value, Valid: true}
+}
+
+// isEmailVerified определяет, является ли email подтверждённым.
+// Считается подтверждённым, если пользователь зарегистрировался через email+пароль
+// или вошёл через OAuth-провайдер, который вернул email (email_verified_at заполнен).
+func isEmailVerified(passwordHash string, hasVerifiedAt bool) bool {
+	return passwordHash != "" || hasVerifiedAt
 }
 
 func isUniqueViolation(err error) bool {

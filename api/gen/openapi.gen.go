@@ -649,10 +649,11 @@ type SettingsNotifications struct {
 
 // SettingsProfile defines model for SettingsProfile.
 type SettingsProfile struct {
-	Company *string              `json:"company,omitempty"`
-	Email   *openapi_types.Email `json:"email,omitempty"`
-	Name    string               `json:"name"`
-	Phone   *string              `json:"phone,omitempty"`
+	Company       *string              `json:"company,omitempty"`
+	Email         *openapi_types.Email `json:"email,omitempty"`
+	EmailVerified bool                 `json:"email_verified"`
+	Name          string               `json:"name"`
+	Phone         *string              `json:"phone,omitempty"`
 }
 
 // SettingsResponse defines model for SettingsResponse.

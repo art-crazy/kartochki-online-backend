@@ -134,22 +134,32 @@ const getAuthUserByID = `-- name: GetAuthUserByID :one
 select
     id,
     coalesce(email, '') as email,
-    name
+    name,
+    coalesce(password_hash, '') as password_hash,
+    email_verified_at
 from users
 where id = $1
 limit 1
 `
 
 type GetAuthUserByIDRow struct {
-	ID    uuid.UUID
-	Email string
-	Name  string
+	ID              uuid.UUID
+	Email           string
+	Name            string
+	PasswordHash    string
+	EmailVerifiedAt pgtype.Timestamptz
 }
 
 func (q *Queries) GetAuthUserByID(ctx context.Context, id uuid.UUID) (GetAuthUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, getAuthUserByID, id)
 	var i GetAuthUserByIDRow
-	err := row.Scan(&i.ID, &i.Email, &i.Name)
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+	)
 	return i, err
 }
 

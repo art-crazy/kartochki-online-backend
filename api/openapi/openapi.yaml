@@ -3222,6 +3222,7 @@ components:
       type: object
       required:
         - name
+        - email_verified
       properties:
         name:
           type: string
@@ -3230,6 +3231,9 @@ components:
           type: string
           format: email
           example: ivan@example.com
+        email_verified:
+          type: boolean
+          example: true
         phone:
           type: string
           example: +7 999 123-45-67

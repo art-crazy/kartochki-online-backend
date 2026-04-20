@@ -379,7 +379,8 @@ func toSettingsResponse(payload settings.Settings) openapi.SettingsResponse {
 // Email остаётся опциональным, чтобы битые исторические данные не ломали JSON-ответ.
 func toSettingsProfileContract(profile settings.Profile) openapi.SettingsProfile {
 	result := openapi.SettingsProfile{
-		Name: profile.Name,
+		Name:          profile.Name,
+		EmailVerified: profile.EmailVerified,
 	}
 	if email := contractEmailPtr(profile.Email); email != nil {
 		result.Email = email

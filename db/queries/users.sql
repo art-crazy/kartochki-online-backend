@@ -38,7 +38,9 @@ limit 1;
 select
     id,
     coalesce(email, '') as email,
-    name
+    name,
+    coalesce(password_hash, '') as password_hash,
+    email_verified_at
 from users
 where id = $1
 limit 1;
