@@ -138,6 +138,7 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 		CardCount:     req.CardCount,
 		SourceAssetID: req.SourceAssetId.String(),
 		ModelID:       stringOrEmpty(req.ModelId),
+		Product:       mapProductContext(req.Product),
 	})
 	if err != nil {
 		switch {
@@ -172,6 +173,11 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
 				Field:   strPtr("model_id"),
 				Message: "unknown model",
+			})
+		case errors.Is(err, generation.ErrInvalidProduct):
+			response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+				Field:   strPtr("product"),
+				Message: "product.name is required and all fields must be within allowed limits",
 			})
 		case errors.Is(err, generation.ErrQuotaExceeded):
 			response.WriteError(w, r, http.StatusConflict, "generation_quota_exceeded", "generation quota is exceeded")
@@ -240,99 +246,6 @@ func validateCreateGenerationRequest(req openapi.CreateGenerationRequest) []open
 	}
 
 	return details
-}
-
-func toGenerateMarketplaces(items []generation.CatalogOption) []openapi.GenerateMarketplace {
-	result := make([]openapi.GenerateMarketplace, len(items))
-	for i, item := range items {
-		result[i] = openapi.GenerateMarketplace{
-			Id:    item.ID,
-			Label: item.Label,
-		}
-	}
-
-	return result
-}
-
-func toGenerateStyles(items []generation.CatalogOption) []openapi.GenerateStyle {
-	result := make([]openapi.GenerateStyle, len(items))
-	for i, item := range items {
-		result[i] = openapi.GenerateStyle{
-			Id:    item.ID,
-			Label: item.Label,
-		}
-	}
-
-	return result
-}
-
-func toGenerateModels(items []generation.ModelOption) []openapi.GenerateModel {
-	result := make([]openapi.GenerateModel, len(items))
-	for i, item := range items {
-		result[i] = openapi.GenerateModel{
-			Id:            item.ID,
-			Label:         item.Label,
-			Description:   item.Description,
-			PricePerImage: item.PricePerImage,
-		}
-	}
-	return result
-}
-
-func toGenerateCardTypes(items []generation.CardTypeOption) []openapi.GenerateCardType {
-	result := make([]openapi.GenerateCardType, len(items))
-	for i, item := range items {
-		ct := openapi.GenerateCardType{
-			Id:    item.ID,
-			Label: item.Label,
-		}
-		if item.DefaultSelected {
-			ct.DefaultSelected = &item.DefaultSelected
-		}
-		result[i] = ct
-	}
-
-	return result
-}
-
-func toGeneratedCards(items []generation.GeneratedCard) []openapi.GeneratedCard {
-	result := make([]openapi.GeneratedCard, len(items))
-	for i, item := range items {
-		result[i] = openapi.GeneratedCard{
-			Id:         mustParseUUID(item.ID),
-			CardTypeId: item.CardTypeID,
-			AssetId:    mustParseUUID(item.AssetID),
-			PreviewUrl: item.PreviewURL,
-		}
-	}
-
-	return result
-}
-
-// toGenerationStatusResponse конвертирует доменный Status в openapi.GenerationStatusResponse.
-// Опциональные поля передаются как указатели — nil сериализуется с omitempty.
-func toGenerationStatusResponse(result generation.Status) openapi.GenerationStatusResponse {
-	resp := openapi.GenerationStatusResponse{
-		GenerationId: mustParseUUID(result.GenerationID),
-		Status:       openapi.GenerationStatusResponseStatus(result.Status),
-	}
-	if result.CurrentStep != "" {
-		resp.CurrentStep = &result.CurrentStep
-	}
-	if result.ProgressPercent > 0 {
-		resp.ProgressPercent = &result.ProgressPercent
-	}
-	if result.ErrorMessage != "" {
-		resp.ErrorMessage = &result.ErrorMessage
-	}
-	if result.ArchiveDownloadURL != "" {
-		resp.ArchiveDownloadUrl = &result.ArchiveDownloadURL
-	}
-	if len(result.ResultCards) > 0 {
-		cards := toGeneratedCards(result.ResultCards)
-		resp.ResultCards = &cards
-	}
-	return resp
 }
 
 func (h GenerationHandler) requestLogger(r *http.Request) zerolog.Logger {

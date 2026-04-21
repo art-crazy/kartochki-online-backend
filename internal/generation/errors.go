@@ -2,6 +2,13 @@ package generation
 
 import "errors"
 
+// Допустимые значения поля Kind в таблице assets для пакета generation.
+const (
+	assetKindSourceImage   = "source_image"
+	assetKindGeneratedCard = "generated_card"
+	assetKindArchive       = "archive"
+)
+
 var (
 	// ErrSourceAssetNotFound означает, что исходное изображение не найдено или не принадлежит пользователю.
 	ErrSourceAssetNotFound = errors.New("generation source asset not found")
@@ -25,4 +32,6 @@ var (
 	ErrQuotaExceeded = errors.New("generation quota exceeded")
 	// ErrInvalidModel означает, что model_id не входит в поддерживаемый каталог моделей.
 	ErrInvalidModel = errors.New("generation model is invalid")
+	// ErrInvalidProduct означает, что поле product передано, но не прошло валидацию.
+	ErrInvalidProduct = errors.New("generation product context is invalid")
 )

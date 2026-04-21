@@ -145,6 +145,18 @@ type GenerationCardType struct {
 	CardTypeID   string
 }
 
+type GenerationProductContext struct {
+	ID              uuid.UUID
+	GenerationID    uuid.UUID
+	Name            string
+	Category        pgtype.Text
+	Brand           pgtype.Text
+	Description     pgtype.Text
+	Benefits        []string
+	Characteristics []byte
+	CreatedAt       pgtype.Timestamptz
+}
+
 // Пользовательские переключатели уведомлений.
 type NotificationPreference struct {
 	UserID        uuid.UUID

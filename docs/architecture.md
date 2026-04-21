@@ -362,10 +362,13 @@ It owns:
 
 - generation page config (marketplaces, styles, card types, card count options, AI model catalog)
 - source image upload orchestration
-- creation of generation jobs and linked projects
+- creation of generation jobs and linked projects, including optional product context stored in `generation_product_context`
 - polling-ready generation status reads
 - coordination with Asynq worker and local artifact storage
+- prompt building via `BuildPrompt` — assembles an art-direction brief for each card type from marketplace rules, style rules, and optional product context (`ProductContext`)
 - AI image generation via the `ImageGenerator` interface
+
+Product context (`product.name`, `category`, `brand`, `description`, `benefits`, `characteristics`) is accepted at generation creation time and persisted atomically with the generation record. The worker reads it once before the card loop and passes it to the prompt builder. If no product context was provided, the prompt builder produces a structurally complete prompt without inventing product-specific claims.
 
 The `ImageGenerator` interface is defined in `internal/generation` and implemented in `internal/platform/routerai`. Wiring lives in `internal/app` via `routerAIAdapter` — the same adapter pattern used for `authEmailWorker` and `yookassaCheckoutAdapter`.
 

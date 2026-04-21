@@ -21,6 +21,7 @@ type normalizedCreateInput struct {
 	CardCount      int
 	SourceFileName string
 	ModelID        string
+	Product        *ProductContext
 }
 
 // validateCreateInput проверяет пользовательский запрос перед созданием проекта и generation.
@@ -92,8 +93,13 @@ func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (u
 		}
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, fmt.Errorf("get source asset by user: %w", err)
 	}
-	if sourceAsset.Kind != "source_image" {
+	if sourceAsset.Kind != assetKindSourceImage {
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrSourceAssetNotFound
+	}
+
+	product, err := validateProductContext(input.Product)
+	if err != nil {
+		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, err
 	}
 
 	return uid, sourceAssetID, normalizedCreateInput{
@@ -104,6 +110,78 @@ func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (u
 		CardCount:      input.CardCount,
 		SourceFileName: sourceAsset.OriginalFilename,
 		ModelID:        modelID,
+		Product:        product,
+	}, nil
+}
+
+// validateProductContext проверяет поле product и возвращает нормализованный ProductContext.
+// Если product nil, возвращает nil без ошибки — поле опциональное.
+// Если product передан, name обязателен. Пустой объект без name считается ошибкой.
+func validateProductContext(p *ProductContext) (*ProductContext, error) {
+	if p == nil {
+		return nil, nil
+	}
+
+	name := strings.TrimSpace(p.Name)
+	if name == "" {
+		return nil, ErrInvalidProduct
+	}
+	if len(name) > 200 {
+		return nil, ErrInvalidProduct
+	}
+
+	category := strings.TrimSpace(p.Category)
+	if len(category) > 120 {
+		return nil, ErrInvalidProduct
+	}
+
+	brand := strings.TrimSpace(p.Brand)
+	if len(brand) > 120 {
+		return nil, ErrInvalidProduct
+	}
+
+	description := strings.TrimSpace(p.Description)
+	if len(description) > 2000 {
+		return nil, ErrInvalidProduct
+	}
+
+	if len(p.Benefits) > 10 {
+		return nil, ErrInvalidProduct
+	}
+	benefits := make([]string, 0, len(p.Benefits))
+	for _, b := range p.Benefits {
+		trimmed := strings.TrimSpace(b)
+		if len(trimmed) > 120 {
+			return nil, ErrInvalidProduct
+		}
+		if trimmed != "" {
+			benefits = append(benefits, trimmed)
+		}
+	}
+
+	if len(p.Characteristics) > 20 {
+		return nil, ErrInvalidProduct
+	}
+	characteristics := make([]ProductCharacteristic, 0, len(p.Characteristics))
+	for _, c := range p.Characteristics {
+		cName := strings.TrimSpace(c.Name)
+		cValue := strings.TrimSpace(c.Value)
+		if cName == "" || cValue == "" {
+			return nil, ErrInvalidProduct
+		}
+		if len(cName) > 120 || len(cValue) > 120 {
+			return nil, ErrInvalidProduct
+		}
+		characteristics = append(characteristics, ProductCharacteristic{Name: cName, Value: cValue})
+	}
+
+	return &ProductContext{
+		Name:            name,
+		Category:        category,
+		Brand:           brand,
+		Description:     description,
+		Benefits:        benefits,
+		Characteristics: characteristics,
 	}, nil
 }
 
@@ -116,7 +194,7 @@ func containsMarketplaceID(items []marketplaceOption, target string) bool {
 	return false
 }
 
-func containsCatalogID(items []promptCatalogOption, target string) bool {
+func containsCatalogID(items []CatalogOption, target string) bool {
 	for _, item := range items {
 		if item.ID == target {
 			return true
@@ -125,7 +203,7 @@ func containsCatalogID(items []promptCatalogOption, target string) bool {
 	return false
 }
 
-func containsCardTypeID(items []promptCardTypeOption, target string) bool {
+func containsCardTypeID(items []CardTypeOption, target string) bool {
 	for _, item := range items {
 		if item.ID == target {
 			return true

@@ -205,6 +205,49 @@ func (q *Queries) CreateGeneration(ctx context.Context, arg CreateGenerationPara
 	return i, err
 }
 
+const createGenerationProductContext = `-- name: CreateGenerationProductContext :one
+insert into generation_product_context (generation_id, name, category, brand, description, benefits, characteristics)
+values ($1, $2, $3, $4, $5, $6, $7)
+returning id, generation_id, name, category, brand, description, benefits, characteristics, created_at
+`
+
+type CreateGenerationProductContextParams struct {
+	GenerationID    uuid.UUID
+	Name            string
+	Category        pgtype.Text
+	Brand           pgtype.Text
+	Description     pgtype.Text
+	Benefits        []string
+	Characteristics []byte
+}
+
+// Сохраняет контекст товара, переданный пользователем при запуске генерации.
+// Вызывается в той же транзакции, что и создание generation, чтобы откат был атомарным.
+func (q *Queries) CreateGenerationProductContext(ctx context.Context, arg CreateGenerationProductContextParams) (GenerationProductContext, error) {
+	row := q.db.QueryRow(ctx, createGenerationProductContext,
+		arg.GenerationID,
+		arg.Name,
+		arg.Category,
+		arg.Brand,
+		arg.Description,
+		arg.Benefits,
+		arg.Characteristics,
+	)
+	var i GenerationProductContext
+	err := row.Scan(
+		&i.ID,
+		&i.GenerationID,
+		&i.Name,
+		&i.Category,
+		&i.Brand,
+		&i.Description,
+		&i.Benefits,
+		&i.Characteristics,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const deleteAssetByID = `-- name: DeleteAssetByID :execrows
 delete from assets
 where id = $1
@@ -275,6 +318,29 @@ func (q *Queries) GetGenerationByID(ctx context.Context, id uuid.UUID) (Generati
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ModelID,
+	)
+	return i, err
+}
+
+const getGenerationProductContextByGenerationID = `-- name: GetGenerationProductContextByGenerationID :one
+select id, generation_id, name, category, brand, description, benefits, characteristics, created_at from generation_product_context
+where generation_id = $1
+`
+
+// Возвращает контекст товара для generation перед запуском prompt builder в worker.
+func (q *Queries) GetGenerationProductContextByGenerationID(ctx context.Context, generationID uuid.UUID) (GenerationProductContext, error) {
+	row := q.db.QueryRow(ctx, getGenerationProductContextByGenerationID, generationID)
+	var i GenerationProductContext
+	err := row.Scan(
+		&i.ID,
+		&i.GenerationID,
+		&i.Name,
+		&i.Category,
+		&i.Brand,
+		&i.Description,
+		&i.Benefits,
+		&i.Characteristics,
+		&i.CreatedAt,
 	)
 	return i, err
 }

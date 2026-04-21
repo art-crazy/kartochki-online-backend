@@ -2,6 +2,24 @@ package generation
 
 import "context"
 
+// ProductCharacteristic описывает одну характеристику товара, например "Материал верха: текстиль".
+type ProductCharacteristic struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// ProductContext содержит информацию о товаре, которую пользователь передаёт вместе с запросом генерации.
+// Используется prompt builder для построения детального арт-директорского ТЗ.
+// Поле Name обязательно, остальные поля опциональны.
+type ProductContext struct {
+	Name            string
+	Category        string
+	Brand           string
+	Description     string
+	Benefits        []string
+	Characteristics []ProductCharacteristic
+}
+
 // ImageGenerateInput описывает параметры одной карточки, которую нужно сгенерировать.
 type ImageGenerateInput struct {
 	// Prompt — текстовое описание желаемого изображения.
@@ -48,6 +66,9 @@ type CreateInput struct {
 	// ModelID — идентификатор AI-модели из каталога generateModels.
 	// Если пустой, используется первая модель из каталога.
 	ModelID string
+	// Product — контекст товара для prompt builder. Поле опциональное.
+	// Если nil, prompt строится только по marketplace, style и card type.
+	Product *ProductContext
 }
 
 // CreatedGeneration описывает результат постановки генерации в очередь.

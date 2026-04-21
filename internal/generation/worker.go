@@ -2,6 +2,7 @@ package generation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -119,6 +120,13 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 		return fmt.Errorf("generation has no card types")
 	}
 
+	// Читаем контекст товара до UpdateGenerationProgress, чтобы не записывать прогресс
+	// если данные о товаре повреждены или недоступны — статус в этом случае сразу пойдёт в failed.
+	productCtx, err := s.loadProductContext(ctx, generationID)
+	if err != nil {
+		return err
+	}
+
 	if _, err := s.queries.UpdateGenerationProgress(ctx, dbgen.UpdateGenerationProgressParams{
 		ID:              generationID,
 		CurrentStep:     "rendering_cards",
@@ -132,9 +140,13 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 	for i := 0; i < int(generationRow.CardCount); i++ {
 		cardType := cardTypes[i%len(cardTypes)]
 
-		// Генерируем изображение через AI-провайдер.
-		// Prompt собирается из выбранных marketplace, стиля и типа карточки.
-		prompt := buildCardPrompt(generationRow.MarketplaceID, generationRow.StyleID, cardType.CardTypeID)
+		// Собираем prompt через новый builder с учётом marketplace, стиля, типа карточки и контекста товара.
+		prompt := BuildPrompt(PromptInput{
+			MarketplaceID: generationRow.MarketplaceID,
+			StyleID:       generationRow.StyleID,
+			CardTypeID:    cardType.CardTypeID,
+			Product:       productCtx,
+		})
 		imgBytes, err := s.imageGenerator.GenerateImage(ctx, ImageGenerateInput{
 			Prompt:              prompt,
 			SourceImageBody:     sourceImageBody,
@@ -214,6 +226,39 @@ func (s *Service) processGeneration(ctx context.Context, generationID uuid.UUID)
 	return nil
 }
 
+// loadProductContext читает контекст товара для generation из БД.
+// Если контекст не найден — это нормальная ситуация, метод возвращает nil без ошибки.
+func (s *Service) loadProductContext(ctx context.Context, generationID uuid.UUID) (*ProductContext, error) {
+	row, err := s.queries.GetGenerationProductContextByGenerationID(ctx, generationID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load product context: %w", err)
+	}
+
+	p := &ProductContext{
+		Name:     row.Name,
+		Benefits: row.Benefits,
+	}
+	if row.Category.Valid {
+		p.Category = row.Category.String
+	}
+	if row.Brand.Valid {
+		p.Brand = row.Brand.String
+	}
+	if row.Description.Valid {
+		p.Description = row.Description.String
+	}
+	if len(row.Characteristics) > 0 {
+		if err := json.Unmarshal(row.Characteristics, &p.Characteristics); err != nil {
+			return nil, fmt.Errorf("unmarshal product characteristics: %w", err)
+		}
+	}
+
+	return p, nil
+}
+
 // loadSourceImage загружает исходник generation из БД и storage.
 // Дополнительная проверка kind защищает worker от неконсистентных данных в очереди или БД.
 func (s *Service) loadSourceImage(ctx context.Context, assetID uuid.UUID) (dbgen.Asset, []byte, error) {
@@ -221,7 +266,7 @@ func (s *Service) loadSourceImage(ctx context.Context, assetID uuid.UUID) (dbgen
 	if err != nil {
 		return dbgen.Asset{}, nil, fmt.Errorf("get source asset for processing: %w", err)
 	}
-	if sourceAsset.Kind != "source_image" {
+	if sourceAsset.Kind != assetKindSourceImage {
 		return dbgen.Asset{}, nil, fmt.Errorf("asset %s is not a source image", assetID)
 	}
 

@@ -15,27 +15,11 @@ type CardTypeOption struct {
 	DefaultSelected bool
 }
 
-// marketplaceOption хранит публичные поля marketplace и внутренние данные для генерации.
+// marketplaceOption хранит поля marketplace, включая aspect ratio для prompt builder.
 type marketplaceOption struct {
 	ID          string
 	Label       string
 	AspectRatio string
-	promptPart  string
-}
-
-// promptCatalogOption хранит публичные поля справочника и часть prompt для AI.
-type promptCatalogOption struct {
-	ID         string
-	Label      string
-	promptPart string
-}
-
-// promptCardTypeOption хранит публичные поля типа карточки и часть prompt для AI.
-type promptCardTypeOption struct {
-	ID              string
-	Label           string
-	DefaultSelected bool
-	promptPart      string
 }
 
 // ModelOption описывает AI-модель, доступную пользователю при генерации.
@@ -60,27 +44,28 @@ var (
 	// generateMaxCardCount задаёт верхнюю границу количества карточек в одном запуске.
 	// Это значение должно совпадать с доменной валидацией и ответом /generate/config.
 	generateMaxCardCount = 15
-	// generateMarketplaces хранит marketplace вместе с aspect ratio и частью prompt.
-	// Добавление нового marketplace должно менять только этот каталог и OpenAPI-ответ.
+
+	// generateMarketplaces хранит marketplace вместе с aspect ratio для prompt builder.
+	// Добавление нового marketplace должно менять этот каталог, marketplaceRule и OpenAPI-ответ.
 	generateMarketplaces = []marketplaceOption{
-		{ID: "wildberries", Label: "Wildberries", AspectRatio: "3:4", promptPart: "Wildberries"},
-		{ID: "ozon", Label: "Ozon", AspectRatio: "3:4", promptPart: "Ozon"},
-		{ID: "yandex_market", Label: "Яндекс Маркет", AspectRatio: "1:1", promptPart: "Yandex Market"},
+		{ID: "wildberries", Label: "Wildberries", AspectRatio: "3:4"},
+		{ID: "ozon", Label: "Ozon", AspectRatio: "3:4"},
+		{ID: "yandex_market", Label: "Яндекс Маркет", AspectRatio: "1:1"},
 	}
 
-	generateStyles = []promptCatalogOption{
-		{ID: "clean_catalog", Label: "Чистый каталог", promptPart: "clean catalog, white background, minimal"},
-		{ID: "accent_offer", Label: "Акцент на выгоде", promptPart: "accent on offer and benefits, vibrant, attention-grabbing"},
-		{ID: "premium_brand", Label: "Премиальный бренд", promptPart: "premium brand, luxury, elegant, sophisticated"},
+	generateStyles = []CatalogOption{
+		{ID: "clean_catalog", Label: "Чистый каталог"},
+		{ID: "accent_offer", Label: "Акцент на выгоде"},
+		{ID: "premium_brand", Label: "Премиальный бренд"},
 	}
 
-	generateCardTypes = []promptCardTypeOption{
-		{ID: "cover", Label: "Обложка", DefaultSelected: true, promptPart: "main product cover shot, hero image"},
-		{ID: "benefits", Label: "Преимущества", DefaultSelected: true, promptPart: "product benefits and key features highlighted"},
-		{ID: "details", Label: "Детали", DefaultSelected: true, promptPart: "product details and close-up view"},
-		{ID: "usage", Label: "Сценарий использования", promptPart: "product in use, lifestyle scenario"},
-		{ID: "dimensions", Label: "Размеры", promptPart: "product dimensions and measurements diagram"},
-		{ID: "composition", Label: "Состав", promptPart: "product composition and materials"},
+	generateCardTypes = []CardTypeOption{
+		{ID: "cover", Label: "Обложка", DefaultSelected: true},
+		{ID: "benefits", Label: "Преимущества", DefaultSelected: true},
+		{ID: "details", Label: "Детали", DefaultSelected: true},
+		{ID: "usage", Label: "Сценарий использования"},
+		{ID: "dimensions", Label: "Размеры"},
+		{ID: "composition", Label: "Состав"},
 	}
 
 	// generateModels хранит доступные AI-модели и цену одной картинки в копейках.
@@ -117,8 +102,8 @@ var (
 func (s *Service) GetConfig(_ context.Context) Config {
 	return Config{
 		Marketplaces:     marketplacesToCatalog(generateMarketplaces),
-		Styles:           promptCatalogToCatalog(generateStyles),
-		CardTypes:        promptCardTypesToCardTypes(generateCardTypes),
+		Styles:           append([]CatalogOption(nil), generateStyles...),
+		CardTypes:        append([]CardTypeOption(nil), generateCardTypes...),
 		CardCountOptions: buildCardCountOptions(generateMaxCardCount),
 		Models:           cloneModelOptions(generateModels),
 	}
@@ -132,26 +117,6 @@ func marketplacesToCatalog(items []marketplaceOption) []CatalogOption {
 	return result
 }
 
-func promptCatalogToCatalog(items []promptCatalogOption) []CatalogOption {
-	result := make([]CatalogOption, len(items))
-	for i, item := range items {
-		result[i] = CatalogOption{ID: item.ID, Label: item.Label}
-	}
-	return result
-}
-
-func promptCardTypesToCardTypes(items []promptCardTypeOption) []CardTypeOption {
-	result := make([]CardTypeOption, len(items))
-	for i, item := range items {
-		result[i] = CardTypeOption{
-			ID:              item.ID,
-			Label:           item.Label,
-			DefaultSelected: item.DefaultSelected,
-		}
-	}
-	return result
-}
-
 func cloneModelOptions(items []ModelOption) []ModelOption {
 	return append([]ModelOption(nil), items...)
 }
@@ -161,11 +126,9 @@ func buildCardCountOptions(maxCount int) []int {
 	if maxCount <= 0 {
 		return nil
 	}
-
 	options := make([]int, 0, maxCount)
 	for count := 1; count <= maxCount; count++ {
 		options = append(options, count)
 	}
-
 	return options
 }

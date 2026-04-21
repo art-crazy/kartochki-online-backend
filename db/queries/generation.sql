@@ -142,3 +142,15 @@ set status = 'active',
     updated_at = now()
 where id = @id
   and deleted_at is null;
+
+-- name: CreateGenerationProductContext :one
+-- Сохраняет контекст товара, переданный пользователем при запуске генерации.
+-- Вызывается в той же транзакции, что и создание generation, чтобы откат был атомарным.
+insert into generation_product_context (generation_id, name, category, brand, description, benefits, characteristics)
+values (@generation_id, @name, @category, @brand, @description, @benefits, @characteristics)
+returning *;
+
+-- name: GetGenerationProductContextByGenerationID :one
+-- Возвращает контекст товара для generation перед запуском prompt builder в worker.
+select * from generation_product_context
+where generation_id = @generation_id;

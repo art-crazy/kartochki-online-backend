@@ -1,19 +1,40 @@
 package generation
 
-import "fmt"
+import "strings"
 
-// buildCardPrompt составляет prompt для генерации одной карточки marketplace.
-// Описание оставлено на английском, потому что image-модели обычно лучше понимают английские prompt.
-func buildCardPrompt(marketplaceID, styleID, cardTypeID string) string {
-	marketplace := findMarketplacePromptPart(generateMarketplaces, marketplaceID, "marketplace")
-	style := findCatalogPromptPart(generateStyles, styleID, "clean and professional")
-	cardType := findCardTypePromptPart(generateCardTypes, cardTypeID, "product image")
+// qualityBlock — общий блок требований к качеству и безопасности, добавляется в каждый prompt.
+// Он запрещает выдумывать свойства товара, выпускать текст с ошибками и уводить фокус с товара.
+const qualityBlock = `Important quality rules:
+- Preserve the original product shape, color, proportions and visible logo as accurately as possible.
+- Do not redesign the product itself.
+- Keep the product as the main visual focus. A model or lifestyle scene may support the composition, but must not dominate over the product.
+- Do not invent brand claims, certificates, discounts, ratings or exact numbers.
+- Use only facts that are explicitly provided in the input product context.
+- If some benefit, material, feature or measurement is not provided, do not mention it in text.
+- Do not add fake marketplace badges, fake reviews or fake official labels.
+- All text must be in Russian, short and readable.
+- Use correct Russian spelling and grammar.
+- Proofread every Russian word before returning the final image.
+- Text must not cover the main product.
+- Avoid generic filler bullets and avoid awkward or unnatural product wording.
+- Do not return only a cut-out product photo or a plain background replacement.
+- Build a complete marketplace card layout with composition, visual hierarchy, readable Russian text and product-focused design.
+- The result must look like a finished e-commerce product card.`
 
-	return fmt.Sprintf(
-		"Create a professional product card image for %s marketplace. Style: %s. Card type: %s. "+
-			"High quality, clean background, suitable for e-commerce listing. No text overlays.",
-		marketplace, style, cardType,
-	)
+// BuildPrompt собирает prompt из четырёх блоков: задача карточки, marketplace, стиль, quality.
+// Описание блоков оставлено на английском, потому что image-модели лучше реагируют на английские prompt.
+// Если Product nil, шаблоны строятся без конкретных деталей товара — модель не выдумывает бренды и числа.
+func BuildPrompt(input PromptInput) string {
+	marketplace := marketplaceDisplayName(input.MarketplaceID)
+
+	parts := []string{
+		cardTypeBlock(input.CardTypeID, marketplace, input.Product),
+		marketplaceRule(input.MarketplaceID),
+		styleRule(input.StyleID),
+		qualityBlock,
+	}
+
+	return strings.Join(parts, "\n\n")
 }
 
 // marketplaceAspectRatio возвращает рекомендуемое соотношение сторон карточки для marketplace.
@@ -24,31 +45,4 @@ func marketplaceAspectRatio(marketplaceID string) string {
 		}
 	}
 	return "3:4"
-}
-
-func findMarketplacePromptPart(items []marketplaceOption, id, fallback string) string {
-	for _, item := range items {
-		if item.ID == id {
-			return item.promptPart
-		}
-	}
-	return fallback
-}
-
-func findCatalogPromptPart(items []promptCatalogOption, id, fallback string) string {
-	for _, item := range items {
-		if item.ID == id {
-			return item.promptPart
-		}
-	}
-	return fallback
-}
-
-func findCardTypePromptPart(items []promptCardTypeOption, id, fallback string) string {
-	for _, item := range items {
-		if item.ID == id {
-			return item.promptPart
-		}
-	}
-	return fallback
 }

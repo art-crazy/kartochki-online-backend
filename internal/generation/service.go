@@ -2,6 +2,7 @@ package generation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"kartochki-online-backend/internal/dbgen"
@@ -87,7 +89,7 @@ func (s *Service) UploadSourceImage(ctx context.Context, userID string, image Up
 	row, err := s.queries.CreateAsset(ctx, dbgen.CreateAssetParams{
 		ID:               assetID,
 		UserID:           uid,
-		Kind:             "source_image",
+		Kind:             assetKindSourceImage,
 		StorageKey:       saved.StorageKey,
 		OriginalFilename: image.FileName,
 		MimeType:         mimeType,
@@ -159,6 +161,14 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreatedGenerat
 		}
 	}
 
+	// Сохраняем контекст товара в той же транзакции, если пользователь его передал.
+	// Откат транзакции автоматически отменит и эту запись.
+	if normalized.Product != nil {
+		if err := saveProductContext(ctx, txQueries, generationID, normalized.Product); err != nil {
+			return CreatedGeneration{}, err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return CreatedGeneration{}, fmt.Errorf("commit generation create tx: %w", err)
 	}
@@ -183,6 +193,36 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreatedGenerat
 		GenerationID: row.ID.String(),
 		Status:       row.Status,
 	}, nil
+}
+
+// saveProductContext сериализует характеристики и сохраняет контекст товара через sqlc.
+// Вызывается внутри транзакции создания generation, поэтому не берёт отдельную tx.
+func saveProductContext(ctx context.Context, q *dbgen.Queries, generationID uuid.UUID, p *ProductContext) error {
+	// json.Marshal(nil) возвращает "null", а не "[]", поэтому обрабатываем пустой срез явно.
+	var charsJSON []byte
+	if len(p.Characteristics) == 0 {
+		charsJSON = []byte("[]")
+	} else {
+		var err error
+		charsJSON, err = json.Marshal(p.Characteristics)
+		if err != nil {
+			return fmt.Errorf("marshal product characteristics: %w", err)
+		}
+	}
+
+	if _, err := q.CreateGenerationProductContext(ctx, dbgen.CreateGenerationProductContextParams{
+		GenerationID:    generationID,
+		Name:            p.Name,
+		Category:        pgtype.Text{String: p.Category, Valid: p.Category != ""},
+		Brand:           pgtype.Text{String: p.Brand, Valid: p.Brand != ""},
+		Description:     pgtype.Text{String: p.Description, Valid: p.Description != ""},
+		Benefits:        p.Benefits,
+		Characteristics: charsJSON,
+	}); err != nil {
+		return fmt.Errorf("create generation product context: %w", err)
+	}
+
+	return nil
 }
 
 // GetByID возвращает статус генерации и готовые артефакты, если они уже появились.

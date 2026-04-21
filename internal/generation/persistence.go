@@ -31,7 +31,7 @@ func (s *Service) persistGeneratedCard(
 	if _, err := txQueries.CreateAsset(ctx, dbgen.CreateAssetParams{
 		ID:               assetID,
 		UserID:           generationRow.UserID,
-		Kind:             "generated_card",
+		Kind:             assetKindGeneratedCard,
 		StorageKey:       savedFile.StorageKey,
 		OriginalFilename: filepath.Base(savedFile.StorageKey),
 		// RouterAI всегда возвращает PNG независимо от формата исходника.
@@ -63,7 +63,7 @@ func (s *Service) persistArchiveAsset(ctx context.Context, assetID uuid.UUID, ge
 	if _, err := s.queries.CreateAsset(ctx, dbgen.CreateAssetParams{
 		ID:               assetID,
 		UserID:           generationRow.UserID,
-		Kind:             "archive",
+		Kind:             assetKindArchive,
 		StorageKey:       archiveFile.StorageKey,
 		OriginalFilename: "cards.zip",
 		MimeType:         "application/zip",

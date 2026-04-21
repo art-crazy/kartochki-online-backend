@@ -339,6 +339,7 @@ type CreateGenerationRequest struct {
 
 	// ModelId Идентификатор AI-модели из каталога /generate/config. Если не указан, используется первая модель по умолчанию.
 	ModelId       *string            `json:"model_id,omitempty"`
+	Product       *ProductContext    `json:"product,omitempty"`
 	ProjectName   *string            `json:"project_name,omitempty"`
 	SourceAssetId openapi_types.UUID `json:"source_asset_id"`
 	StyleId       string             `json:"style_id"`
@@ -532,6 +533,22 @@ type PatchProjectRequest struct {
 	Title              *string `json:"title,omitempty"`
 }
 
+// ProductCharacteristic defines model for ProductCharacteristic.
+type ProductCharacteristic struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// ProductContext defines model for ProductContext.
+type ProductContext struct {
+	Benefits        *[]string                `json:"benefits,omitempty"`
+	Brand           *string                  `json:"brand,omitempty"`
+	Category        *string                  `json:"category,omitempty"`
+	Characteristics *[]ProductCharacteristic `json:"characteristics,omitempty"`
+	Description     *string                  `json:"description,omitempty"`
+	Name            string                   `json:"name"`
+}
+
 // Project defines model for Project.
 type Project struct {
 	// Cards Только готовые карточки проекта. Если карточек нет, массив пустой.
@@ -649,11 +666,13 @@ type SettingsNotifications struct {
 
 // SettingsProfile defines model for SettingsProfile.
 type SettingsProfile struct {
-	Company       *string              `json:"company,omitempty"`
-	Email         *openapi_types.Email `json:"email,omitempty"`
-	EmailVerified bool                 `json:"email_verified"`
-	Name          string               `json:"name"`
-	Phone         *string              `json:"phone,omitempty"`
+	Company *string              `json:"company,omitempty"`
+	Email   *openapi_types.Email `json:"email,omitempty"`
+
+	// EmailVerified Подтверждён ли email пользователя.
+	EmailVerified bool    `json:"email_verified"`
+	Name          string  `json:"name"`
+	Phone         *string `json:"phone,omitempty"`
 }
 
 // SettingsResponse defines model for SettingsResponse.

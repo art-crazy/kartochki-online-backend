@@ -109,6 +109,57 @@ schemas:
         format: uri
         example: http://localhost:8080/media/uploads/user-id/source.png
 
+  ProductCharacteristic:
+    type: object
+    required:
+      - name
+      - value
+    properties:
+      name:
+        type: string
+        maxLength: 120
+        example: Материал верха
+      value:
+        type: string
+        maxLength: 120
+        example: текстиль
+
+  ProductContext:
+    type: object
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        maxLength: 200
+        example: Женские кроссовки Nike Air Zoom
+      category:
+        type: string
+        maxLength: 120
+        example: обувь
+      brand:
+        type: string
+        maxLength: 120
+        example: Nike
+      description:
+        type: string
+        maxLength: 2000
+        example: Лёгкие женские кроссовки для прогулок и спорта
+      benefits:
+        type: array
+        maxItems: 10
+        items:
+          type: string
+          maxLength: 120
+        example:
+          - лёгкая подошва
+          - дышащий верх
+      characteristics:
+        type: array
+        maxItems: 20
+        items:
+          $ref: "#/schemas/ProductCharacteristic"
+
   CreateGenerationRequest:
     type: object
     required:
@@ -147,6 +198,8 @@ schemas:
         type: string
         description: Идентификатор AI-модели из каталога /generate/config. Если не указан, используется первая модель по умолчанию.
         example: google/gemini-2.5-flash-image
+      product:
+        $ref: "#/schemas/ProductContext"
 
   CreateGenerationResponse:
     type: object
