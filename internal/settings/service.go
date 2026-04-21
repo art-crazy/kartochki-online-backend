@@ -22,7 +22,7 @@ import (
 const (
 	defaultCardsPerGeneration = 10
 	defaultImageFormat        = "png"
-	deleteAccountConfirmWord  = "DELETE"
+	deleteAccountConfirmWord  = "УДАЛИТЬ"
 	apiKeyPrefix              = "ko_live_"
 )
 

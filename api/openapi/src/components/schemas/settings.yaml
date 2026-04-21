@@ -259,4 +259,4 @@ schemas:
     properties:
       confirm_word:
         type: string
-        example: DELETE
+        example: УДАЛИТЬ
