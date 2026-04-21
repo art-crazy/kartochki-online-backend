@@ -72,16 +72,16 @@ var (
 	// Первая модель считается выбором по умолчанию, если клиент не передал ModelID.
 	generateModels = []ModelOption{
 		{
-			ID:            "google/gemini-2.5-flash-image",
-			Label:         "Gemini 2.5 Flash",
-			Description:   "Быстро и дёшево. Хорошо для прототипирования и большого количества карточек.",
-			PricePerImage: 5,
-		},
-		{
 			ID:            "google/gemini-3-pro-image-preview",
 			Label:         "Gemini 3 Pro",
 			Description:   "Высокое качество изображений, детальная проработка. Оптимален для финального результата.",
 			PricePerImage: 25,
+		},
+		{
+			ID:            "google/gemini-2.5-flash-image",
+			Label:         "Gemini 2.5 Flash",
+			Description:   "Быстро и дёшево. Хорошо для прототипирования и большого количества карточек.",
+			PricePerImage: 5,
 		},
 		{
 			ID:            "black-forest-labs/flux.2-pro",
