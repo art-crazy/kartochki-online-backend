@@ -26,6 +26,11 @@ const (
 	apiKeyPrefix              = "ko_live_"
 )
 
+var deleteAccountConfirmWords = map[string]struct{}{
+	deleteAccountConfirmWord: {},
+	"DELETE":                {},
+}
+
 var defaultNotificationItems = []NotificationItem{
 	{Key: "billing_updates", Enabled: true},
 	{Key: "generation_ready", Enabled: true},
@@ -571,7 +576,7 @@ func (s *Service) ExportData(ctx context.Context, userID string) error {
 // чтобы исключить race window: middleware не сможет авторизовать запрос
 // по токену, который формально ещё числился активным в момент DELETE.
 func (s *Service) DeleteAccount(ctx context.Context, userID string, confirmWord string) error {
-	if strings.TrimSpace(confirmWord) != deleteAccountConfirmWord {
+	if _, ok := deleteAccountConfirmWords[strings.TrimSpace(confirmWord)]; !ok {
 		return ErrInvalidConfirmWord
 	}
 
