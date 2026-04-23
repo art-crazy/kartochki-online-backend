@@ -1,7 +1,6 @@
 package routerai
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -16,7 +15,7 @@ import (
 
 const (
 	defaultEndpoint = "https://routerai.ru/api/v1"
-	defaultTimeout  = 120 * time.Second
+	defaultTimeout  = 10 * time.Minute
 	maxRespBodySize = 32 << 20 // 32 МБ — изображения могут быть большими
 )
 
@@ -93,16 +92,9 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([
 		return nil, fmt.Errorf("marshal routerai request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint+"/chat/completions", bytes.NewReader(body))
+	resp, err := c.doChatCompletionRequest(ctx, body)
 	if err != nil {
-		return nil, fmt.Errorf("create routerai request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("routerai request failed: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 

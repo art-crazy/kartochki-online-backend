@@ -248,7 +248,7 @@ func loadFromEnv() (Config, error) {
 		return Config{}, err
 	}
 
-	routerAITimeout, err := getDuration("ROUTERAI_TIMEOUT", 120*time.Second)
+	routerAITimeout, err := getDuration("ROUTERAI_TIMEOUT", 10*time.Minute)
 	if err != nil {
 		return Config{}, err
 	}
