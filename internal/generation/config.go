@@ -72,6 +72,12 @@ var (
 	// Первая модель считается выбором по умолчанию, если клиент не передал ModelID.
 	generateModels = []ModelOption{
 		{
+			ID:            "openai/gpt-5.4-image-2",
+			Label:         "GPT-5.4 Image 2",
+			Description:   "Новая мультимодальная модель OpenAI для генерации изображений с сильным качеством и пониманием сложных инструкций.",
+			PricePerImage: 30,
+		},
+		{
 			ID:            "google/gemini-3-pro-image-preview",
 			Label:         "Gemini 3 Pro",
 			Description:   "Высокое качество изображений, детальная проработка. Оптимален для финального результата.",

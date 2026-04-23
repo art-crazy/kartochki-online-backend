@@ -2888,7 +2888,7 @@ components:
         model_id:
           type: string
           description: Идентификатор AI-модели из каталога /generate/config. Если не указан, используется первая модель по умолчанию.
-          example: google/gemini-2.5-flash-image
+          example: openai/gpt-5.4-image-2
         product:
           $ref: '#/components/schemas/ProductContext'
     CreateGenerationResponse:
@@ -3842,17 +3842,17 @@ components:
       properties:
         id:
           type: string
-          example: google/gemini-2.5-flash-image
+          example: openai/gpt-5.4-image-2
         label:
           type: string
-          example: Gemini 2.5 Flash
+          example: GPT-5.4 Image 2
         description:
           type: string
-          example: Быстро и дёшево. Хорошо для прототипирования и большого количества карточек.
+          example: Новая мультимодальная модель OpenAI для генерации изображений с сильным качеством и пониманием сложных инструкций.
         price_per_image:
           type: integer
           description: Стоимость одного изображения в копейках. Умножьте на card_count для итоговой цены.
-          example: 5
+          example: 30
     ProductCharacteristic:
       type: object
       required:

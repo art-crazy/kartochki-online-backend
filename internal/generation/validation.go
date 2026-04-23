@@ -70,7 +70,8 @@ func (s *Service) validateCreateInput(ctx context.Context, input CreateInput) (u
 		return uuid.UUID{}, uuid.UUID{}, normalizedCreateInput{}, ErrInvalidCardType
 	}
 
-	// Если модель не задана, берём первую из каталога. Сейчас это дешёвый вариант по умолчанию.
+	// Если модель не задана, берём первую из каталога.
+	// Так backend и frontend используют один и тот же порядок моделей по умолчанию.
 	modelID := strings.TrimSpace(input.ModelID)
 	if modelID == "" {
 		modelID = generateModels[0].ID
