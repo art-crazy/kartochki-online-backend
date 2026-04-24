@@ -72,22 +72,46 @@ var (
 	// Первая модель считается выбором по умолчанию, если клиент не передал ModelID.
 	generateModels = []ModelOption{
 		{
-			ID:            "openai/gpt-5.4-image-2",
-			Label:         "GPT-5.4 Image 2",
-			Description:   "Новая мультимодальная модель OpenAI для генерации изображений с сильным качеством и пониманием сложных инструкций.",
-			PricePerImage: 30,
+			ID:            "google/gemini-3.1-flash-image-preview",
+			Label:         "Gemini 3.1 Flash Image Preview",
+			Description:   "Быстрая модель Google для генерации и редактирования изображений с хорошим качеством.",
+			PricePerImage: 10,
 		},
 		{
-			ID:            "google/gemini-3-pro-image-preview",
-			Label:         "Gemini 3 Pro",
-			Description:   "Высокое качество изображений, детальная проработка. Оптимален для финального результата.",
-			PricePerImage: 25,
+			ID:            "openai/gpt-5-image",
+			Label:         "GPT-5 Image",
+			Description:   "Флагманская мультимодальная модель OpenAI для генерации изображений и сложных инструкций.",
+			PricePerImage: 50,
 		},
 		{
-			ID:            "google/gemini-2.5-flash-image",
-			Label:         "Gemini 2.5 Flash",
-			Description:   "Быстро и дёшево. Хорошо для прототипирования и большого количества карточек.",
-			PricePerImage: 5,
+			ID:            "black-forest-labs/flux.2-flex",
+			Label:         "FLUX.2 Flex",
+			Description:   "Производительная модель FLUX.2 с балансом качества и скорости для production-сценариев.",
+			PricePerImage: 35,
+		},
+		{
+			ID:            "black-forest-labs/flux.2-max",
+			Label:         "FLUX.2 Max",
+			Description:   "Сильная модель FLUX.2 для сложного текста, типографики и мелких деталей.",
+			PricePerImage: 45,
+		},
+		{
+			ID:            "black-forest-labs/flux.2-klein-4b",
+			Label:         "FLUX.2 Klein 4B",
+			Description:   "Самая быстрая и экономичная модель в линейке FLUX.2 для массовых генераций.",
+			PricePerImage: 10,
+		},
+		{
+			ID:            "bytedance-seed/seedream-4.5",
+			Label:         "Seedream 4.5",
+			Description:   "Новая модель ByteDance для генерации изображений с улучшенной согласованностью редактирования и детализацией.",
+			PricePerImage: 20,
+		},
+		{
+			ID:            "openai/gpt-5-image-mini",
+			Label:         "GPT-5 Image Mini",
+			Description:   "Хорошее соотношение цены и качества от OpenAI.",
+			PricePerImage: 15,
 		},
 		{
 			ID:            "black-forest-labs/flux.2-pro",
@@ -96,10 +120,22 @@ var (
 			PricePerImage: 40,
 		},
 		{
-			ID:            "openai/gpt-5-image-mini",
-			Label:         "GPT-5 Image Mini",
-			Description:   "Хорошее соотношение цены и качества от OpenAI.",
-			PricePerImage: 15,
+			ID:            "google/gemini-2.5-flash-image",
+			Label:         "Gemini 2.5 Flash",
+			Description:   "Быстро и дёшево. Хорошо для прототипирования и большого количества карточек.",
+			PricePerImage: 5,
+		},
+		{
+			ID:            "google/gemini-3-pro-image-preview",
+			Label:         "Gemini 3 Pro",
+			Description:   "Высокое качество изображений, детальная проработка. Оптимален для финального результата.",
+			PricePerImage: 25,
+		},
+		{
+			ID:            "openai/gpt-5.4-image-2",
+			Label:         "GPT-5.4 Image 2",
+			Description:   "Новая мультимодальная модель OpenAI для генерации изображений с сильным качеством и пониманием сложных инструкций.",
+			PricePerImage: 30,
 		},
 	}
 )

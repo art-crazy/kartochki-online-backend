@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -77,7 +78,7 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([
 				Content: content,
 			},
 		},
-		Modalities: []string{"image", "text"},
+		Modalities: requestModalities(input.ModelID),
 	}
 
 	// Соотношение сторон передаём только если оно задано явно.
@@ -91,6 +92,16 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([
 	if err != nil {
 		return nil, fmt.Errorf("marshal routerai request: %w", err)
 	}
+
+	// Логируем ключевые поля запроса, чтобы в консоли backend было видно,
+	// какой prompt и с какими параметрами ушёл в RouterAI.
+	log.Printf(
+		"routerai request: model=%q prompt=%q has_source_image=%t aspect_ratio=%q",
+		input.ModelID,
+		input.Prompt,
+		len(input.SourceImageBody) > 0,
+		input.AspectRatio,
+	)
 
 	resp, err := c.doChatCompletionRequest(ctx, body)
 	if err != nil {
@@ -116,12 +127,10 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([
 		return nil, fmt.Errorf("routerai returned no choices")
 	}
 
-	images := parsed.Choices[0].Message.Images
-	if len(images) == 0 {
-		return nil, fmt.Errorf("routerai returned no images in response (проверьте, поддерживает ли модель %q генерацию изображений)", input.ModelID)
+	dataURL, err := extractImageDataURL(parsed.Choices[0].Message)
+	if err != nil {
+		return nil, fmt.Errorf("routerai returned no images in response (проверьте, поддерживает ли модель %q генерацию изображений): %w", input.ModelID, err)
 	}
-
-	dataURL := images[0].ImageURL.URL
 	imgBytes, err := decodeDataURL(dataURL)
 	if err != nil {
 		return nil, fmt.Errorf("decode routerai image: %w", err)
@@ -198,49 +207,18 @@ func truncate(s string, max int) string {
 	return s[:max] + "..."
 }
 
-// --- типы запроса/ответа RouterAI (OpenAI-совместимый формат) ---
+// requestModalities возвращает модальности, совместимые с конкретной моделью RouterAI.
+// Для image-only моделей запрашиваем только image: RouterAI сообщает, что комбинация
+// image+text для них не маршрутизируется в доступный endpoint.
+func requestModalities(modelID string) []string {
+	switch modelID {
+	case "black-forest-labs/flux.2-pro",
+		"black-forest-labs/flux.2-klein-4b",
+		"black-forest-labs/flux.2-max",
+		"black-forest-labs/flux.2-flex",
+		"bytedance-seed/seedream-4.5":
+		return []string{"image"}
+	}
 
-type chatCompletionRequest struct {
-	Model       string       `json:"model"`
-	Messages    []message    `json:"messages"`
-	Modalities  []string     `json:"modalities"`
-	ImageConfig *imageConfig `json:"image_config,omitempty"`
-}
-
-type message struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"`
-}
-
-type messagePart struct {
-	Type     string    `json:"type"`
-	Text     string    `json:"text,omitempty"`
-	ImageURL *imageURL `json:"image_url,omitempty"`
-}
-
-type imageConfig struct {
-	AspectRatio string `json:"aspect_ratio,omitempty"`
-}
-
-type chatCompletionResponse struct {
-	Choices []choice `json:"choices"`
-}
-
-type choice struct {
-	Message assistantMessage `json:"message"`
-}
-
-type assistantMessage struct {
-	Role    string      `json:"role"`
-	Content string      `json:"content"`
-	Images  []imageItem `json:"images"`
-}
-
-type imageItem struct {
-	Type     string   `json:"type"`
-	ImageURL imageURL `json:"image_url"`
-}
-
-type imageURL struct {
-	URL string `json:"url"`
+	return []string{"image", "text"}
 }
