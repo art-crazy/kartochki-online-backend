@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -109,6 +110,10 @@ func (s *Service) handlePaymentSucceeded(ctx context.Context, event WebhookEvent
 		if err := s.activateSubscription(ctx, qtx, event, paidAt); err != nil {
 			return err
 		}
+	case paymentTypeSubscriptionRenewal:
+		if err := s.activateSubscription(ctx, qtx, event, paidAt); err != nil {
+			return err
+		}
 	case paymentTypeAddon:
 		if err := s.activateAddon(ctx, qtx, event, paidAt); err != nil {
 			return err
@@ -138,7 +143,10 @@ func (s *Service) activateSubscription(ctx context.Context, q *dbgen.Queries, ev
 	}
 
 	period := PlanPeriod(event.Metadata.Period)
-	periodStart, periodEnd := billingPeriodForPlan(paidAt.Time, period)
+	periodStart, periodEnd, err := s.subscriptionPeriodForWebhook(ctx, q, userID, event.Metadata.Type, paidAt.Time, period)
+	if err != nil {
+		return err
+	}
 
 	sub, err := q.UpsertActiveSubscription(ctx, dbgen.UpsertActiveSubscriptionParams{
 		UserID:                 userID,
@@ -174,6 +182,21 @@ func subscriptionProviderID(event WebhookEvent) string {
 	}
 
 	return event.ProviderPaymentID
+}
+
+func (s *Service) subscriptionPeriodForWebhook(ctx context.Context, q *dbgen.Queries, userID uuid.UUID, paymentType string, paidAt time.Time, period PlanPeriod) (time.Time, time.Time, error) {
+	if paymentType != paymentTypeSubscriptionRenewal {
+		start, end := billingPeriodForPlan(paidAt, period)
+		return start, end, nil
+	}
+
+	current, err := q.GetCurrentSubscriptionByUserID(ctx, userID)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("get current subscription for renewal: %w", err)
+	}
+
+	start := current.CurrentPeriodEnd.Time.UTC()
+	return start, billingPeriodEnd(start, period), nil
 }
 
 // activateAddon зачисляет дополнительные карточки после покупки addon-пакета.
@@ -223,10 +246,14 @@ func (s *Service) handlePaymentCanceled(ctx context.Context, event WebhookEvent)
 // billingPeriodForPlan вычисляет период подписки от момента активации в зависимости от плана.
 func billingPeriodForPlan(from time.Time, period PlanPeriod) (time.Time, time.Time) {
 	start := from.UTC().Truncate(24 * time.Hour)
+	return start, billingPeriodEnd(start, period)
+}
+
+func billingPeriodEnd(start time.Time, period PlanPeriod) time.Time {
 	switch period {
 	case PlanPeriodYearly:
-		return start, start.AddDate(1, 0, 0)
+		return start.AddDate(1, 0, 0)
 	default:
-		return start, start.AddDate(0, 1, 0)
+		return start.AddDate(0, 1, 0)
 	}
 }

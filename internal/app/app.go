@@ -126,11 +126,18 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	billingHandler := handlers.NewBillingHandler(billingService, logger)
 	billingWebhookHandler := handlers.NewBillingWebhookHandler(billingService, webhookVerifier, logger)
 	settingsHandler := handlers.NewSettingsHandler(settingsService, logger)
-	worker := jobs.NewServer(redisClient.AsynqOpt(), cfg.Asynq.Concurrency, logger, generationWorkerAdapter{service: generationService}, authEmailWorker{
-		sender:      emailSender,
-		sendTimeout: cfg.Auth.EmailSendTimeout,
-		logger:      logger,
-	})
+	worker := jobs.NewServer(
+		redisClient.AsynqOpt(),
+		cfg.Asynq.Concurrency,
+		logger,
+		generationWorkerAdapter{service: generationService},
+		authEmailWorker{
+			sender:      emailSender,
+			sendTimeout: cfg.Auth.EmailSendTimeout,
+			logger:      logger,
+		},
+		billingRenewalWorker{service: billingService, logger: logger},
+	)
 
 	router := httptransport.NewRouter(
 		cfg.HTTP,

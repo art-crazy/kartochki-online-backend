@@ -25,6 +25,7 @@ var _ handlers.PaymentStatusVerifier = (*yookassa.Client)(nil)
 var _ generation.ImageGenerator = routerAIAdapter{}
 var _ generation.GenerationJobEnqueuer = asynqGenerationEnqueuer{}
 var _ jobs.GenerationHandler = generationWorkerAdapter{}
+var _ jobs.BillingRenewalHandler = billingRenewalWorker{}
 
 // asynqGenerationEnqueuer адаптирует jobs.Client к минимальному контракту generation.
 // Так generation-сервис не зависит от конкретного клиента фоновой очереди.
@@ -50,6 +51,24 @@ type generationWorkerAdapter struct {
 // HandleGeneration извлекает payload очереди и передаёт домену только id generation.
 func (a generationWorkerAdapter) HandleGeneration(ctx context.Context, payload jobs.GenerationPayload) error {
 	return a.service.HandleGeneration(ctx, payload.GenerationID)
+}
+
+// billingRenewalWorker адаптирует billing.Service к worker-контракту автопродления.
+type billingRenewalWorker struct {
+	service *billing.Service
+	logger  zerolog.Logger
+}
+
+// HandleBillingRenewSubscriptions запускает пачку рекуррентных платежей для due-подписок.
+func (w billingRenewalWorker) HandleBillingRenewSubscriptions(ctx context.Context, payload jobs.BillingRenewSubscriptionsPayload) error {
+	created, err := w.service.RenewDueSubscriptions(ctx, payload.BatchLimit)
+	if err != nil {
+		w.logger.Error().Err(err).Msg("worker: не удалось создать платежи автопродления")
+		return err
+	}
+
+	w.logger.Info().Int("created", created).Msg("worker: платежи автопродления созданы")
+	return nil
 }
 
 // routerAIAdapter оборачивает routerai.Client и реализует generation.ImageGenerator.
@@ -103,6 +122,27 @@ func (a yookassaCheckoutAdapter) CreateAddonCheckout(ctx context.Context, input 
 		Amount:         input.Amount,
 		Currency:       input.Currency,
 		IdempotencyKey: input.IdempotencyKey,
+	})
+	if err != nil {
+		return billing.CheckoutSession{}, err
+	}
+
+	return billing.CheckoutSession{
+		ProviderPaymentID: session.ProviderPaymentID,
+		CheckoutURL:       session.CheckoutURL,
+	}, nil
+}
+
+// CreateRecurringPayment реализует billing.CheckoutProvider для автопродления подписки.
+func (a yookassaCheckoutAdapter) CreateRecurringPayment(ctx context.Context, input billing.RecurringPaymentInput) (billing.CheckoutSession, error) {
+	session, err := a.client.CreateRecurringPayment(ctx, yookassa.RecurringPaymentInput{
+		UserID:          input.UserID,
+		PlanCode:        input.PlanCode,
+		Period:          string(input.Period),
+		Amount:          input.Amount,
+		Currency:        input.Currency,
+		PaymentMethodID: input.PaymentMethodID,
+		IdempotencyKey:  input.IdempotencyKey,
 	})
 	if err != nil {
 		return billing.CheckoutSession{}, err

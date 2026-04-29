@@ -238,6 +238,7 @@ schemas:
             type: string
             enum:
               - subscription
+              - subscription_renewal
               - addon
 
   YooKassaWebhookEvent:

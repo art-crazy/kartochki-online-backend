@@ -632,6 +632,93 @@ func (q *Queries) ListActiveBillingPlans(ctx context.Context) ([]Plan, error) {
 	return items, nil
 }
 
+const listSubscriptionsDueForRenewal = `-- name: ListSubscriptionsDueForRenewal :many
+select
+    s.id,
+    s.user_id,
+    s.plan_id,
+    s.provider,
+    s.provider_subscription_id,
+    s.current_period_start,
+    s.current_period_end,
+    s.renews_at,
+    p.code as plan_code,
+    p.monthly_price,
+    p.yearly_monthly_price,
+    p.cards_per_month
+from subscriptions s
+join plans p on p.id = s.plan_id
+where s.status = 'active'
+  and s.has_payment_method = true
+  and s.provider = 'yookassa'
+  and s.provider_subscription_id is not null
+  and s.renews_at <= $1
+  and not exists (
+      select 1
+      from payments pay
+      where pay.subscription_id = s.id
+        and pay.kind = 'subscription'
+        and pay.status = 'pending'
+  )
+order by s.renews_at asc
+limit $2
+`
+
+type ListSubscriptionsDueForRenewalParams struct {
+	NowAt      pgtype.Timestamptz
+	BatchLimit int32
+}
+
+type ListSubscriptionsDueForRenewalRow struct {
+	ID                     uuid.UUID
+	UserID                 uuid.UUID
+	PlanID                 uuid.UUID
+	Provider               string
+	ProviderSubscriptionID pgtype.Text
+	CurrentPeriodStart     pgtype.Timestamptz
+	CurrentPeriodEnd       pgtype.Timestamptz
+	RenewsAt               pgtype.Timestamptz
+	PlanCode               string
+	MonthlyPrice           int32
+	YearlyMonthlyPrice     pgtype.Int4
+	CardsPerMonth          int32
+}
+
+// Находим активные подписки, которым пора создать рекуррентный платёж.
+// pending-платёж по той же подписке означает, что попытка уже создана и ждёт webhook.
+func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context, arg ListSubscriptionsDueForRenewalParams) ([]ListSubscriptionsDueForRenewalRow, error) {
+	rows, err := q.db.Query(ctx, listSubscriptionsDueForRenewal, arg.NowAt, arg.BatchLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSubscriptionsDueForRenewalRow
+	for rows.Next() {
+		var i ListSubscriptionsDueForRenewalRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.PlanID,
+			&i.Provider,
+			&i.ProviderSubscriptionID,
+			&i.CurrentPeriodStart,
+			&i.CurrentPeriodEnd,
+			&i.RenewsAt,
+			&i.PlanCode,
+			&i.MonthlyPrice,
+			&i.YearlyMonthlyPrice,
+			&i.CardsPerMonth,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markPaymentCanceled = `-- name: MarkPaymentCanceled :execrows
 update payments
 set status = 'canceled'

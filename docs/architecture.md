@@ -397,6 +397,7 @@ It owns:
 
 - subscription and usage quota state
 - checkout session creation (delegated to a `CheckoutProvider` interface)
+- recurring payment creation for subscription auto-renewal
 - webhook event handling (idempotent, transactional)
 - generation quota enforcement via `EnsureGenerationAllowed`
 
@@ -405,6 +406,7 @@ The `CheckoutProvider` interface is defined in `internal/billing` and implemente
 `internal/platform/yookassa` implements the ЮКасса HTTP API:
 
 - payment creation for subscriptions and addons
+- recurring payment creation by saved `payment_method_id`
 - payment status lookup for webhook authenticity checks
 - per-attempt idempotency keys to prevent accidental provider duplicates without reusing canceled payments
 
@@ -427,6 +429,17 @@ Incoming payment provider webhooks follow this flow:
 6. On any error, the handler returns 500 so the provider retries
 
 The webhook endpoint does not require user authentication; it is protected by provider-side payment status verification.
+
+### Subscription auto-renewal pattern
+
+Auto-renewal is implemented by our backend, not by a YooKassa subscription object:
+
+1. The first successful subscription payment stores the saved YooKassa `payment_method.id` in `subscriptions.provider_subscription_id`
+2. An Asynq scheduler enqueues `billing:renew-subscriptions` every 30 minutes
+3. `billing.Service.RenewDueSubscriptions` finds active YooKassa subscriptions with `renews_at <= now`, skipping `scheduled_cancel` and subscriptions that already have a pending renewal payment
+4. The YooKassa adapter creates a payment with `payment_method_id`, `capture: true`, and metadata type `subscription_renewal`
+5. The local `payments` row is saved as `pending`; subscription dates and quotas move forward only after `payment.succeeded`
+6. `payment.canceled` leaves the current subscription state unchanged and allows a later renewal attempt
 
 ## Data and Persistence Conventions
 

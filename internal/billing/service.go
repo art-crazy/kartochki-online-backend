@@ -31,8 +31,9 @@ const (
 
 	paymentStatusPending = "pending"
 
-	paymentTypeSubscription = "subscription"
-	paymentTypeAddon        = "addon"
+	paymentTypeSubscription        = "subscription"
+	paymentTypeSubscriptionRenewal = "subscription_renewal"
+	paymentTypeAddon               = "addon"
 )
 
 var planFeaturesByCode = map[string][]PlanFeature{
@@ -209,6 +210,7 @@ type Service struct {
 type CheckoutProvider interface {
 	CreateSubscriptionCheckout(ctx context.Context, input SubscriptionCheckoutInput) (CheckoutSession, error)
 	CreateAddonCheckout(ctx context.Context, input AddonCheckoutInput) (CheckoutSession, error)
+	CreateRecurringPayment(ctx context.Context, input RecurringPaymentInput) (CheckoutSession, error)
 }
 
 // CheckoutSession описывает созданный платёж у внешнего провайдера.
@@ -237,6 +239,17 @@ type AddonCheckoutInput struct {
 	Currency  string
 	// IdempotencyKey — стабильный ключ для дедупликации запроса на стороне платёжного провайдера.
 	IdempotencyKey string
+}
+
+// RecurringPaymentInput описывает параметры автосписания за продление подписки.
+type RecurringPaymentInput struct {
+	UserID          string
+	PlanCode        string
+	Period          PlanPeriod
+	Amount          int
+	Currency        string
+	PaymentMethodID string
+	IdempotencyKey  string
 }
 
 type noopCheckoutProvider struct{}
@@ -433,6 +446,70 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 	}
 
 	return PurchaseAddonResult{CheckoutURL: session.CheckoutURL}, nil
+}
+
+// RenewDueSubscriptions создаёт рекуррентные платежи для подписок, у которых наступила дата renews_at.
+// Фактическое продление периода выполняется позже через webhook payment.succeeded.
+func (s *Service) RenewDueSubscriptions(ctx context.Context, batchLimit int) (int, error) {
+	if batchLimit <= 0 {
+		batchLimit = 50
+	}
+
+	rows, err := s.queries.ListSubscriptionsDueForRenewal(ctx, dbgen.ListSubscriptionsDueForRenewalParams{
+		NowAt:      toTimestamp(time.Now().UTC()),
+		BatchLimit: int32(batchLimit),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("list subscriptions due for renewal: %w", err)
+	}
+
+	created := 0
+	for _, row := range rows {
+		if err := s.createRenewalPayment(ctx, row); err != nil {
+			return created, err
+		}
+		created++
+	}
+
+	return created, nil
+}
+
+func (s *Service) createRenewalPayment(ctx context.Context, row dbgen.ListSubscriptionsDueForRenewalRow) error {
+	period := renewalPeriod(row.CurrentPeriodStart.Time, row.CurrentPeriodEnd.Time)
+	amount, err := amountForRenewal(row, period)
+	if err != nil {
+		return err
+	}
+
+	session, err := s.provider.CreateRecurringPayment(ctx, RecurringPaymentInput{
+		UserID:          row.UserID.String(),
+		PlanCode:        row.PlanCode,
+		Period:          period,
+		Amount:          amount,
+		Currency:        checkoutCurrencyRUB,
+		PaymentMethodID: row.ProviderSubscriptionID.String,
+		IdempotencyKey:  checkoutIdempotencyKey(row.ID.String(), row.CurrentPeriodEnd.Time.UTC().Format(time.RFC3339), string(period)),
+	})
+	if err != nil {
+		return fmt.Errorf("create recurring payment for subscription %s: %w", row.ID, err)
+	}
+
+	if err := s.recordPendingPayment(ctx, dbgen.CreatePaymentParams{
+		UserID:            row.UserID,
+		SubscriptionID:    toPgUUID(row.ID),
+		AddonProductID:    pgtype.UUID{},
+		Provider:          ProviderYooKassa,
+		ProviderPaymentID: toPgText(session.ProviderPaymentID),
+		Kind:              paymentTypeSubscription,
+		Status:            paymentStatusPending,
+		Amount:            int32(amount),
+		Currency:          checkoutCurrencyRUB,
+		CheckoutUrl:       pgtype.Text{},
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CancelSubscription ставит активную платную подписку на отмену в конце текущего периода.
@@ -700,10 +777,36 @@ func amountForPeriod(plan dbgen.Plan, period PlanPeriod) (int, error) {
 	}
 }
 
+func amountForRenewal(row dbgen.ListSubscriptionsDueForRenewalRow, period PlanPeriod) (int, error) {
+	switch period {
+	case PlanPeriodMonthly:
+		return int(row.MonthlyPrice), nil
+	case PlanPeriodYearly:
+		if !row.YearlyMonthlyPrice.Valid {
+			return 0, ErrInvalidPlanPeriod
+		}
+		return int(row.YearlyMonthlyPrice.Int32) * 12, nil
+	default:
+		return 0, ErrInvalidPlanPeriod
+	}
+}
+
+func renewalPeriod(start, end time.Time) PlanPeriod {
+	if start.AddDate(1, 0, 0).Equal(end) {
+		return PlanPeriodYearly
+	}
+
+	return PlanPeriodMonthly
+}
+
 func (noopCheckoutProvider) CreateSubscriptionCheckout(context.Context, SubscriptionCheckoutInput) (CheckoutSession, error) {
 	return CheckoutSession{}, ErrCheckoutProviderNotConfigured
 }
 
 func (noopCheckoutProvider) CreateAddonCheckout(context.Context, AddonCheckoutInput) (CheckoutSession, error) {
+	return CheckoutSession{}, ErrCheckoutProviderNotConfigured
+}
+
+func (noopCheckoutProvider) CreateRecurringPayment(context.Context, RecurringPaymentInput) (CheckoutSession, error) {
 	return CheckoutSession{}, ErrCheckoutProviderNotConfigured
 }

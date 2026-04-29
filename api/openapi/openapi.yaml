@@ -3201,6 +3201,7 @@ components:
               type: string
               enum:
                 - subscription
+                - subscription_renewal
                 - addon
     SettingsResponse:
       type: object

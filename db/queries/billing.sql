@@ -200,6 +200,39 @@ from payments
 where provider_payment_id = @provider_payment_id
 limit 1;
 
+-- name: ListSubscriptionsDueForRenewal :many
+-- Находим активные подписки, которым пора создать рекуррентный платёж.
+-- pending-платёж по той же подписке означает, что попытка уже создана и ждёт webhook.
+select
+    s.id,
+    s.user_id,
+    s.plan_id,
+    s.provider,
+    s.provider_subscription_id,
+    s.current_period_start,
+    s.current_period_end,
+    s.renews_at,
+    p.code as plan_code,
+    p.monthly_price,
+    p.yearly_monthly_price,
+    p.cards_per_month
+from subscriptions s
+join plans p on p.id = s.plan_id
+where s.status = 'active'
+  and s.has_payment_method = true
+  and s.provider = 'yookassa'
+  and s.provider_subscription_id is not null
+  and s.renews_at <= @now_at
+  and not exists (
+      select 1
+      from payments pay
+      where pay.subscription_id = s.id
+        and pay.kind = 'subscription'
+        and pay.status = 'pending'
+  )
+order by s.renews_at asc
+limit sqlc.arg(batch_limit);
+
 -- name: CreatePayment :one
 -- Создаём запись платежа после получения checkout от провайдера.
 insert into payments (

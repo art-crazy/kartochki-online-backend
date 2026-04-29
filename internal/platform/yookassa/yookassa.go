@@ -76,7 +76,7 @@ func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input Subscript
 		},
 	}
 
-	return c.createPayment(ctx, body, input.IdempotencyKey)
+	return c.createPayment(ctx, body, input.IdempotencyKey, true)
 }
 
 // CreateAddonCheckout создаёт разовый платёж для покупки пакета карточек.
@@ -101,7 +101,28 @@ func (c *Client) CreateAddonCheckout(ctx context.Context, input AddonCheckoutInp
 		},
 	}
 
-	return c.createPayment(ctx, body, input.IdempotencyKey)
+	return c.createPayment(ctx, body, input.IdempotencyKey, true)
+}
+
+// CreateRecurringPayment создаёт автосписание по сохранённому payment_method_id без участия пользователя.
+func (c *Client) CreateRecurringPayment(ctx context.Context, input RecurringPaymentInput) (CheckoutSession, error) {
+	body := map[string]any{
+		"amount": map[string]string{
+			"value":    formatAmount(input.Amount),
+			"currency": input.Currency,
+		},
+		"capture":           true,
+		"payment_method_id": input.PaymentMethodID,
+		"description":       fmt.Sprintf("Продление подписки %s (%s)", input.PlanCode, input.Period),
+		"metadata": map[string]string{
+			"user_id":   input.UserID,
+			"plan_code": input.PlanCode,
+			"period":    string(input.Period),
+			"type":      "subscription_renewal",
+		},
+	}
+
+	return c.createPayment(ctx, body, input.IdempotencyKey, false)
 }
 
 // ParseWebhookEvent разбирает тело webhook-уведомления от ЮКасса.
@@ -148,7 +169,7 @@ func (c *Client) GetPayment(ctx context.Context, paymentID string) (PaymentObjec
 }
 
 // createPayment отправляет запрос на создание платежа и возвращает данные для сохранения в БД.
-func (c *Client) createPayment(ctx context.Context, body map[string]any, idempotencyKey string) (CheckoutSession, error) {
+func (c *Client) createPayment(ctx context.Context, body map[string]any, idempotencyKey string, requireConfirmation bool) (CheckoutSession, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return CheckoutSession{}, fmt.Errorf("marshal yookassa payment request: %w", err)
@@ -186,7 +207,7 @@ func (c *Client) createPayment(ctx context.Context, body map[string]any, idempot
 	if result.ID == "" {
 		return CheckoutSession{}, fmt.Errorf("yookassa returned empty payment id")
 	}
-	if result.Confirmation.ConfirmationURL == "" {
+	if requireConfirmation && result.Confirmation.ConfirmationURL == "" {
 		return CheckoutSession{}, fmt.Errorf("yookassa returned empty confirmation_url")
 	}
 
@@ -200,76 +221,6 @@ func (c *Client) createPayment(ctx context.Context, body map[string]any, idempot
 // ЮКасса ожидает сумму в формате "100.00" (рубли).
 func formatAmount(rubles int) string {
 	return fmt.Sprintf("%d.00", rubles)
-}
-
-// CheckoutSession содержит данные созданного платежа ЮКасса.
-type CheckoutSession struct {
-	ProviderPaymentID string
-	CheckoutURL       string
-}
-
-// SubscriptionCheckoutInput — параметры для создания платежа подписки.
-type SubscriptionCheckoutInput struct {
-	UserID         string
-	PlanCode       string
-	Period         string
-	Amount         int
-	Currency       string
-	IdempotencyKey string
-}
-
-// AddonCheckoutInput — параметры для создания разового платежа addon.
-type AddonCheckoutInput struct {
-	UserID         string
-	AddonCode      string
-	Amount         int
-	Currency       string
-	IdempotencyKey string
-}
-
-// WebhookEvent описывает входящее уведомление от ЮКасса.
-type WebhookEvent struct {
-	// Type — тип события, например "payment.succeeded".
-	Type   EventType     `json:"type"`
-	Object PaymentObject `json:"object"`
-}
-
-// PaymentObject описывает объект платежа внутри webhook-уведомления.
-type PaymentObject struct {
-	ID          string          `json:"id"`
-	Status      string          `json:"status"`
-	Amount      PaymentAmount   `json:"amount"`
-	Description string          `json:"description"`
-	Metadata    PaymentMetadata `json:"metadata"`
-	// PaidAt — время фактического списания средств.
-	PaidAt string `json:"captured_at"`
-	// ExpiresAt — время истечения авторизации (для двухэтапных платежей).
-	ExpiresAt string `json:"expires_at"`
-	// PaymentMethod содержит сохранённый способ оплаты при save_payment_method: true.
-	// Его id нужен для будущих рекуррентных списаний.
-	PaymentMethod PaymentMethod `json:"payment_method"`
-}
-
-// PaymentMethod описывает способ оплаты внутри объекта платежа ЮКасса.
-type PaymentMethod struct {
-	ID    string `json:"id"`
-	Saved bool   `json:"saved"`
-}
-
-// PaymentAmount описывает сумму платежа.
-type PaymentAmount struct {
-	Value    string `json:"value"`
-	Currency string `json:"currency"`
-}
-
-// PaymentMetadata хранит произвольные поля, переданные при создании платежа.
-type PaymentMetadata struct {
-	UserID    string `json:"user_id"`
-	PlanCode  string `json:"plan_code"`
-	AddonCode string `json:"addon_code"`
-	Period    string `json:"period"`
-	// Type — тип платежа: "subscription" или "addon".
-	Type string `json:"type"`
 }
 
 type createPaymentResponse struct {

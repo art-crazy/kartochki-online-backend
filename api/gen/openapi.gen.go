@@ -96,8 +96,9 @@ const (
 
 // Defines values for YooKassaPaymentObjectMetadataType.
 const (
-	Addon        YooKassaPaymentObjectMetadataType = "addon"
-	Subscription YooKassaPaymentObjectMetadataType = "subscription"
+	Addon               YooKassaPaymentObjectMetadataType = "addon"
+	Subscription        YooKassaPaymentObjectMetadataType = "subscription"
+	SubscriptionRenewal YooKassaPaymentObjectMetadataType = "subscription_renewal"
 )
 
 // Defines values for YooKassaPaymentObjectStatus.
