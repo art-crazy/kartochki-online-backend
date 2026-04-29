@@ -18,6 +18,8 @@ var (
 	ErrPlanAlreadyActive = errors.New("billing plan is already active")
 	// ErrCheckoutProviderNotConfigured возвращается, когда backend ещё не подключён к платёжному провайдеру.
 	ErrCheckoutProviderNotConfigured = errors.New("billing checkout provider is not configured")
+	// ErrCheckoutProviderFailed возвращается, когда платёжный провайдер отклонил создание checkout.
+	ErrCheckoutProviderFailed = errors.New("billing checkout provider failed")
 	// ErrSubscriptionNotCancelable возвращается, когда у пользователя нет платной подписки для отмены.
 	ErrSubscriptionNotCancelable = errors.New("billing subscription is not cancelable")
 	// ErrGenerationLimitExceeded возвращается, когда новый запуск генерации превысит доступный лимит карточек.

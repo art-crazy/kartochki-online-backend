@@ -355,7 +355,7 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 
 	currentSubscription, _, err := s.getCurrentBillingSnapshot(ctx, uid)
 	if err != nil {
-		return CheckoutResult{}, err
+		return CheckoutResult{}, fmt.Errorf("%w: %v", ErrCheckoutProviderFailed, err)
 	}
 	if strings.TrimSpace(currentSubscription.PlanCode) == targetPlan.Code {
 		return CheckoutResult{}, ErrPlanAlreadyActive
@@ -427,7 +427,7 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 		IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
-		return PurchaseAddonResult{}, err
+		return PurchaseAddonResult{}, fmt.Errorf("%w: %v", ErrCheckoutProviderFailed, err)
 	}
 
 	if err := s.recordPendingPayment(ctx, dbgen.CreatePaymentParams{
@@ -493,7 +493,7 @@ func (s *Service) createRenewalPayment(ctx context.Context, row dbgen.ListSubscr
 		IdempotencyKey:  checkoutIdempotencyKey(row.ID.String(), row.CurrentPeriodEnd.Time.UTC().Format(time.RFC3339), string(period)),
 	})
 	if err != nil {
-		return fmt.Errorf("create recurring payment for subscription %s: %w", row.ID, err)
+		return fmt.Errorf("%w: create recurring payment for subscription %s: %v", ErrCheckoutProviderFailed, row.ID, err)
 	}
 
 	if err := s.recordPendingPayment(ctx, dbgen.CreatePaymentParams{
