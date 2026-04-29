@@ -464,14 +464,16 @@ func (s *Service) RenewDueSubscriptions(ctx context.Context, batchLimit int) (in
 	}
 
 	created := 0
+	var joined error
 	for _, row := range rows {
 		if err := s.createRenewalPayment(ctx, row); err != nil {
-			return created, err
+			joined = errors.Join(joined, err)
+			continue
 		}
 		created++
 	}
 
-	return created, nil
+	return created, joined
 }
 
 func (s *Service) createRenewalPayment(ctx context.Context, row dbgen.ListSubscriptionsDueForRenewalRow) error {

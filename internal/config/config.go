@@ -311,7 +311,7 @@ func loadFromEnv() (Config, error) {
 		YooKassa: YooKassaConfig{
 			ShopID:    getEnv("YOOKASSA_SHOP_ID", ""),
 			SecretKey: getEnv("YOOKASSA_SECRET_KEY", ""),
-			ReturnURL: getEnv("YOOKASSA_RETURN_URL", "http://localhost:3000/app/billing"),
+			ReturnURL: getEnv("YOOKASSA_RETURN_URL", billingReturnURL(getEnv("FRONTEND_URL", "http://localhost:3000"))),
 		},
 		RouterAI: RouterAIConfig{
 			APIKey:   getEnv("ROUTERAI_API_KEY", ""),
@@ -412,6 +412,15 @@ func normalizePublicPath(value string) string {
 		value = strings.TrimRight(value, "/")
 	}
 	return value
+}
+
+func billingReturnURL(frontendURL string) string {
+	frontendURL = strings.TrimSpace(frontendURL)
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
+	return strings.TrimRight(frontendURL, "/") + "/app/billing"
 }
 
 func splitCSV(value string) []string {
