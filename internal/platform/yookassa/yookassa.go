@@ -6,14 +6,11 @@ package yookassa
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"net/url"
 	"time"
 
 	"kartochki-online-backend/internal/config"
@@ -38,27 +35,25 @@ const (
 // Client — HTTP-клиент ЮКасса.
 // Аутентификация — Basic Auth: shopID как логин, secretKey как пароль.
 type Client struct {
-	shopID        string
-	secretKey     string
-	webhookSecret string
-	returnURL     string
-	httpClient    *http.Client
+	shopID     string
+	secretKey  string
+	returnURL  string
+	httpClient *http.Client
 }
 
 // New создаёт клиент ЮКасса из конфига.
 func New(cfg config.YooKassaConfig) *Client {
 	return &Client{
-		shopID:        cfg.ShopID,
-		secretKey:     cfg.SecretKey,
-		webhookSecret: cfg.WebhookSecret,
-		returnURL:     cfg.ReturnURL,
-		httpClient:    &http.Client{Timeout: defaultTimeout},
+		shopID:     cfg.ShopID,
+		secretKey:  cfg.SecretKey,
+		returnURL:  cfg.ReturnURL,
+		httpClient: &http.Client{Timeout: defaultTimeout},
 	}
 }
 
-// CreateSubscriptionCheckout создаёт платёж для покупки тарифа и возвращает URL страницы оплаты.
+// CreateSubscriptionCheckout создаёт платёж для покупки тарифа и возвращает данные checkout.
 // Параметр save_payment_method позволит повторно списывать деньги при продлении.
-func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input SubscriptionCheckoutInput) (string, error) {
+func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input SubscriptionCheckoutInput) (CheckoutSession, error) {
 	amountStr := formatAmount(input.Amount)
 
 	body := map[string]any{
@@ -85,7 +80,7 @@ func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input Subscript
 }
 
 // CreateAddonCheckout создаёт разовый платёж для покупки пакета карточек.
-func (c *Client) CreateAddonCheckout(ctx context.Context, input AddonCheckoutInput) (string, error) {
+func (c *Client) CreateAddonCheckout(ctx context.Context, input AddonCheckoutInput) (CheckoutSession, error) {
 	amountStr := formatAmount(input.Amount)
 
 	body := map[string]any{
@@ -109,21 +104,6 @@ func (c *Client) CreateAddonCheckout(ctx context.Context, input AddonCheckoutInp
 	return c.createPayment(ctx, body, input.IdempotencyKey)
 }
 
-// VerifyWebhookSignature проверяет подпись входящего webhook-уведомления.
-// ЮКасса передаёт HMAC-SHA256 подпись в заголовке YooKassa-Signature.
-// При пустом webhookSecret проверка пропускается — только для локальной разработки.
-func (c *Client) VerifyWebhookSignature(body []byte, signature string) bool {
-	if c.webhookSecret == "" {
-		return true
-	}
-
-	mac := hmac.New(sha256.New, []byte(c.webhookSecret))
-	mac.Write(body)
-	expected := hex.EncodeToString(mac.Sum(nil))
-
-	return hmac.Equal([]byte(expected), []byte(strings.ToLower(signature)))
-}
-
 // ParseWebhookEvent разбирает тело webhook-уведомления от ЮКасса.
 func ParseWebhookEvent(body []byte) (WebhookEvent, error) {
 	var event WebhookEvent
@@ -134,17 +114,49 @@ func ParseWebhookEvent(body []byte) (WebhookEvent, error) {
 	return event, nil
 }
 
+// GetPayment получает актуальное состояние платежа в ЮКасса.
+// Это используется для проверки webhook: событие принимаем только после сверки статуса у провайдера.
+func (c *Client) GetPayment(ctx context.Context, paymentID string) (PaymentObject, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/payments/"+url.PathEscape(paymentID), nil)
+	if err != nil {
+		return PaymentObject{}, fmt.Errorf("build yookassa get payment request: %w", err)
+	}
 
-// createPayment отправляет запрос на создание платежа и возвращает confirmation_url.
-func (c *Client) createPayment(ctx context.Context, body map[string]any, idempotencyKey string) (string, error) {
+	req.SetBasicAuth(c.shopID, c.secretKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return PaymentObject{}, fmt.Errorf("yookassa get payment request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxRespBodySize))
+	if err != nil {
+		return PaymentObject{}, fmt.Errorf("read yookassa get payment response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return PaymentObject{}, fmt.Errorf("yookassa get payment returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var payment PaymentObject
+	if err := json.Unmarshal(respBody, &payment); err != nil {
+		return PaymentObject{}, fmt.Errorf("parse yookassa get payment response: %w", err)
+	}
+
+	return payment, nil
+}
+
+// createPayment отправляет запрос на создание платежа и возвращает данные для сохранения в БД.
+func (c *Client) createPayment(ctx context.Context, body map[string]any, idempotencyKey string) (CheckoutSession, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
-		return "", fmt.Errorf("marshal yookassa payment request: %w", err)
+		return CheckoutSession{}, fmt.Errorf("marshal yookassa payment request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/payments", bytes.NewReader(data))
 	if err != nil {
-		return "", fmt.Errorf("build yookassa request: %w", err)
+		return CheckoutSession{}, fmt.Errorf("build yookassa request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -153,37 +165,47 @@ func (c *Client) createPayment(ctx context.Context, body map[string]any, idempot
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("yookassa http request: %w", err)
+		return CheckoutSession{}, fmt.Errorf("yookassa http request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxRespBodySize))
 	if err != nil {
-		return "", fmt.Errorf("read yookassa response: %w", err)
+		return CheckoutSession{}, fmt.Errorf("read yookassa response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("yookassa returned status %d: %s", resp.StatusCode, string(respBody))
+		return CheckoutSession{}, fmt.Errorf("yookassa returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var result createPaymentResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("parse yookassa payment response: %w", err)
+		return CheckoutSession{}, fmt.Errorf("parse yookassa payment response: %w", err)
 	}
 
+	if result.ID == "" {
+		return CheckoutSession{}, fmt.Errorf("yookassa returned empty payment id")
+	}
 	if result.Confirmation.ConfirmationURL == "" {
-		return "", fmt.Errorf("yookassa returned empty confirmation_url")
+		return CheckoutSession{}, fmt.Errorf("yookassa returned empty confirmation_url")
 	}
 
-	return result.Confirmation.ConfirmationURL, nil
+	return CheckoutSession{
+		ProviderPaymentID: result.ID,
+		CheckoutURL:       result.Confirmation.ConfirmationURL,
+	}, nil
 }
 
-// formatAmount переводит целую сумму в копейках в строку рублей с двумя знаками после запятой.
+// formatAmount переводит целую сумму в рублях в строку с двумя знаками после запятой.
 // ЮКасса ожидает сумму в формате "100.00" (рубли).
-func formatAmount(kopecks int) string {
-	rubles := kopecks / 100
-	cents := kopecks % 100
-	return fmt.Sprintf("%d.%02d", rubles, cents)
+func formatAmount(rubles int) string {
+	return fmt.Sprintf("%d.00", rubles)
+}
+
+// CheckoutSession содержит данные созданного платежа ЮКасса.
+type CheckoutSession struct {
+	ProviderPaymentID string
+	CheckoutURL       string
 }
 
 // SubscriptionCheckoutInput — параметры для создания платежа подписки.
@@ -208,8 +230,8 @@ type AddonCheckoutInput struct {
 // WebhookEvent описывает входящее уведомление от ЮКасса.
 type WebhookEvent struct {
 	// Type — тип события, например "payment.succeeded".
-	Type   EventType      `json:"type"`
-	Object PaymentObject  `json:"object"`
+	Type   EventType     `json:"type"`
+	Object PaymentObject `json:"object"`
 }
 
 // PaymentObject описывает объект платежа внутри webhook-уведомления.
@@ -220,12 +242,18 @@ type PaymentObject struct {
 	Description string          `json:"description"`
 	Metadata    PaymentMetadata `json:"metadata"`
 	// PaidAt — время фактического списания средств.
-	PaidAt      string `json:"captured_at"`
+	PaidAt string `json:"captured_at"`
 	// ExpiresAt — время истечения авторизации (для двухэтапных платежей).
-	ExpiresAt   string `json:"expires_at"`
-	// PaymentMethodID сохраняется ЮКасса при save_payment_method: true.
-	// Используется для рекуррентных списаний при продлении подписки.
-	PaymentMethodID string `json:"payment_method_id"`
+	ExpiresAt string `json:"expires_at"`
+	// PaymentMethod содержит сохранённый способ оплаты при save_payment_method: true.
+	// Его id нужен для будущих рекуррентных списаний.
+	PaymentMethod PaymentMethod `json:"payment_method"`
+}
+
+// PaymentMethod описывает способ оплаты внутри объекта платежа ЮКасса.
+type PaymentMethod struct {
+	ID    string `json:"id"`
+	Saved bool   `json:"saved"`
 }
 
 // PaymentAmount описывает сумму платежа.

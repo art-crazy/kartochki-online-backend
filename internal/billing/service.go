@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"kartochki-online-backend/internal/dbgen"
@@ -27,6 +28,8 @@ const (
 
 	subscriptionStatusActive          = "active"
 	subscriptionStatusScheduledCancel = "scheduled_cancel"
+
+	paymentStatusPending = "pending"
 
 	paymentTypeSubscription = "subscription"
 	paymentTypeAddon        = "addon"
@@ -204,8 +207,14 @@ type Service struct {
 // CheckoutProvider описывает внешний платёжный провайдер, который создаёт checkout-сессии.
 // Реализация живёт в internal/platform/yookassa и подключается через app-адаптер.
 type CheckoutProvider interface {
-	CreateSubscriptionCheckout(ctx context.Context, input SubscriptionCheckoutInput) (string, error)
-	CreateAddonCheckout(ctx context.Context, input AddonCheckoutInput) (string, error)
+	CreateSubscriptionCheckout(ctx context.Context, input SubscriptionCheckoutInput) (CheckoutSession, error)
+	CreateAddonCheckout(ctx context.Context, input AddonCheckoutInput) (CheckoutSession, error)
+}
+
+// CheckoutSession описывает созданный платёж у внешнего провайдера.
+type CheckoutSession struct {
+	ProviderPaymentID string
+	CheckoutURL       string
 }
 
 // SubscriptionCheckoutInput описывает параметры checkout для покупки тарифа.
@@ -344,22 +353,36 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 		return CheckoutResult{}, err
 	}
 
-	// Ключ включает год-месяц: стабилен при повторных попытках в одном месяце,
-	// уникален при покупке того же плана в следующем периоде.
-	billingMonth := time.Now().UTC().Format("2006-01")
-	checkoutURL, err := s.provider.CreateSubscriptionCheckout(ctx, SubscriptionCheckoutInput{
+	// Ключ уникален для каждой checkout-попытки, чтобы отменённый платёж не блокировал новый.
+	idempotencyKey := checkoutIdempotencyKey(uid.String(), targetPlan.Code, string(period), uuid.NewString())
+	session, err := s.provider.CreateSubscriptionCheckout(ctx, SubscriptionCheckoutInput{
 		UserID:         uid.String(),
 		PlanCode:       targetPlan.Code,
 		Period:         period,
 		Amount:         amount,
 		Currency:       checkoutCurrencyRUB,
-		IdempotencyKey: checkoutIdempotencyKey(uid.String(), targetPlan.Code, string(period), billingMonth),
+		IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
 		return CheckoutResult{}, err
 	}
 
-	return CheckoutResult{CheckoutURL: checkoutURL}, nil
+	if err := s.recordPendingPayment(ctx, dbgen.CreatePaymentParams{
+		UserID:            uid,
+		SubscriptionID:    pgtype.UUID{},
+		AddonProductID:    pgtype.UUID{},
+		Provider:          ProviderYooKassa,
+		ProviderPaymentID: toPgText(session.ProviderPaymentID),
+		Kind:              paymentTypeSubscription,
+		Status:            paymentStatusPending,
+		Amount:            int32(amount),
+		Currency:          checkoutCurrencyRUB,
+		CheckoutUrl:       toPgText(session.CheckoutURL),
+	}); err != nil {
+		return CheckoutResult{}, err
+	}
+
+	return CheckoutResult{CheckoutURL: session.CheckoutURL}, nil
 }
 
 // PurchaseAddon валидирует покупку разового пакета и делегирует checkout платёжному провайдеру.
@@ -381,19 +404,35 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 		return PurchaseAddonResult{}, fmt.Errorf("get billing addon by code: %w", err)
 	}
 
-	billingMonth := time.Now().UTC().Format("2006-01")
-	checkoutURL, err := s.provider.CreateAddonCheckout(ctx, AddonCheckoutInput{
+	// Для addon также создаём отдельную checkout-попытку на каждый клик оплаты.
+	idempotencyKey := checkoutIdempotencyKey(uid.String(), addon.Code, uuid.NewString())
+	session, err := s.provider.CreateAddonCheckout(ctx, AddonCheckoutInput{
 		UserID:         uid.String(),
 		AddonCode:      addon.Code,
 		Amount:         int(addon.Price),
 		Currency:       checkoutCurrencyRUB,
-		IdempotencyKey: checkoutIdempotencyKey(uid.String(), addon.Code, billingMonth),
+		IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
 		return PurchaseAddonResult{}, err
 	}
 
-	return PurchaseAddonResult{CheckoutURL: checkoutURL}, nil
+	if err := s.recordPendingPayment(ctx, dbgen.CreatePaymentParams{
+		UserID:            uid,
+		SubscriptionID:    pgtype.UUID{},
+		AddonProductID:    toPgUUID(addon.ID),
+		Provider:          ProviderYooKassa,
+		ProviderPaymentID: toPgText(session.ProviderPaymentID),
+		Kind:              paymentTypeAddon,
+		Status:            paymentStatusPending,
+		Amount:            int32(addon.Price),
+		Currency:          checkoutCurrencyRUB,
+		CheckoutUrl:       toPgText(session.CheckoutURL),
+	}); err != nil {
+		return PurchaseAddonResult{}, err
+	}
+
+	return PurchaseAddonResult{CheckoutURL: session.CheckoutURL}, nil
 }
 
 // CancelSubscription ставит активную платную подписку на отмену в конце текущего периода.
@@ -565,6 +604,22 @@ func (s *Service) ensureUserExists(ctx context.Context, userID uuid.UUID) error 
 	return nil
 }
 
+// recordPendingPayment сохраняет созданный checkout в БД.
+// Если ЮКасса вернула тот же payment_id по ключу идемпотентности, повторный запрос безопасно переиспользует запись.
+func (s *Service) recordPendingPayment(ctx context.Context, params dbgen.CreatePaymentParams) error {
+	if _, err := s.queries.GetPaymentByProviderID(ctx, params.ProviderPaymentID); err == nil {
+		return nil
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("get pending payment before create: %w", err)
+	}
+
+	if _, err := s.queries.CreatePayment(ctx, params); err != nil {
+		return fmt.Errorf("create pending payment: %w", err)
+	}
+
+	return nil
+}
+
 func toPlans(rows []dbgen.Plan, currentPlanCode string) []Plan {
 	result := make([]Plan, len(rows))
 	for i, row := range rows {
@@ -624,9 +679,8 @@ func clonePlanFeatures(features []PlanFeature) []PlanFeature {
 	return result
 }
 
-// checkoutIdempotencyKey возвращает детерминированный ключ для дедупликации checkout-запроса.
-// Ключ строится из бизнес-параметров и периода, поэтому стабилен при повторных попытках
-// в пределах одного периода и уникален для каждого нового периода.
+// checkoutIdempotencyKey возвращает ключ для дедупликации одного запроса к платёжному провайдеру.
+// Последняя часть обычно случайная, чтобы новая попытка оплаты не переиспользовала старый отменённый платёж.
 func checkoutIdempotencyKey(parts ...string) string {
 	h := sha256.Sum256([]byte(strings.Join(parts, ":")))
 	return hex.EncodeToString(h[:])
@@ -646,10 +700,10 @@ func amountForPeriod(plan dbgen.Plan, period PlanPeriod) (int, error) {
 	}
 }
 
-func (noopCheckoutProvider) CreateSubscriptionCheckout(context.Context, SubscriptionCheckoutInput) (string, error) {
-	return "", ErrCheckoutProviderNotConfigured
+func (noopCheckoutProvider) CreateSubscriptionCheckout(context.Context, SubscriptionCheckoutInput) (CheckoutSession, error) {
+	return CheckoutSession{}, ErrCheckoutProviderNotConfigured
 }
 
-func (noopCheckoutProvider) CreateAddonCheckout(context.Context, AddonCheckoutInput) (string, error) {
-	return "", ErrCheckoutProviderNotConfigured
+func (noopCheckoutProvider) CreateAddonCheckout(context.Context, AddonCheckoutInput) (CheckoutSession, error) {
+	return CheckoutSession{}, ErrCheckoutProviderNotConfigured
 }

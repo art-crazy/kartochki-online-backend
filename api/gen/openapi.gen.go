@@ -807,6 +807,10 @@ type YooKassaPaymentObject struct {
 		Type      *YooKassaPaymentObjectMetadataType   `json:"type,omitempty"`
 		UserId    *string                              `json:"user_id,omitempty"`
 	} `json:"metadata"`
+	PaymentMethod *struct {
+		Id    *string `json:"id,omitempty"`
+		Saved *bool   `json:"saved,omitempty"`
+	} `json:"payment_method,omitempty"`
 	Status YooKassaPaymentObjectStatus `json:"status"`
 }
 

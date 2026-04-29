@@ -90,10 +90,10 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 
 	// Если YOOKASSA_SHOP_ID задан — используем реальный клиент ЮКасса.
 	// Иначе noopCheckoutProvider: checkout вернёт ошибку, но остальной billing работает,
-	// а проверка подписи webhook пропускается (NoopWebhookVerifier).
+	// а webhook для локальной разработки доверяет payload без запроса к ЮКасса.
 	var (
 		billingProvider billing.CheckoutProvider
-		webhookVerifier handlers.WebhookSignatureVerifier = handlers.NoopWebhookVerifier{}
+		webhookVerifier handlers.PaymentStatusVerifier = handlers.NoopWebhookVerifier{}
 	)
 	if cfg.YooKassa.ShopID != "" {
 		yk := yookassa.New(cfg.YooKassa)

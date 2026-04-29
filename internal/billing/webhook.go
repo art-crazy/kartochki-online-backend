@@ -33,15 +33,25 @@ type WebhookPaymentMetadata struct {
 	Type string
 }
 
+// WebhookPaymentAmount хранит сумму платежа из события провайдера.
+type WebhookPaymentAmount struct {
+	Value    string
+	Currency string
+}
+
 // WebhookEvent описывает нормализованное событие от платёжного провайдера,
 // которое billing.Service принимает для обработки независимо от источника.
 type WebhookEvent struct {
 	// ProviderPaymentID — внешний идентификатор платежа в системе провайдера.
 	ProviderPaymentID string
+	// ProviderPaymentMethodID — сохранённый способ оплаты ЮКасса для будущих автосписаний.
+	ProviderPaymentMethodID string
 	// EventType — тип события: payment.succeeded или payment.canceled.
 	EventType WebhookEventType
 	// PaidAt — время фактического списания (заполняется при payment.succeeded).
 	PaidAt *time.Time
+	// Amount — сумма платежа от провайдера. Используется для восстановления payments при редком сбое записи checkout.
+	Amount WebhookPaymentAmount
 	// Metadata — параметры, которые мы передали провайдеру при создании платежа.
 	Metadata WebhookPaymentMetadata
 }
@@ -77,6 +87,10 @@ func (s *Service) handlePaymentSucceeded(ctx context.Context, event WebhookEvent
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	qtx := s.queries.WithTx(tx)
+
+	if err := s.ensurePendingPaymentForWebhook(ctx, qtx, event); err != nil {
+		return err
+	}
 
 	affected, err := qtx.MarkPaymentPaid(ctx, dbgen.MarkPaymentPaidParams{
 		ProviderPaymentID: toPgText(event.ProviderPaymentID),
@@ -130,7 +144,7 @@ func (s *Service) activateSubscription(ctx context.Context, q *dbgen.Queries, ev
 		UserID:                 userID,
 		PlanID:                 plan.ID,
 		Provider:               ProviderYooKassa,
-		ProviderSubscriptionID: toPgText(event.ProviderPaymentID),
+		ProviderSubscriptionID: toPgText(subscriptionProviderID(event)),
 		HasPaymentMethod:       true,
 		StartedAt:              paidAt,
 		CurrentPeriodStart:     toTimestamp(periodStart),
@@ -152,6 +166,14 @@ func (s *Service) activateSubscription(ctx context.Context, q *dbgen.Queries, ev
 	}
 
 	return nil
+}
+
+func subscriptionProviderID(event WebhookEvent) string {
+	if event.ProviderPaymentMethodID != "" {
+		return event.ProviderPaymentMethodID
+	}
+
+	return event.ProviderPaymentID
 }
 
 // activateAddon зачисляет дополнительные карточки после покупки addon-пакета.

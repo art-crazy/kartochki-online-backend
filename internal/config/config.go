@@ -50,10 +50,9 @@ type RouterAIConfig struct {
 // YooKassaConfig хранит параметры для интеграции с платёжной системой ЮКасса.
 // При пустом ShopID и SecretKey приложение использует noopCheckoutProvider (без реальных платежей).
 type YooKassaConfig struct {
-	ShopID        string
-	SecretKey     string
-	WebhookSecret string
-	ReturnURL     string
+	ShopID    string
+	SecretKey string
+	ReturnURL string
 }
 
 // AppConfig хранит общие параметры приложения.
@@ -310,10 +309,9 @@ func loadFromEnv() (Config, error) {
 			ReplyTo:     getEnv("EMAIL_REPLY_TO", ""),
 		},
 		YooKassa: YooKassaConfig{
-			ShopID:        getEnv("YOOKASSA_SHOP_ID", ""),
-			SecretKey:     getEnv("YOOKASSA_SECRET_KEY", ""),
-			WebhookSecret: getEnv("YOOKASSA_WEBHOOK_SECRET", ""),
-			ReturnURL:     getEnv("YOOKASSA_RETURN_URL", "http://localhost:3000/app/billing"),
+			ShopID:    getEnv("YOOKASSA_SHOP_ID", ""),
+			SecretKey: getEnv("YOOKASSA_SECRET_KEY", ""),
+			ReturnURL: getEnv("YOOKASSA_RETURN_URL", "http://localhost:3000/app/billing"),
 		},
 		RouterAI: RouterAIConfig{
 			APIKey:   getEnv("ROUTERAI_API_KEY", ""),

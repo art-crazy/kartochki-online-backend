@@ -118,7 +118,7 @@ func NewRouter(
 			protected.Delete("/settings/account", settingsHandler.DeleteAccount)
 		})
 
-		// Webhook не требует авторизации пользователя — подпись проверяется внутри handler.
+		// Webhook не требует авторизации пользователя — handler сверяет платёж через API провайдера.
 		api.Post("/billing/webhook", billingWebhookHandler.Handle)
 
 		api.Route("/public", func(publicRouter chi.Router) {

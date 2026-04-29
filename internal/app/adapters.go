@@ -21,7 +21,7 @@ import (
 // Компилятор сообщит об ошибке, если сигнатура метода разойдётся с интерфейсом.
 var _ jobs.SendAuthEmailHandler = authEmailWorker{}
 var _ billing.CheckoutProvider = yookassaCheckoutAdapter{}
-var _ handlers.WebhookSignatureVerifier = (*yookassa.Client)(nil)
+var _ handlers.PaymentStatusVerifier = (*yookassa.Client)(nil)
 var _ generation.ImageGenerator = routerAIAdapter{}
 var _ generation.GenerationJobEnqueuer = asynqGenerationEnqueuer{}
 var _ jobs.GenerationHandler = generationWorkerAdapter{}
@@ -76,8 +76,8 @@ type yookassaCheckoutAdapter struct {
 }
 
 // CreateSubscriptionCheckout реализует billing.CheckoutProvider для подписки.
-func (a yookassaCheckoutAdapter) CreateSubscriptionCheckout(ctx context.Context, input billing.SubscriptionCheckoutInput) (string, error) {
-	return a.client.CreateSubscriptionCheckout(ctx, yookassa.SubscriptionCheckoutInput{
+func (a yookassaCheckoutAdapter) CreateSubscriptionCheckout(ctx context.Context, input billing.SubscriptionCheckoutInput) (billing.CheckoutSession, error) {
+	session, err := a.client.CreateSubscriptionCheckout(ctx, yookassa.SubscriptionCheckoutInput{
 		UserID:         input.UserID,
 		PlanCode:       input.PlanCode,
 		Period:         string(input.Period),
@@ -85,17 +85,33 @@ func (a yookassaCheckoutAdapter) CreateSubscriptionCheckout(ctx context.Context,
 		Currency:       input.Currency,
 		IdempotencyKey: input.IdempotencyKey,
 	})
+	if err != nil {
+		return billing.CheckoutSession{}, err
+	}
+
+	return billing.CheckoutSession{
+		ProviderPaymentID: session.ProviderPaymentID,
+		CheckoutURL:       session.CheckoutURL,
+	}, nil
 }
 
 // CreateAddonCheckout реализует billing.CheckoutProvider для разового пакета.
-func (a yookassaCheckoutAdapter) CreateAddonCheckout(ctx context.Context, input billing.AddonCheckoutInput) (string, error) {
-	return a.client.CreateAddonCheckout(ctx, yookassa.AddonCheckoutInput{
+func (a yookassaCheckoutAdapter) CreateAddonCheckout(ctx context.Context, input billing.AddonCheckoutInput) (billing.CheckoutSession, error) {
+	session, err := a.client.CreateAddonCheckout(ctx, yookassa.AddonCheckoutInput{
 		UserID:         input.UserID,
 		AddonCode:      input.AddonCode,
 		Amount:         input.Amount,
 		Currency:       input.Currency,
 		IdempotencyKey: input.IdempotencyKey,
 	})
+	if err != nil {
+		return billing.CheckoutSession{}, err
+	}
+
+	return billing.CheckoutSession{
+		ProviderPaymentID: session.ProviderPaymentID,
+		CheckoutURL:       session.CheckoutURL,
+	}, nil
 }
 
 // authEmailWorker адаптирует auth.EmailSender к worker-контракту auth-писем.

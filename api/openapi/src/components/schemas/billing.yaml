@@ -208,6 +208,15 @@ schemas:
       captured_at:
         type: string
         format: date-time
+      payment_method:
+        type: object
+        properties:
+          id:
+            type: string
+            example: 22d6d597-000f-5000-9000-145f6df21d6f
+          saved:
+            type: boolean
+            example: true
       metadata:
         type: object
         properties:

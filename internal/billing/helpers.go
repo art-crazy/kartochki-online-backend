@@ -25,6 +25,10 @@ func toPgText(s string) pgtype.Text {
 	return pgtype.Text{String: s, Valid: s != ""}
 }
 
+func toPgUUID(value uuid.UUID) pgtype.UUID {
+	return pgtype.UUID{Bytes: value, Valid: value != uuid.Nil}
+}
+
 func nullableTime(value pgtype.Timestamptz) *time.Time {
 	if !value.Valid {
 		return nil

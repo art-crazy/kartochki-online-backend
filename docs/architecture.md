@@ -405,8 +405,8 @@ The `CheckoutProvider` interface is defined in `internal/billing` and implemente
 `internal/platform/yookassa` implements the ЮКасса HTTP API:
 
 - payment creation for subscriptions and addons
-- HMAC-SHA256 webhook signature verification
-- deterministic idempotency keys (SHA256 of input params + year-month) to prevent duplicate payments on retry while allowing new payments in subsequent periods
+- payment status lookup for webhook authenticity checks
+- per-attempt idempotency keys to prevent accidental provider duplicates without reusing canceled payments
 
 `internal/platform/routerai` implements the RouterAI image generation API:
 
@@ -419,13 +419,14 @@ The `CheckoutProvider` interface is defined in `internal/billing` and implemente
 
 Incoming payment provider webhooks follow this flow:
 
-1. `BillingWebhookHandler` (transport) reads and signature-verifies the raw body
+1. `BillingWebhookHandler` (transport) reads the body and verifies the payment status through the provider API
 2. `yookassaEventToBilling` converts the provider-specific event to a domain `billing.WebhookEvent` (strings normalized at this boundary)
 3. `billing.Service.HandleWebhookEvent` handles the event in a single DB transaction
-4. Idempotency is enforced by `MarkPaymentPaid WHERE status = 'pending'` — `affected == 0` means the webhook was already processed, no activation occurs
-5. On any error, the handler returns 500 so the provider retries
+4. If a provider payment exists but the local `payments` row was not saved after checkout creation, billing restores a pending row from verified webhook data
+5. Idempotency is enforced by `MarkPaymentPaid WHERE status = 'pending'` — `affected == 0` means the webhook was already processed, no activation occurs
+6. On any error, the handler returns 500 so the provider retries
 
-The webhook endpoint does not require user authentication; it is protected by signature verification only.
+The webhook endpoint does not require user authentication; it is protected by provider-side payment status verification.
 
 ## Data and Persistence Conventions
 

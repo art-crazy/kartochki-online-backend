@@ -23,28 +23,31 @@ type webhookBillingService interface {
 	HandleWebhookEvent(ctx context.Context, event billing.WebhookEvent) error
 }
 
-// WebhookSignatureVerifier проверяет подпись входящего webhook-уведомления.
-type WebhookSignatureVerifier interface {
-	VerifyWebhookSignature(body []byte, signature string) bool
+// PaymentStatusVerifier проверяет актуальное состояние платежа у провайдера.
+type PaymentStatusVerifier interface {
+	GetPayment(ctx context.Context, paymentID string) (yookassa.PaymentObject, error)
 }
 
-// NoopWebhookVerifier всегда возвращает true — используется когда провайдер не настроен.
+// NoopWebhookVerifier доверяет payload без запроса к провайдеру.
+// Используется только в локальной разработке, когда ЮКасса не настроена.
 type NoopWebhookVerifier struct{}
 
-// VerifyWebhookSignature всегда возвращает true (проверка отключена).
-func (NoopWebhookVerifier) VerifyWebhookSignature([]byte, string) bool { return true }
+// GetPayment возвращает пустой объект: handler оставит payload как есть.
+func (NoopWebhookVerifier) GetPayment(context.Context, string) (yookassa.PaymentObject, error) {
+	return yookassa.PaymentObject{}, nil
+}
 
 // BillingWebhookHandler обслуживает POST /api/v1/billing/webhook.
 type BillingWebhookHandler struct {
 	service  webhookBillingService
-	verifier WebhookSignatureVerifier
+	verifier PaymentStatusVerifier
 	logger   zerolog.Logger
 }
 
 // NewBillingWebhookHandler создаёт handler для приёма webhook-уведомлений от ЮКасса.
 func NewBillingWebhookHandler(
 	service webhookBillingService,
-	verifier WebhookSignatureVerifier,
+	verifier PaymentStatusVerifier,
 	logger zerolog.Logger,
 ) BillingWebhookHandler {
 	return BillingWebhookHandler{
@@ -54,25 +57,16 @@ func NewBillingWebhookHandler(
 	}
 }
 
-// Handle принимает webhook-уведомление от ЮКасса, проверяет подпись и вызывает billing-сервис.
+// Handle принимает webhook-уведомление от ЮКасса, сверяет статус платежа и вызывает billing-сервис.
 // ЮКасса повторяет уведомление при ответах, отличных от 200, поэтому метод идемпотентен.
 func (h BillingWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	logger := requestctx.Logger(r.Context(), h.logger)
 
-	// Читаем тело целиком до обработки, чтобы проверить подпись по сырым байтам.
+	// Читаем тело целиком до обработки, чтобы корректно разобрать событие и ограничить размер payload.
 	body, err := io.ReadAll(io.LimitReader(r.Body, webhookBodyLimit))
 	if err != nil {
 		logger.Warn().Err(err).Msg("webhook: не удалось прочитать тело запроса")
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_request", "failed to read request body")
-		return
-	}
-
-	// Проверяем подпись из заголовка YooKassa-Signature.
-	// При пустом YOOKASSA_WEBHOOK_SECRET проверка пропускается (только для локальной разработки).
-	signature := r.Header.Get("YooKassa-Signature")
-	if !h.verifier.VerifyWebhookSignature(body, signature) {
-		logger.Warn().Str("signature", signature).Msg("webhook: неверная подпись")
-		response.WriteError(w, r, http.StatusUnauthorized, "invalid_signature", "webhook signature is invalid")
 		return
 	}
 
@@ -92,6 +86,28 @@ func (h BillingWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		logger.Warn().Str("event_type", string(raw.Type)).Msg("webhook: пустой payment_id в событии")
 		response.WriteError(w, r, http.StatusBadRequest, "invalid_payload", "webhook event missing payment id")
 		return
+	}
+
+	verifiedPayment, err := h.verifier.GetPayment(r.Context(), raw.Object.ID)
+	if err != nil {
+		logger.Error().
+			Err(err).
+			Str("payment_id", raw.Object.ID).
+			Msg("webhook: не удалось проверить статус платежа в ЮКасса")
+		response.WriteError(w, r, http.StatusBadGateway, "provider_unavailable", "failed to verify payment status")
+		return
+	}
+	if verifiedPayment.ID != "" {
+		raw.Object = verifiedPayment
+		if !eventMatchesPaymentStatus(raw.Type, raw.Object.Status) {
+			logger.Warn().
+				Str("event_type", string(raw.Type)).
+				Str("payment_id", raw.Object.ID).
+				Str("provider_status", raw.Object.Status).
+				Msg("webhook: статус платежа не совпадает с типом события")
+			response.WriteError(w, r, http.StatusBadRequest, "invalid_payload", "webhook event does not match provider payment status")
+			return
+		}
 	}
 
 	event, err := yookassaEventToBilling(raw)
@@ -120,13 +136,29 @@ func (h BillingWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func eventMatchesPaymentStatus(eventType yookassa.EventType, status string) bool {
+	switch eventType {
+	case yookassa.EventPaymentSucceeded:
+		return status == "succeeded"
+	case yookassa.EventPaymentCanceled:
+		return status == "canceled"
+	default:
+		return true
+	}
+}
+
 // yookassaEventToBilling конвертирует yookassa.WebhookEvent в доменный billing.WebhookEvent.
 // Конвертация живёт в transport-слое, чтобы billing-домен не зависел от деталей провайдера.
 func yookassaEventToBilling(raw yookassa.WebhookEvent) (billing.WebhookEvent, error) {
 	// Нормализуем строки на входе, чтобы внутренняя логика billing не зависела от пробелов.
 	event := billing.WebhookEvent{
-		ProviderPaymentID: strings.TrimSpace(raw.Object.ID),
-		EventType:         billing.WebhookEventType(raw.Type),
+		ProviderPaymentID:       strings.TrimSpace(raw.Object.ID),
+		EventType:               billing.WebhookEventType(raw.Type),
+		ProviderPaymentMethodID: strings.TrimSpace(raw.Object.PaymentMethod.ID),
+		Amount: billing.WebhookPaymentAmount{
+			Value:    strings.TrimSpace(raw.Object.Amount.Value),
+			Currency: strings.TrimSpace(raw.Object.Amount.Currency),
+		},
 		Metadata: billing.WebhookPaymentMetadata{
 			UserID:    strings.TrimSpace(raw.Object.Metadata.UserID),
 			PlanCode:  strings.TrimSpace(raw.Object.Metadata.PlanCode),

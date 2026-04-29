@@ -258,8 +258,7 @@ paths:
       summary: Webhook-уведомление от ЮКасса
       description: |
         Принимает события payment.succeeded и payment.canceled от ЮКасса.
-        Подпись проверяется через заголовок YooKassa-Signature (HMAC-SHA256).
-        Endpoint не требует авторизации пользователя — он публичный, но защищён подписью.
+        Endpoint не требует авторизации пользователя — он публичный, но backend сверяет актуальный статус платежа через API ЮКасса.
         ЮКасса повторяет уведомление при ответах, отличных от 2xx, поэтому обработка идемпотентна.
       operationId: billingWebhook
       tags:
@@ -283,8 +282,8 @@ paths:
             application/json:
               schema:
                 $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
-        "401":
-          description: Неверная подпись YooKassa-Signature
+        "502":
+          description: Не удалось проверить платёж в ЮКасса
           content:
             application/json:
               schema:
