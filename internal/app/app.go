@@ -88,14 +88,14 @@ func New(cfg config.Config, logger zerolog.Logger) (*App, error) {
 	projectService := projects.NewService(queries, storageClient)
 	blogService := blog.NewService(queries)
 
-	// Если YOOKASSA_SHOP_ID задан — используем реальный клиент ЮКасса.
+	// Если shop id и secret key заданы — используем реальный клиент ЮКасса.
 	// Иначе noopCheckoutProvider: checkout вернёт ошибку, но остальной billing работает,
 	// а webhook для локальной разработки доверяет payload без запроса к ЮКасса.
 	var (
 		billingProvider billing.CheckoutProvider
 		webhookVerifier handlers.PaymentStatusVerifier = handlers.NoopWebhookVerifier{}
 	)
-	if cfg.YooKassa.ShopID != "" {
+	if cfg.YooKassa.ShopID != "" && cfg.YooKassa.SecretKey != "" {
 		yk := yookassa.New(cfg.YooKassa)
 		billingProvider = yookassaCheckoutAdapter{client: yk}
 		webhookVerifier = yk

@@ -311,7 +311,7 @@ func loadFromEnv() (Config, error) {
 		YooKassa: YooKassaConfig{
 			ShopID:    getEnv("YOOKASSA_SHOP_ID", ""),
 			SecretKey: getEnv("YOOKASSA_SECRET_KEY", ""),
-			ReturnURL: getEnv("YOOKASSA_RETURN_URL", billingReturnURL(getEnv("FRONTEND_URL", "http://localhost:3000"))),
+			ReturnURL: getNonEmptyEnv("YOOKASSA_RETURN_URL", billingReturnURL(getEnv("FRONTEND_URL", "http://localhost:3000"))),
 		},
 		RouterAI: RouterAIConfig{
 			APIKey:   getEnv("ROUTERAI_API_KEY", ""),
@@ -352,6 +352,14 @@ func loadFromEnv() (Config, error) {
 
 func getEnv(key string, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+
+	return fallback
+}
+
+func getNonEmptyEnv(key string, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok && strings.TrimSpace(value) != "" {
 		return value
 	}
 
@@ -550,6 +558,14 @@ func validate(cfg Config) error {
 		if cfg.Email.FromAddress == "" {
 			return fmt.Errorf("EMAIL_FROM must not be empty when SMTP_HOST is set")
 		}
+	}
+
+	if (cfg.YooKassa.ShopID == "") != (cfg.YooKassa.SecretKey == "") {
+		return fmt.Errorf("YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY must be set together")
+	}
+
+	if cfg.App.IsProduction() && cfg.YooKassa.ShopID == "" {
+		return fmt.Errorf("YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY must be set in production")
 	}
 
 	return nil

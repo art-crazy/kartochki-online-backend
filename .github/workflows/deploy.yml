@@ -73,7 +73,6 @@ jobs:
           EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           YOOKASSA_SHOP_ID: ${{ secrets.YOOKASSA_SHOP_ID }}
           YOOKASSA_SECRET_KEY: ${{ secrets.YOOKASSA_SECRET_KEY }}
-          YOOKASSA_WEBHOOK_SECRET: ${{ secrets.YOOKASSA_WEBHOOK_SECRET }}
         run: |
           set -a
           . ./config/production.env
@@ -99,8 +98,6 @@ jobs:
             printf 'EMAIL_REPLY_TO=%s\n' "$EMAIL_REPLY_TO"
             printf 'YOOKASSA_SHOP_ID=%s\n' "$YOOKASSA_SHOP_ID"
             printf 'YOOKASSA_SECRET_KEY=%s\n' "$YOOKASSA_SECRET_KEY"
-            printf 'YOOKASSA_WEBHOOK_SECRET=%s\n' "$YOOKASSA_WEBHOOK_SECRET"
-            printf 'YOOKASSA_RETURN_URL=%s\n' "$YOOKASSA_RETURN_URL"
           } > backend.env
 
           scp -i ~/.ssh/server_key backend.env ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/kartochki-backend.env
