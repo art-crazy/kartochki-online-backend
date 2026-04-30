@@ -63,7 +63,7 @@ func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input Subscript
 		},
 		"confirmation": map[string]string{
 			"type":       "redirect",
-			"return_url": c.returnURL,
+			"return_url": checkoutReturnURL(c.returnURL, "billing_checkout", input.PlanCode),
 		},
 		"capture":     true,
 		"description": fmt.Sprintf("Подписка %s (%s)", input.PlanCode, input.Period),
@@ -90,7 +90,7 @@ func (c *Client) CreateAddonCheckout(ctx context.Context, input AddonCheckoutInp
 		},
 		"confirmation": map[string]string{
 			"type":       "redirect",
-			"return_url": c.returnURL,
+			"return_url": checkoutReturnURL(c.returnURL, "billing_addon", input.AddonCode),
 		},
 		"capture":     true,
 		"description": fmt.Sprintf("Пакет карточек: %s", input.AddonCode),
@@ -247,6 +247,19 @@ func receiptDescription(value string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func checkoutReturnURL(returnURL string, marker string, value string) string {
+	u, err := url.Parse(returnURL)
+	if err != nil {
+		return returnURL
+	}
+
+	q := u.Query()
+	q.Set(marker, value)
+	u.RawQuery = q.Encode()
+
+	return u.String()
 }
 
 type createPaymentResponse struct {

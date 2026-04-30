@@ -153,7 +153,7 @@ func yookassaEventToBilling(raw yookassa.WebhookEvent) (billing.WebhookEvent, er
 	// Нормализуем строки на входе, чтобы внутренняя логика billing не зависела от пробелов.
 	event := billing.WebhookEvent{
 		ProviderPaymentID:       strings.TrimSpace(raw.Object.ID),
-		EventType:               billing.WebhookEventType(raw.Type),
+		EventType:               billingWebhookEventType(raw),
 		ProviderPaymentMethodID: strings.TrimSpace(raw.Object.PaymentMethod.ID),
 		Amount: billing.WebhookPaymentAmount{
 			Value:    strings.TrimSpace(raw.Object.Amount.Value),
@@ -177,4 +177,15 @@ func yookassaEventToBilling(raw yookassa.WebhookEvent) (billing.WebhookEvent, er
 	}
 
 	return event, nil
+}
+
+func billingWebhookEventType(raw yookassa.WebhookEvent) billing.WebhookEventType {
+	switch raw.Object.Status {
+	case "succeeded":
+		return billing.WebhookEventPaymentSucceeded
+	case "canceled":
+		return billing.WebhookEventPaymentCanceled
+	default:
+		return billing.WebhookEventType(raw.Type)
+	}
 }
