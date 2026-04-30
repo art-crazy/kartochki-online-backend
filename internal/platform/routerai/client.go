@@ -103,6 +103,30 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([
 		input.AspectRatio,
 	)
 
+	imgBytes, err := c.generateImageWithBody(ctx, body, input.ModelID)
+	if err == nil {
+		return imgBytes, nil
+	}
+
+	if !shouldRetryWithoutModalities(input.ModelID, err) {
+		return nil, err
+	}
+
+	reqBody.Modalities = nil
+	body, marshalErr := json.Marshal(reqBody)
+	if marshalErr != nil {
+		return nil, fmt.Errorf("marshal routerai retry request: %w", marshalErr)
+	}
+
+	imgBytes, retryErr := c.generateImageWithBody(ctx, body, input.ModelID)
+	if retryErr != nil {
+		return nil, fmt.Errorf("%w; retry without modalities failed: %v", err, retryErr)
+	}
+
+	return imgBytes, nil
+}
+
+func (c *Client) generateImageWithBody(ctx context.Context, body []byte, modelID string) ([]byte, error) {
 	resp, err := c.doChatCompletionRequest(ctx, body)
 	if err != nil {
 		return nil, err
@@ -129,7 +153,7 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([
 
 	dataURL, err := extractImageDataURL(parsed.Choices[0].Message)
 	if err != nil {
-		return nil, fmt.Errorf("routerai returned no images in response (проверьте, поддерживает ли модель %q генерацию изображений): %w", input.ModelID, err)
+		return nil, fmt.Errorf("routerai returned no images in response (проверьте, поддерживает ли модель %q генерацию изображений): %w", modelID, err)
 	}
 	imgBytes, err := decodeDataURL(dataURL)
 	if err != nil {
@@ -137,6 +161,11 @@ func (c *Client) GenerateImage(ctx context.Context, input GenerateImageInput) ([
 	}
 
 	return imgBytes, nil
+}
+
+func shouldRetryWithoutModalities(modelID string, err error) bool {
+	return modelID == "google/gemini-3.1-flash-image-preview" &&
+		strings.Contains(err.Error(), "routerai returned no images in response")
 }
 
 // decodeDataURL извлекает и декодирует base64-часть из строки вида "data:image/png;base64,<data>".
