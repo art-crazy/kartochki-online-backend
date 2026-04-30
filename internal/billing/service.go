@@ -392,7 +392,7 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 		Currency:          checkoutCurrencyRUB,
 		CheckoutUrl:       toPgText(session.CheckoutURL),
 	}); err != nil {
-		return CheckoutResult{}, err
+		return CheckoutResult{}, fmt.Errorf("%w: %v", ErrCheckoutPersistenceFailed, err)
 	}
 
 	return CheckoutResult{CheckoutURL: session.CheckoutURL}, nil
@@ -442,7 +442,7 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 		Currency:          checkoutCurrencyRUB,
 		CheckoutUrl:       toPgText(session.CheckoutURL),
 	}); err != nil {
-		return PurchaseAddonResult{}, err
+		return PurchaseAddonResult{}, fmt.Errorf("%w: %v", ErrCheckoutPersistenceFailed, err)
 	}
 
 	return PurchaseAddonResult{CheckoutURL: session.CheckoutURL}, nil
@@ -508,7 +508,7 @@ func (s *Service) createRenewalPayment(ctx context.Context, row dbgen.ListSubscr
 		Currency:          checkoutCurrencyRUB,
 		CheckoutUrl:       pgtype.Text{},
 	}); err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrCheckoutPersistenceFailed, err)
 	}
 
 	return nil

@@ -20,6 +20,8 @@ var (
 	ErrCheckoutProviderNotConfigured = errors.New("billing checkout provider is not configured")
 	// ErrCheckoutProviderFailed возвращается, когда платёжный провайдер отклонил создание checkout.
 	ErrCheckoutProviderFailed = errors.New("billing checkout provider failed")
+	// ErrCheckoutPersistenceFailed возвращается, когда checkout создан у провайдера, но не сохранён в БД.
+	ErrCheckoutPersistenceFailed = errors.New("billing checkout persistence failed")
 	// ErrSubscriptionNotCancelable возвращается, когда у пользователя нет платной подписки для отмены.
 	ErrSubscriptionNotCancelable = errors.New("billing subscription is not cancelable")
 	// ErrGenerationLimitExceeded возвращается, когда новый запуск генерации превысит доступный лимит карточек.

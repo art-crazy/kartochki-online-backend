@@ -245,6 +245,8 @@ func (h BillingHandler) writeBillingError(w http.ResponseWriter, r *http.Request
 		response.WriteError(w, r, http.StatusNotImplemented, "checkout_not_configured", "checkout provider is not configured yet")
 	case errors.Is(err, billing.ErrCheckoutProviderFailed):
 		response.WriteError(w, r, http.StatusBadGateway, "checkout_provider_error", err.Error())
+	case errors.Is(err, billing.ErrCheckoutPersistenceFailed):
+		response.WriteError(w, r, http.StatusInternalServerError, "checkout_persistence_error", err.Error())
 	case errors.Is(err, billing.ErrFreePlanNotFound):
 		// Бесплатный тариф отсутствует в БД — миграция не применена.
 		// Логируем как критическую ошибку конфигурации, клиенту отдаём 503.
