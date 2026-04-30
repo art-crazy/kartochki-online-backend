@@ -221,11 +221,13 @@ type CheckoutSession struct {
 
 // SubscriptionCheckoutInput описывает параметры checkout для покупки тарифа.
 type SubscriptionCheckoutInput struct {
-	UserID   string
-	PlanCode string
-	Period   PlanPeriod
-	Amount   int
-	Currency string
+	UserID             string
+	CustomerEmail      string
+	PlanCode           string
+	Period             PlanPeriod
+	Amount             int
+	Currency           string
+	ReceiptDescription string
 	// IdempotencyKey — стабильный ключ для дедупликации запроса на стороне платёжного провайдера.
 	// Вычисляется в billing-сервисе, чтобы провайдер не создавал дублирующий платёж при повторных попытках.
 	IdempotencyKey string
@@ -233,10 +235,12 @@ type SubscriptionCheckoutInput struct {
 
 // AddonCheckoutInput описывает параметры checkout для покупки разового пакета.
 type AddonCheckoutInput struct {
-	UserID    string
-	AddonCode string
-	Amount    int
-	Currency  string
+	UserID             string
+	CustomerEmail      string
+	AddonCode          string
+	Amount             int
+	Currency           string
+	ReceiptDescription string
 	// IdempotencyKey — стабильный ключ для дедупликации запроса на стороне платёжного провайдера.
 	IdempotencyKey string
 }
@@ -341,7 +345,8 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 		return CheckoutResult{}, ErrInvalidPlanPeriod
 	}
 
-	if err := s.ensureUserExists(ctx, uid); err != nil {
+	customerEmail, err := s.checkoutCustomerEmail(ctx, uid)
+	if err != nil {
 		return CheckoutResult{}, err
 	}
 
@@ -369,12 +374,14 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 	// Ключ уникален для каждой checkout-попытки, чтобы отменённый платёж не блокировал новый.
 	idempotencyKey := checkoutIdempotencyKey(uid.String(), targetPlan.Code, string(period), uuid.NewString())
 	session, err := s.provider.CreateSubscriptionCheckout(ctx, SubscriptionCheckoutInput{
-		UserID:         uid.String(),
-		PlanCode:       targetPlan.Code,
-		Period:         period,
-		Amount:         amount,
-		Currency:       checkoutCurrencyRUB,
-		IdempotencyKey: idempotencyKey,
+		UserID:             uid.String(),
+		CustomerEmail:      customerEmail,
+		PlanCode:           targetPlan.Code,
+		Period:             period,
+		Amount:             amount,
+		Currency:           checkoutCurrencyRUB,
+		ReceiptDescription: strings.TrimSpace(targetPlan.Name),
+		IdempotencyKey:     idempotencyKey,
 	})
 	if err != nil {
 		return CheckoutResult{}, fmt.Errorf("%w: %v", ErrCheckoutProviderFailed, err)
@@ -405,7 +412,8 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 		return PurchaseAddonResult{}, ErrUserNotFound
 	}
 
-	if err := s.ensureUserExists(ctx, uid); err != nil {
+	customerEmail, err := s.checkoutCustomerEmail(ctx, uid)
+	if err != nil {
 		return PurchaseAddonResult{}, err
 	}
 
@@ -420,11 +428,13 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 	// Для addon также создаём отдельную checkout-попытку на каждый клик оплаты.
 	idempotencyKey := checkoutIdempotencyKey(uid.String(), addon.Code, uuid.NewString())
 	session, err := s.provider.CreateAddonCheckout(ctx, AddonCheckoutInput{
-		UserID:         uid.String(),
-		AddonCode:      addon.Code,
-		Amount:         int(addon.Price),
-		Currency:       checkoutCurrencyRUB,
-		IdempotencyKey: idempotencyKey,
+		UserID:             uid.String(),
+		CustomerEmail:      customerEmail,
+		AddonCode:          addon.Code,
+		Amount:             int(addon.Price),
+		Currency:           checkoutCurrencyRUB,
+		ReceiptDescription: strings.TrimSpace(addon.Title),
+		IdempotencyKey:     idempotencyKey,
 	})
 	if err != nil {
 		return PurchaseAddonResult{}, fmt.Errorf("%w: %v", ErrCheckoutProviderFailed, err)
@@ -681,6 +691,23 @@ func (s *Service) ensureUserExists(ctx context.Context, userID uuid.UUID) error 
 	}
 
 	return nil
+}
+
+func (s *Service) checkoutCustomerEmail(ctx context.Context, userID uuid.UUID) (string, error) {
+	user, err := s.queries.GetAuthUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", ErrUserNotFound
+		}
+		return "", fmt.Errorf("%w: get billing user: %v", ErrCheckoutPreparationFailed, err)
+	}
+
+	email := strings.TrimSpace(user.Email)
+	if email == "" {
+		return "", fmt.Errorf("%w: user email is required for yookassa receipt", ErrCheckoutPreparationFailed)
+	}
+
+	return email, nil
 }
 
 // recordPendingPayment сохраняет созданный checkout в БД.

@@ -8,21 +8,25 @@ type CheckoutSession struct {
 
 // SubscriptionCheckoutInput — параметры для создания платежа подписки.
 type SubscriptionCheckoutInput struct {
-	UserID         string
-	PlanCode       string
-	Period         string
-	Amount         int
-	Currency       string
-	IdempotencyKey string
+	UserID             string
+	CustomerEmail      string
+	PlanCode           string
+	Period             string
+	Amount             int
+	Currency           string
+	ReceiptDescription string
+	IdempotencyKey     string
 }
 
 // AddonCheckoutInput — параметры для создания разового платежа addon.
 type AddonCheckoutInput struct {
-	UserID         string
-	AddonCode      string
-	Amount         int
-	Currency       string
-	IdempotencyKey string
+	UserID             string
+	CustomerEmail      string
+	AddonCode          string
+	Amount             int
+	Currency           string
+	ReceiptDescription string
+	IdempotencyKey     string
 }
 
 // RecurringPaymentInput — параметры для рекуррентного платежа без confirmation.

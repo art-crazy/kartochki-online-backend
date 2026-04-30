@@ -97,12 +97,14 @@ type yookassaCheckoutAdapter struct {
 // CreateSubscriptionCheckout реализует billing.CheckoutProvider для подписки.
 func (a yookassaCheckoutAdapter) CreateSubscriptionCheckout(ctx context.Context, input billing.SubscriptionCheckoutInput) (billing.CheckoutSession, error) {
 	session, err := a.client.CreateSubscriptionCheckout(ctx, yookassa.SubscriptionCheckoutInput{
-		UserID:         input.UserID,
-		PlanCode:       input.PlanCode,
-		Period:         string(input.Period),
-		Amount:         input.Amount,
-		Currency:       input.Currency,
-		IdempotencyKey: input.IdempotencyKey,
+		UserID:             input.UserID,
+		CustomerEmail:      input.CustomerEmail,
+		PlanCode:           input.PlanCode,
+		Period:             string(input.Period),
+		Amount:             input.Amount,
+		Currency:           input.Currency,
+		ReceiptDescription: input.ReceiptDescription,
+		IdempotencyKey:     input.IdempotencyKey,
 	})
 	if err != nil {
 		return billing.CheckoutSession{}, err
@@ -117,11 +119,13 @@ func (a yookassaCheckoutAdapter) CreateSubscriptionCheckout(ctx context.Context,
 // CreateAddonCheckout реализует billing.CheckoutProvider для разового пакета.
 func (a yookassaCheckoutAdapter) CreateAddonCheckout(ctx context.Context, input billing.AddonCheckoutInput) (billing.CheckoutSession, error) {
 	session, err := a.client.CreateAddonCheckout(ctx, yookassa.AddonCheckoutInput{
-		UserID:         input.UserID,
-		AddonCode:      input.AddonCode,
-		Amount:         input.Amount,
-		Currency:       input.Currency,
-		IdempotencyKey: input.IdempotencyKey,
+		UserID:             input.UserID,
+		CustomerEmail:      input.CustomerEmail,
+		AddonCode:          input.AddonCode,
+		Amount:             input.Amount,
+		Currency:           input.Currency,
+		ReceiptDescription: input.ReceiptDescription,
+		IdempotencyKey:     input.IdempotencyKey,
 	})
 	if err != nil {
 		return billing.CheckoutSession{}, err

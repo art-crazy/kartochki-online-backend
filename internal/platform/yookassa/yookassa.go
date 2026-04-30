@@ -20,6 +20,7 @@ const (
 	baseURL         = "https://api.yookassa.ru/v3"
 	defaultTimeout  = 15 * time.Second
 	maxRespBodySize = 1 << 20 // 1 MB — защита от аномально большого ответа
+	vatCodeNone     = 1
 )
 
 // EventType описывает тип события из webhook-уведомления ЮКасса.
@@ -66,6 +67,7 @@ func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input Subscript
 		},
 		"capture":     true,
 		"description": fmt.Sprintf("Подписка %s (%s)", input.PlanCode, input.Period),
+		"receipt":     paymentReceipt(input.CustomerEmail, receiptDescription(input.ReceiptDescription, "Подписка "+input.PlanCode), amountStr, input.Currency),
 		"metadata": map[string]string{
 			"user_id":   input.UserID,
 			"plan_code": input.PlanCode,
@@ -92,6 +94,7 @@ func (c *Client) CreateAddonCheckout(ctx context.Context, input AddonCheckoutInp
 		},
 		"capture":     true,
 		"description": fmt.Sprintf("Пакет карточек: %s", input.AddonCode),
+		"receipt":     paymentReceipt(input.CustomerEmail, receiptDescription(input.ReceiptDescription, "Пакет карточек "+input.AddonCode), amountStr, input.Currency),
 		"metadata": map[string]string{
 			"user_id":    input.UserID,
 			"addon_code": input.AddonCode,
@@ -219,6 +222,31 @@ func (c *Client) createPayment(ctx context.Context, body map[string]any, idempot
 // ЮКасса ожидает сумму в формате "100.00" (рубли).
 func formatAmount(rubles int) string {
 	return fmt.Sprintf("%d.00", rubles)
+}
+
+func paymentReceipt(customerEmail string, description string, amount string, currency string) map[string]any {
+	return map[string]any{
+		"customer": map[string]string{
+			"email": customerEmail,
+		},
+		"items": []map[string]any{
+			{
+				"description":     description,
+				"quantity":        "1.00",
+				"amount":          map[string]string{"value": amount, "currency": currency},
+				"vat_code":        vatCodeNone,
+				"payment_mode":    "full_payment",
+				"payment_subject": "service",
+			},
+		},
+	}
+}
+
+func receiptDescription(value string, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 type createPaymentResponse struct {
