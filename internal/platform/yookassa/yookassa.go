@@ -52,7 +52,6 @@ func New(cfg config.YooKassaConfig) *Client {
 }
 
 // CreateSubscriptionCheckout создаёт платёж для покупки тарифа и возвращает данные checkout.
-// Параметр save_payment_method позволит повторно списывать деньги при продлении.
 func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input SubscriptionCheckoutInput) (CheckoutSession, error) {
 	amountStr := formatAmount(input.Amount)
 
@@ -65,9 +64,8 @@ func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input Subscript
 			"type":       "redirect",
 			"return_url": c.returnURL,
 		},
-		"capture":             true,
-		"save_payment_method": true,
-		"description":         fmt.Sprintf("Подписка %s (%s)", input.PlanCode, input.Period),
+		"capture":     true,
+		"description": fmt.Sprintf("Подписка %s (%s)", input.PlanCode, input.Period),
 		"metadata": map[string]string{
 			"user_id":   input.UserID,
 			"plan_code": input.PlanCode,

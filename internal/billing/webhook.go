@@ -153,11 +153,11 @@ func (s *Service) activateSubscription(ctx context.Context, q *dbgen.Queries, ev
 		PlanID:                 plan.ID,
 		Provider:               ProviderYooKassa,
 		ProviderSubscriptionID: toPgText(subscriptionProviderID(event)),
-		HasPaymentMethod:       true,
+		HasPaymentMethod:       false,
 		StartedAt:              paidAt,
 		CurrentPeriodStart:     toTimestamp(periodStart),
 		CurrentPeriodEnd:       toTimestamp(periodEnd),
-		RenewsAt:               toTimestamp(periodEnd),
+		RenewsAt:               pgtype.Timestamptz{},
 	})
 	if err != nil {
 		return fmt.Errorf("upsert active subscription: %w", err)
