@@ -64,6 +64,16 @@ type planCatalogItem struct {
 }
 
 var planCatalogByCode = map[string]planCatalogItem{
+	"test": {
+		Name:          "Тест",
+		MonthlyPrice:  10,
+		CardsPerMonth: 1,
+		Features: []PlanFeature{
+			{Label: "1 карточка в месяц", Enabled: true},
+			{Label: "Тестовая оплата через ЮKassa", Enabled: true},
+			{Label: "Без автопродления", Enabled: true},
+		},
+	},
 	"free": {
 		Name:          "Старт",
 		MonthlyPrice:  0,
