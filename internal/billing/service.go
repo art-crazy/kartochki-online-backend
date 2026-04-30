@@ -350,12 +350,12 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 		if errors.Is(err, pgx.ErrNoRows) {
 			return CheckoutResult{}, ErrPlanNotFound
 		}
-		return CheckoutResult{}, fmt.Errorf("get billing plan by code: %w", err)
+		return CheckoutResult{}, fmt.Errorf("%w: get billing plan by code: %v", ErrCheckoutPreparationFailed, err)
 	}
 
 	currentSubscription, _, err := s.getCurrentBillingSnapshot(ctx, uid)
 	if err != nil {
-		return CheckoutResult{}, fmt.Errorf("%w: %v", ErrCheckoutProviderFailed, err)
+		return CheckoutResult{}, fmt.Errorf("%w: get current billing snapshot: %v", ErrCheckoutPreparationFailed, err)
 	}
 	if strings.TrimSpace(currentSubscription.PlanCode) == targetPlan.Code {
 		return CheckoutResult{}, ErrPlanAlreadyActive
@@ -363,7 +363,7 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 
 	amount, err := amountForPeriod(targetPlan, period)
 	if err != nil {
-		return CheckoutResult{}, err
+		return CheckoutResult{}, fmt.Errorf("%w: resolve amount for period: %v", ErrCheckoutPreparationFailed, err)
 	}
 
 	// Ключ уникален для каждой checkout-попытки, чтобы отменённый платёж не блокировал новый.
@@ -377,7 +377,7 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 		IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
-		return CheckoutResult{}, err
+		return CheckoutResult{}, fmt.Errorf("%w: %v", ErrCheckoutProviderFailed, err)
 	}
 
 	if err := s.recordPendingPayment(ctx, dbgen.CreatePaymentParams{
@@ -414,7 +414,7 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 		if errors.Is(err, pgx.ErrNoRows) {
 			return PurchaseAddonResult{}, ErrAddonNotFound
 		}
-		return PurchaseAddonResult{}, fmt.Errorf("get billing addon by code: %w", err)
+		return PurchaseAddonResult{}, fmt.Errorf("%w: get billing addon by code: %v", ErrCheckoutPreparationFailed, err)
 	}
 
 	// Для addon также создаём отдельную checkout-попытку на каждый клик оплаты.
