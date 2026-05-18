@@ -1247,19 +1247,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 code: generation_quota_exceeded
-                message: 'Лимит карточек на текущий период исчерпан: доступно 0 карточек, нужно 1 карточка. Лимит обновится 01.06.2026. Также можно увеличить лимит в разделе тарифов.'
+                message: 'Недостаточно карточек в текущем лимите. Доступно: 0. Нужно: 1. Обновление лимита: 01.06.2026.'
                 request_id: 01HZY3GQK0M5YAWQ2N6R8T9P1S
                 details:
                   - field: cards_limit
-                    message: 'Лимит тарифа: 5 карточек на текущий период.'
+                    message: 'Лимит тарифа: 5 карточек.'
                   - field: reserved_cards
-                    message: 'Уже занято: 5 карточек, включая готовые карточки и генерации в очереди или обработке.'
+                    message: 'Уже занято: 5 карточек. Сюда входят готовые карточки и запуски в очереди.'
                   - field: requested_cards
-                    message: 'Для этого запуска нужно: 1 карточка.'
+                    message: 'Нужно для запуска: 1 карточка.'
                   - field: available_cards
-                    message: 'Доступно сейчас: 0 карточек.'
+                    message: 'Осталось: 0 карточек.'
                   - field: period_end
-                    message: Лимит обновится 01.06.2026.
+                    message: 'Обновление лимита: 01.06.2026.'
         '500':
           description: Внутренняя ошибка при создании generation job
           headers:

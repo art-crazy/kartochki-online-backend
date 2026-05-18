@@ -17,10 +17,10 @@ func TestBuildGenerationQuotaMessageIncludesUserDetails(t *testing.T) {
 	})
 
 	expectedParts := []string{
-		"Лимит карточек на текущий период исчерпан",
-		"доступно 0",
-		"нужно 1",
-		"Лимит обновится 01.06.2026",
+		"Недостаточно карточек в текущем лимите",
+		"Доступно: 0",
+		"Нужно: 1",
+		"Обновление лимита: 01.06.2026",
 	}
 	for _, part := range expectedParts {
 		if !strings.Contains(message, part) {

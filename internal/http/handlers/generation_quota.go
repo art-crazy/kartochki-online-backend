@@ -31,30 +31,30 @@ func writeGenerationQuotaError(w http.ResponseWriter, r *http.Request, err error
 		r,
 		http.StatusConflict,
 		"generation_quota_exceeded",
-		"Лимит генераций на текущий период исчерпан. Увеличьте лимит в тарифе или попробуйте снова после обновления периода.",
+		"Недостаточно карточек в текущем лимите. Можно сменить тариф или дождаться обновления лимита.",
 	)
 }
 
 func buildGenerationQuotaMessage(err generation.QuotaExceededError) string {
 	availableCards := max(err.CardsLimit-err.ReservedCards, 0)
-	base := fmt.Sprintf(
-		"Для этого запуска не хватает карточек: доступно %s, нужно %s.",
-		russianCards(availableCards),
-		russianCards(err.RequestedCards),
+	message := fmt.Sprintf(
+		"Недостаточно карточек в текущем лимите. Доступно: %d. Нужно: %d.",
+		availableCards,
+		err.RequestedCards,
 	)
-	if availableCards == 0 {
-		base = fmt.Sprintf(
-			"Лимит карточек на текущий период исчерпан: доступно %s, нужно %s.",
-			russianCards(availableCards),
-			russianCards(err.RequestedCards),
+	if availableCards > 0 {
+		message = fmt.Sprintf(
+			"Не хватает карточек для запуска. Доступно: %d. Нужно: %d.",
+			availableCards,
+			err.RequestedCards,
 		)
 	}
 
 	if !err.PeriodEnd.IsZero() {
-		return fmt.Sprintf("%s Лимит обновится %s. Также можно увеличить лимит в разделе тарифов.", base, formatUserDate(err.PeriodEnd))
+		return fmt.Sprintf("%s Обновление лимита: %s.", message, formatUserDate(err.PeriodEnd))
 	}
 
-	return base + " Увеличьте лимит в разделе тарифов или попробуйте снова после обновления периода."
+	return message + " Можно сменить тариф или дождаться обновления лимита."
 }
 
 func buildGenerationQuotaDetails(err generation.QuotaExceededError) []openapi.ErrorDetail {
@@ -62,29 +62,29 @@ func buildGenerationQuotaDetails(err generation.QuotaExceededError) []openapi.Er
 	details := []openapi.ErrorDetail{
 		{
 			Field:   strPtr("cards_limit"),
-			Message: fmt.Sprintf("Лимит тарифа: %s на текущий период.", russianCards(err.CardsLimit)),
+			Message: fmt.Sprintf("Лимит тарифа: %s.", russianCards(err.CardsLimit)),
 		},
 		{
 			Field: strPtr("reserved_cards"),
 			Message: fmt.Sprintf(
-				"Уже занято: %s, включая готовые карточки и генерации в очереди или обработке.",
+				"Уже занято: %s. Сюда входят готовые карточки и запуски в очереди.",
 				russianCards(err.ReservedCards),
 			),
 		},
 		{
 			Field:   strPtr("requested_cards"),
-			Message: fmt.Sprintf("Для этого запуска нужно: %s.", russianCards(err.RequestedCards)),
+			Message: fmt.Sprintf("Нужно для запуска: %s.", russianCards(err.RequestedCards)),
 		},
 		{
 			Field:   strPtr("available_cards"),
-			Message: fmt.Sprintf("Доступно сейчас: %s.", russianCards(availableCards)),
+			Message: fmt.Sprintf("Осталось: %s.", russianCards(availableCards)),
 		},
 	}
 
 	if !err.PeriodEnd.IsZero() {
 		details = append(details, openapi.ErrorDetail{
 			Field:   strPtr("period_end"),
-			Message: fmt.Sprintf("Лимит обновится %s.", formatUserDate(err.PeriodEnd)),
+			Message: fmt.Sprintf("Обновление лимита: %s.", formatUserDate(err.PeriodEnd)),
 		})
 	}
 
