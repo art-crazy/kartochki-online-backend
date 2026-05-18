@@ -1,6 +1,10 @@
 package generation
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 // Допустимые значения поля Kind в таблице assets для пакета generation.
 const (
@@ -35,3 +39,27 @@ var (
 	// ErrInvalidProduct означает, что поле product передано, но не прошло валидацию.
 	ErrInvalidProduct = errors.New("generation product context is invalid")
 )
+
+// QuotaExceededError хранит детали превышения лимита для ответа пользователю.
+type QuotaExceededError struct {
+	CardsLimit     int
+	ReservedCards  int
+	RequestedCards int
+	PeriodEnd      time.Time
+}
+
+// Error возвращает короткий технический текст для логов и errors.Is.
+func (e QuotaExceededError) Error() string {
+	return fmt.Sprintf(
+		"%v: limit=%d reserved=%d requested=%d",
+		ErrQuotaExceeded,
+		e.CardsLimit,
+		e.ReservedCards,
+		e.RequestedCards,
+	)
+}
+
+// Is позволяет errors.Is распознавать ошибку как ErrQuotaExceeded.
+func (e QuotaExceededError) Is(target error) bool {
+	return target == ErrQuotaExceeded
+}

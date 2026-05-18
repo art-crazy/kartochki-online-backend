@@ -1,6 +1,10 @@
 package billing
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 var (
 	// ErrUserNotFound возвращается, когда billing-сценарий запрошен для несуществующего пользователя.
@@ -29,3 +33,28 @@ var (
 	// ErrGenerationLimitExceeded возвращается, когда новый запуск генерации превысит доступный лимит карточек.
 	ErrGenerationLimitExceeded = errors.New("billing generation limit exceeded")
 )
+
+// GenerationLimitExceededError описывает, почему генерация не прошла проверку лимита.
+// HTTP-слой использует эти числа, чтобы показать пользователю понятное сообщение.
+type GenerationLimitExceededError struct {
+	CardsLimit     int
+	ReservedCards  int
+	RequestedCards int
+	PeriodEnd      time.Time
+}
+
+// Error возвращает короткий технический текст для логов и errors.Is.
+func (e GenerationLimitExceededError) Error() string {
+	return fmt.Sprintf(
+		"%v: limit=%d reserved=%d requested=%d",
+		ErrGenerationLimitExceeded,
+		e.CardsLimit,
+		e.ReservedCards,
+		e.RequestedCards,
+	)
+}
+
+// Is позволяет errors.Is распознавать ошибку как ErrGenerationLimitExceeded.
+func (e GenerationLimitExceededError) Is(target error) bool {
+	return target == ErrGenerationLimitExceeded
+}

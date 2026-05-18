@@ -578,7 +578,7 @@ func (s *Service) EnsureGenerationAllowed(ctx context.Context, userID string, re
 		return ErrUserNotFound
 	}
 	if requestedCards <= 0 {
-		return ErrGenerationLimitExceeded
+		return GenerationLimitExceededError{RequestedCards: requestedCards}
 	}
 
 	if err := s.ensureUserExists(ctx, uid); err != nil {
@@ -599,7 +599,14 @@ func (s *Service) EnsureGenerationAllowed(ctx context.Context, userID string, re
 		return fmt.Errorf("sum reserved generation cards for billing limit: %w", err)
 	}
 	if int(reservedCards)+requestedCards > int(usageQuota.CardsLimit) {
-		return ErrGenerationLimitExceeded
+		// Передаём детали лимита наверх, чтобы клиент получил не сухой код ошибки,
+		// а понятное объяснение с числами текущего периода.
+		return GenerationLimitExceededError{
+			CardsLimit:     int(usageQuota.CardsLimit),
+			ReservedCards:  int(reservedCards),
+			RequestedCards: requestedCards,
+			PeriodEnd:      usageQuota.PeriodEnd.Time,
+		}
 	}
 
 	return nil

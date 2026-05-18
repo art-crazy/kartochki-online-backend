@@ -180,7 +180,7 @@ func (h GenerationHandler) CreateGeneration(w http.ResponseWriter, r *http.Reque
 				Message: "product.name is required and all fields must be within allowed limits",
 			})
 		case errors.Is(err, generation.ErrQuotaExceeded):
-			response.WriteError(w, r, http.StatusConflict, "generation_quota_exceeded", "generation quota is exceeded")
+			writeGenerationQuotaError(w, r, err)
 		default:
 			logger := h.requestLogger(r)
 			logger.Error().Err(err).Str("user_id", user.ID).Msg("не удалось запустить генерацию")

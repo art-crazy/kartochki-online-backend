@@ -207,6 +207,15 @@ func (a generationBillingLimits) EnsureGenerationAllowed(ctx context.Context, us
 	if err == nil {
 		return nil
 	}
+	var limitErr billing.GenerationLimitExceededError
+	if errors.As(err, &limitErr) {
+		return generation.QuotaExceededError{
+			CardsLimit:     limitErr.CardsLimit,
+			ReservedCards:  limitErr.ReservedCards,
+			RequestedCards: limitErr.RequestedCards,
+			PeriodEnd:      limitErr.PeriodEnd,
+		}
+	}
 	if errors.Is(err, billing.ErrGenerationLimitExceeded) {
 		return generation.ErrQuotaExceeded
 	}
