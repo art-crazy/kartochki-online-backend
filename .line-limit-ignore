@@ -9,7 +9,6 @@ docs/architecture.md
 docs/database.dbml
 docs/database.sql
 internal/auth/service.go
-internal/billing/service.go
 internal/blog/service.go
 internal/config/config.go
 internal/http/handlers/auth.go
