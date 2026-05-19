@@ -125,11 +125,12 @@ func writeStyleBlock(sb *strings.Builder, styleID string) {
 func writeCardTypeBlock(sb *strings.Builder, cardTypeID string, p *ProductContext) {
 	sb.WriteString("\nТИП КАРТОЧКИ:\n")
 	switch cardTypeID {
-	case "cover":
+	// Текущие ID каталога.
+	case "main":
 		sb.WriteString("- главная обложка;\n")
 		sb.WriteString("- короткий заголовок 1-2 слова крупно;\n")
 		sb.WriteString("- 2-3 коротких преимущества только из переданных данных.\n")
-	case "benefits":
+	case "infographic", "advantages":
 		sb.WriteString("- карточка преимуществ;\n")
 		writeBenefitsInstruction(sb, p)
 	case "details":
@@ -140,12 +141,24 @@ func writeCardTypeBlock(sb *strings.Builder, cardTypeID string, p *ProductContex
 		sb.WriteString("- карточка сценария использования;\n")
 		sb.WriteString("- покажи товар в реалистичном, но чистом контексте;\n")
 		sb.WriteString("- товар должен оставаться главным объектом и быть узнаваемым.\n")
-	case "dimensions":
+	case "sizes":
 		sb.WriteString("- карточка размеров;\n")
 		writeDimensionsInstruction(sb, p)
 	case "composition":
 		sb.WriteString("- карточка состава или материала;\n")
 		writeCompositionInstruction(sb, p)
+	case "use-case":
+		sb.WriteString("- карточка сценария использования;\n")
+		sb.WriteString("- покажи товар в конкретной, узнаваемой ситуации применения;\n")
+		sb.WriteString("- добавь короткий русский заголовок с описанием ситуации.\n")
+	case "packaging":
+		sb.WriteString("- карточка упаковки;\n")
+		sb.WriteString("- покажи упаковку как аргумент в пользу покупки;\n")
+		sb.WriteString("- подписи только из предоставленных данных об упаковке.\n")
+	case "comparison":
+		sb.WriteString("- карточка сравнения;\n")
+		sb.WriteString("- визуальный контраст «мы vs альтернатива» без упоминания конкурентов;\n")
+		sb.WriteString("- преимущества только из переданных данных.\n")
 	default:
 		sb.WriteString("- универсальная премиальная карточка товара.\n")
 	}

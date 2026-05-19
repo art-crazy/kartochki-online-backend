@@ -10,18 +10,23 @@ import (
 // Если product nil, используется вариант без конкретных деталей товара.
 func cardTypeBlock(cardTypeID, marketplaceName string, product *ProductContext) string {
 	switch cardTypeID {
-	case "cover":
+	// Текущие ID каталога.
+	case "main":
 		return coverBlock(marketplaceName, product)
-	case "benefits":
+	case "infographic", "advantages":
 		return benefitsBlock(marketplaceName, product)
 	case "details":
 		return detailsBlock(marketplaceName, product)
-	case "usage":
-		return usageBlock(marketplaceName, product)
-	case "dimensions":
+	case "sizes":
 		return dimensionsBlock(marketplaceName, product)
 	case "composition":
 		return compositionBlock(marketplaceName, product)
+	case "use-case":
+		return useCaseBlock(marketplaceName, product)
+	case "packaging":
+		return packagingBlock(marketplaceName, product)
+	case "comparison":
+		return comparisonBlock(marketplaceName, product)
 	default:
 		return fmt.Sprintf(
 			"Create a professional product card for %s marketplace.\n"+
@@ -120,36 +125,6 @@ func detailsBlock(marketplace string, p *ProductContext) string {
 	return sb.String()
 }
 
-// usageBlock описывает lifestyle-карточку.
-// Она может опираться на описание товара, но не должна придумывать новые сценарии и характеристики.
-func usageBlock(marketplace string, p *ProductContext) string {
-	if p == nil || (p.Description == "" && p.Category == "") {
-		return fmt.Sprintf(
-			"Create a lifestyle product card for %s.\n"+
-				"Show the product in a realistic but neutral usage scenario.\n"+
-				"Keep the product recognizable.\n"+
-				"Do not invent specific claims, brand names or exact use cases.",
-			marketplace,
-		)
-	}
-
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "Create a lifestyle product card for %s.\n", marketplace)
-	sb.WriteString("Show the product in a realistic usage scenario.\n")
-	if p.Description != "" {
-		fmt.Fprintf(&sb, "Use this product context: %s.\n", p.Description)
-	}
-	if p.Category != "" {
-		fmt.Fprintf(&sb, "Make the scenario relevant to category: %s.\n", p.Category)
-	}
-	sb.WriteString("Keep the product recognizable.")
-	if len(p.Benefits) > 0 {
-		badges := p.Benefits[:min(2, len(p.Benefits))]
-		fmt.Fprintf(&sb, "\nAdd one short selling headline and up to 2 benefits: %s.", strings.Join(badges, ", "))
-	}
-	return sb.String()
-}
-
 // dimensionsBlock задаёт правила для карточки с размерами.
 // Числа можно показывать только если они есть во входных характеристиках.
 func dimensionsBlock(marketplace string, p *ProductContext) string {
@@ -201,6 +176,83 @@ func compositionBlock(marketplace string, p *ProductContext) string {
 		fmt.Fprintf(&sb, "- %s: %s\n", c.Name, c.Value)
 	}
 	sb.WriteString("Do not invent extra materials, percentages or textile properties.")
+	return sb.String()
+}
+
+// useCaseBlock задаёт правила для карточки сценария использования.
+// Отличается от usageBlock тем, что акцент делается на конкретном сценарии применения, а не на lifestyle.
+func useCaseBlock(marketplace string, p *ProductContext) string {
+	if p == nil || (p.Description == "" && p.Category == "") {
+		return fmt.Sprintf(
+			"Create a use case product card for %s.\n"+
+				"Show the product solving a specific everyday problem or fitting a specific moment.\n"+
+				"Keep the product recognizable and in focus.\n"+
+				"Do not invent specific claims, brand names or scenarios.",
+			marketplace,
+		)
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Create a use case product card for %s.\n", marketplace)
+	sb.WriteString("Show the product in a specific, relatable usage scenario.\n")
+	if p.Description != "" {
+		fmt.Fprintf(&sb, "Base the scenario on this product context: %s.\n", p.Description)
+	}
+	if p.Category != "" {
+		fmt.Fprintf(&sb, "Make the scenario relevant to category: %s.\n", p.Category)
+	}
+	sb.WriteString("Add one short Russian headline describing the situation.\n")
+	sb.WriteString("Keep the product as the main visual element.")
+	return sb.String()
+}
+
+// packagingBlock задаёт правила для карточки упаковки товара.
+// Показываем упаковку как аргумент в пользу покупки: подарочная, защитная, экологичная и т.д.
+func packagingBlock(marketplace string, p *ProductContext) string {
+	packagingChars := filterCharacteristicsByKeywords(p, "упаковк", "коробк", "пакет", "комплект")
+
+	if len(packagingChars) == 0 {
+		return fmt.Sprintf(
+			"Create a packaging card for %s.\n"+
+				"Show the product packaging cleanly and attractively.\n"+
+				"Emphasize quality, protection or gift-readiness without inventing specific packaging claims.\n"+
+				"Do not add text labels or callouts unless packaging details were provided.",
+			marketplace,
+		)
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Create a packaging card for %s.\n", marketplace)
+	sb.WriteString("Show the product packaging cleanly and attractively.\n")
+	sb.WriteString("Add 1-3 short Russian callouts based only on the provided packaging details:\n")
+	for _, c := range packagingChars[:min(3, len(packagingChars))] {
+		fmt.Fprintf(&sb, "- %s: %s\n", c.Name, c.Value)
+	}
+	sb.WriteString("Do not invent packaging claims beyond the provided data.")
+	return sb.String()
+}
+
+// comparisonBlock задаёт правила для карточки сравнения товара с альтернативами.
+// Цель — показать преимущества товара без явного упоминания конкурентов.
+func comparisonBlock(marketplace string, p *ProductContext) string {
+	if p == nil || len(p.Benefits) == 0 {
+		return fmt.Sprintf(
+			"Create a product comparison card for %s.\n"+
+				"Use a visual \"before/after\" or \"us vs them\" layout without naming competitors.\n"+
+				"Show the product as the superior choice through visual contrast and clean design.\n"+
+				"Do not invent specific comparison claims or numbers.",
+			marketplace,
+		)
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Create a product comparison card for %s.\n", marketplace)
+	sb.WriteString("Use a visual comparison layout without naming competitors.\n")
+	sb.WriteString("Show the product as the superior choice using these advantages:\n")
+	for _, b := range p.Benefits[:min(4, len(p.Benefits))] {
+		fmt.Fprintf(&sb, "- %s\n", b)
+	}
+	sb.WriteString("Keep the product visually dominant. Do not invent claims beyond the provided benefits.")
 	return sb.String()
 }
 

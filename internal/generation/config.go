@@ -60,12 +60,15 @@ var (
 	}
 
 	generateCardTypes = []CardTypeOption{
-		{ID: "cover", Label: "Обложка", DefaultSelected: true},
-		{ID: "benefits", Label: "Преимущества", DefaultSelected: true},
-		{ID: "details", Label: "Детали", DefaultSelected: true},
-		{ID: "usage", Label: "Сценарий использования"},
-		{ID: "dimensions", Label: "Размеры"},
+		{ID: "main", Label: "Главная", DefaultSelected: true},
+		{ID: "infographic", Label: "Инфографика", DefaultSelected: true},
+		{ID: "advantages", Label: "Преимущества", DefaultSelected: true},
+		{ID: "use-case", Label: "Сценарий использования"},
+		{ID: "details", Label: "Детали"},
 		{ID: "composition", Label: "Состав"},
+		{ID: "sizes", Label: "Размеры"},
+		{ID: "packaging", Label: "Упаковка"},
+		{ID: "comparison", Label: "Сравнение"},
 	}
 
 	// generateModels хранит доступные AI-модели и цену одной картинки в копейках.
