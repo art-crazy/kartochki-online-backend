@@ -35,7 +35,7 @@ type planCatalogItem struct {
 
 var planCatalogByCode = map[string]planCatalogItem{
 	"test": {
-		Name:          "Тест",
+		Name:          "Триал",
 		MonthlyPrice:  10,
 		CardsPerMonth: 1,
 		Features: []PlanFeature{
