@@ -79,6 +79,39 @@ schemas:
         type: integer
         example: 490
 
+  BillingCard:
+    type: object
+    required:
+      - last4
+      - card_type
+      - expiry_month
+      - expiry_year
+    properties:
+      last4:
+        type: string
+        example: "4242"
+      card_type:
+        type: string
+        example: Visa
+      expiry_month:
+        type: string
+        example: "12"
+      expiry_year:
+        type: string
+        example: "2027"
+
+  BillingPaymentMethod:
+    type: object
+    required:
+      - type
+      - card
+    properties:
+      type:
+        type: string
+        example: bank_card
+      card:
+        $ref: "#/schemas/BillingCard"
+
   BillingSubscription:
     type: object
     required:
@@ -102,8 +135,19 @@ schemas:
       has_payment_method:
         type: boolean
         example: true
+      payment_method:
+        $ref: "#/schemas/BillingPaymentMethod"
       usage:
         $ref: "#/schemas/BillingUsage"
+
+  DeletePaymentMethodResponse:
+    type: object
+    required:
+      - has_payment_method
+    properties:
+      has_payment_method:
+        type: boolean
+        example: false
 
   BillingResponse:
     type: object
@@ -178,80 +222,3 @@ schemas:
         enum:
           - scheduled_cancel
         example: scheduled_cancel
-
-  YooKassaPaymentObject:
-    type: object
-    required:
-      - id
-      - status
-      - amount
-      - metadata
-    properties:
-      id:
-        type: string
-        example: 2a4e4c49-000f-5000-a000-1e1ce5e3b4c4
-      status:
-        type: string
-        enum:
-          - succeeded
-          - canceled
-        example: succeeded
-      amount:
-        type: object
-        properties:
-          value:
-            type: string
-            example: "1490.00"
-          currency:
-            type: string
-            example: RUB
-      captured_at:
-        type: string
-        format: date-time
-      payment_method:
-        type: object
-        properties:
-          id:
-            type: string
-            example: 22d6d597-000f-5000-9000-145f6df21d6f
-          saved:
-            type: boolean
-            example: true
-      metadata:
-        type: object
-        properties:
-          user_id:
-            type: string
-            example: 550e8400-e29b-41d4-a716-446655440000
-          plan_code:
-            type: string
-            example: pro
-          addon_code:
-            type: string
-            example: cards_100
-          period:
-            type: string
-            enum:
-              - monthly
-              - yearly
-          type:
-            type: string
-            enum:
-              - subscription
-              - subscription_renewal
-              - addon
-
-  YooKassaWebhookEvent:
-    type: object
-    required:
-      - type
-      - object
-    properties:
-      type:
-        type: string
-        enum:
-          - payment.succeeded
-          - payment.canceled
-        example: payment.succeeded
-      object:
-        $ref: "#/schemas/YooKassaPaymentObject"

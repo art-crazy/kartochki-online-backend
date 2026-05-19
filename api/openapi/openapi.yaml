@@ -2163,6 +2163,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/billing/payment-method:
+    delete:
+      summary: Удалить привязанную карту
+      description: |
+        Отвязывает сохранённую карту от подписки и автоматически отключает автопродление.
+        Если карты нет — возвращает 404.
+      operationId: deleteBillingPaymentMethod
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Карта успешно удалена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePaymentMethodResponse'
+        '401':
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Привязанная карта не найдена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Внутренняя ошибка при удалении карты
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/billing/webhook:
     post:
       summary: Webhook-уведомление от ЮКасса
@@ -3014,6 +3071,8 @@ components:
         has_payment_method:
           type: boolean
           example: true
+        payment_method:
+          $ref: '#/components/schemas/BillingPaymentMethod'
         usage:
           $ref: '#/components/schemas/BillingUsage'
     BillingUsage:
@@ -3143,6 +3202,45 @@ components:
           enum:
             - scheduled_cancel
           example: scheduled_cancel
+    DeletePaymentMethodResponse:
+      type: object
+      required:
+        - has_payment_method
+      properties:
+        has_payment_method:
+          type: boolean
+          example: false
+    BillingPaymentMethod:
+      type: object
+      required:
+        - type
+        - card
+      properties:
+        type:
+          type: string
+          example: bank_card
+        card:
+          $ref: '#/components/schemas/BillingCard'
+    BillingCard:
+      type: object
+      required:
+        - last4
+        - card_type
+        - expiry_month
+        - expiry_year
+      properties:
+        last4:
+          type: string
+          example: '4242'
+        card_type:
+          type: string
+          example: Visa
+        expiry_month:
+          type: string
+          example: '12'
+        expiry_year:
+          type: string
+          example: '2027'
     YooKassaWebhookEvent:
       type: object
       required:

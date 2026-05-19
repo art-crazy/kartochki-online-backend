@@ -105,6 +105,7 @@ func NewRouter(
 			protected.Post("/billing/checkout", billingHandler.CreateCheckout)
 			protected.Post("/billing/addons", billingHandler.PurchaseAddon)
 			protected.Post("/billing/cancel", billingHandler.CancelSubscription)
+			protected.Delete("/billing/payment-method", billingHandler.DeletePaymentMethod)
 
 			protected.Get("/settings", settingsHandler.Get)
 			protected.Patch("/settings/profile", settingsHandler.PatchProfile)

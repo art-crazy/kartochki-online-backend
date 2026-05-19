@@ -155,6 +155,7 @@ func yookassaEventToBilling(raw yookassa.WebhookEvent) (billing.WebhookEvent, er
 		ProviderPaymentID:       strings.TrimSpace(raw.Object.ID),
 		EventType:               billingWebhookEventType(raw),
 		ProviderPaymentMethodID: strings.TrimSpace(raw.Object.PaymentMethod.ID),
+		PaymentMethodType:       strings.TrimSpace(raw.Object.PaymentMethod.Type),
 		Amount: billing.WebhookPaymentAmount{
 			Value:    strings.TrimSpace(raw.Object.Amount.Value),
 			Currency: strings.TrimSpace(raw.Object.Amount.Currency),
@@ -166,6 +167,16 @@ func yookassaEventToBilling(raw yookassa.WebhookEvent) (billing.WebhookEvent, er
 			Period:    strings.TrimSpace(raw.Object.Metadata.Period),
 			Type:      strings.TrimSpace(raw.Object.Metadata.Type),
 		},
+	}
+
+	// Заполняем данные карты, если ЮКасса вернула их (bank_card с last4).
+	if card := raw.Object.PaymentMethod.Card; card.Last4 != "" {
+		event.PaymentMethodCard = &billing.WebhookPaymentCard{
+			Last4:       strings.TrimSpace(card.Last4),
+			CardType:    strings.TrimSpace(card.CardType),
+			ExpiryMonth: strings.TrimSpace(card.ExpiryMonth),
+			ExpiryYear:  strings.TrimSpace(card.ExpiryYear),
+		}
 	}
 
 	if raw.Object.PaidAt != "" {

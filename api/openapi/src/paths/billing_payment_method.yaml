@@ -1,0 +1,58 @@
+paths:
+  /api/v1/billing/payment-method:
+    delete:
+      summary: Удалить привязанную карту
+      description: |
+        Отвязывает сохранённую карту от подписки и автоматически отключает автопродление.
+        Если карты нет — возвращает 404.
+      operationId: deleteBillingPaymentMethod
+      tags:
+        - Billing
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        "200":
+          description: Карта успешно удалена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/billing.yaml#/schemas/DeletePaymentMethodResponse"
+        "401":
+          description: Токен отсутствует, истёк или недействителен
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "404":
+          description: Привязанная карта не найдена
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"
+        "500":
+          description: Внутренняя ошибка при удалении карты
+          headers:
+            X-Request-ID:
+              description: Request identifier for correlating logs.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "../components/schemas/common.yaml#/schemas/ErrorResponse"

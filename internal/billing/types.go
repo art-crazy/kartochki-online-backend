@@ -23,7 +23,23 @@ type Subscription struct {
 	RenewsAt         *time.Time
 	CancelsAt        *time.Time
 	HasPaymentMethod bool
-	Usage            Usage
+	// PaymentMethod содержит данные привязанной карты. nil, если карта не сохранена.
+	PaymentMethod *SavedPaymentMethod
+	Usage         Usage
+}
+
+// SavedPaymentMethod описывает привязанный способ оплаты в подписке.
+type SavedPaymentMethod struct {
+	Type string
+	Card *SavedCard
+}
+
+// SavedCard содержит реквизиты сохранённой банковской карты.
+type SavedCard struct {
+	Last4       string
+	CardType    string
+	ExpiryMonth string
+	ExpiryYear  string
 }
 
 // Usage описывает текущее использование месячного лимита.

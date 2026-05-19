@@ -164,7 +164,7 @@ insert into subscriptions (
     $9,
     $10
 )
-returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at
+returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, payment_method_type, payment_method_last4, payment_method_card_type, payment_method_expiry_month, payment_method_expiry_year, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at
 `
 
 type CreateSubscriptionParams struct {
@@ -202,6 +202,11 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.Provider,
 		&i.ProviderSubscriptionID,
 		&i.HasPaymentMethod,
+		&i.PaymentMethodType,
+		&i.PaymentMethodLast4,
+		&i.PaymentMethodCardType,
+		&i.PaymentMethodExpiryMonth,
+		&i.PaymentMethodExpiryYear,
 		&i.StartedAt,
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
@@ -345,6 +350,11 @@ select
     s.provider,
     s.provider_subscription_id,
     s.has_payment_method,
+    s.payment_method_type,
+    s.payment_method_last4,
+    s.payment_method_card_type,
+    s.payment_method_expiry_month,
+    s.payment_method_expiry_year,
     s.started_at,
     s.current_period_start,
     s.current_period_end,
@@ -365,24 +375,29 @@ limit 1
 `
 
 type GetCurrentSubscriptionByUserIDRow struct {
-	ID                     uuid.UUID
-	UserID                 uuid.UUID
-	PlanID                 uuid.UUID
-	Status                 string
-	Provider               string
-	ProviderSubscriptionID pgtype.Text
-	HasPaymentMethod       bool
-	StartedAt              pgtype.Timestamptz
-	CurrentPeriodStart     pgtype.Timestamptz
-	CurrentPeriodEnd       pgtype.Timestamptz
-	RenewsAt               pgtype.Timestamptz
-	CancelsAt              pgtype.Timestamptz
-	EndedAt                pgtype.Timestamptz
-	CreatedAt              pgtype.Timestamptz
-	UpdatedAt              pgtype.Timestamptz
-	PlanCode               string
-	PlanName               string
-	CardsPerMonth          int32
+	ID                       uuid.UUID
+	UserID                   uuid.UUID
+	PlanID                   uuid.UUID
+	Status                   string
+	Provider                 string
+	ProviderSubscriptionID   pgtype.Text
+	HasPaymentMethod         bool
+	PaymentMethodType        pgtype.Text
+	PaymentMethodLast4       pgtype.Text
+	PaymentMethodCardType    pgtype.Text
+	PaymentMethodExpiryMonth pgtype.Text
+	PaymentMethodExpiryYear  pgtype.Text
+	StartedAt                pgtype.Timestamptz
+	CurrentPeriodStart       pgtype.Timestamptz
+	CurrentPeriodEnd         pgtype.Timestamptz
+	RenewsAt                 pgtype.Timestamptz
+	CancelsAt                pgtype.Timestamptz
+	EndedAt                  pgtype.Timestamptz
+	CreatedAt                pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+	PlanCode                 string
+	PlanName                 string
+	CardsPerMonth            int32
 }
 
 func (q *Queries) GetCurrentSubscriptionByUserID(ctx context.Context, userID uuid.UUID) (GetCurrentSubscriptionByUserIDRow, error) {
@@ -396,6 +411,11 @@ func (q *Queries) GetCurrentSubscriptionByUserID(ctx context.Context, userID uui
 		&i.Provider,
 		&i.ProviderSubscriptionID,
 		&i.HasPaymentMethod,
+		&i.PaymentMethodType,
+		&i.PaymentMethodLast4,
+		&i.PaymentMethodCardType,
+		&i.PaymentMethodExpiryMonth,
+		&i.PaymentMethodExpiryYear,
 		&i.StartedAt,
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
@@ -503,6 +523,11 @@ select
     provider,
     provider_subscription_id,
     has_payment_method,
+    payment_method_type,
+    payment_method_last4,
+    payment_method_card_type,
+    payment_method_expiry_month,
+    payment_method_expiry_year,
     started_at,
     current_period_start,
     current_period_end,
@@ -526,6 +551,11 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscr
 		&i.Provider,
 		&i.ProviderSubscriptionID,
 		&i.HasPaymentMethod,
+		&i.PaymentMethodType,
+		&i.PaymentMethodLast4,
+		&i.PaymentMethodCardType,
+		&i.PaymentMethodExpiryMonth,
+		&i.PaymentMethodExpiryYear,
 		&i.StartedAt,
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
@@ -843,7 +873,7 @@ do update set
     renews_at                = excluded.renews_at,
     cancels_at               = null,
     updated_at               = now()
-returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at
+returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, payment_method_type, payment_method_last4, payment_method_card_type, payment_method_expiry_month, payment_method_expiry_year, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at
 `
 
 type UpsertActiveSubscriptionParams struct {
@@ -881,6 +911,11 @@ func (q *Queries) UpsertActiveSubscription(ctx context.Context, arg UpsertActive
 		&i.Provider,
 		&i.ProviderSubscriptionID,
 		&i.HasPaymentMethod,
+		&i.PaymentMethodType,
+		&i.PaymentMethodLast4,
+		&i.PaymentMethodCardType,
+		&i.PaymentMethodExpiryMonth,
+		&i.PaymentMethodExpiryYear,
 		&i.StartedAt,
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
@@ -946,4 +981,62 @@ func (q *Queries) UpsertUsageQuotaForSubscription(ctx context.Context, arg Upser
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const setSubscriptionCardDetails = `-- name: SetSubscriptionCardDetails :exec
+update subscriptions
+set payment_method_type         = $1,
+    payment_method_last4        = $2,
+    payment_method_card_type    = $3,
+    payment_method_expiry_month = $4,
+    payment_method_expiry_year  = $5,
+    updated_at                  = now()
+where id = $6
+`
+
+type SetSubscriptionCardDetailsParams struct {
+	PaymentMethodType        pgtype.Text
+	PaymentMethodLast4       pgtype.Text
+	PaymentMethodCardType    pgtype.Text
+	PaymentMethodExpiryMonth pgtype.Text
+	PaymentMethodExpiryYear  pgtype.Text
+	ID                       uuid.UUID
+}
+
+// Сохраняет реквизиты карты, которые ЮКасса вернула при первом успешном платеже.
+func (q *Queries) SetSubscriptionCardDetails(ctx context.Context, arg SetSubscriptionCardDetailsParams) error {
+	_, err := q.db.Exec(ctx, setSubscriptionCardDetails,
+		arg.PaymentMethodType,
+		arg.PaymentMethodLast4,
+		arg.PaymentMethodCardType,
+		arg.PaymentMethodExpiryMonth,
+		arg.PaymentMethodExpiryYear,
+		arg.ID,
+	)
+	return err
+}
+
+const clearSubscriptionPaymentMethod = `-- name: ClearSubscriptionPaymentMethod :execrows
+update subscriptions
+set has_payment_method          = false,
+    payment_method_type         = null,
+    payment_method_last4        = null,
+    payment_method_card_type    = null,
+    payment_method_expiry_month = null,
+    payment_method_expiry_year  = null,
+    renews_at                   = null,
+    updated_at                  = now()
+where user_id = $1
+  and status in ('active', 'scheduled_cancel')
+  and has_payment_method = true
+`
+
+// Удаляет привязанную карту и отключает автопродление.
+// affected == 0 означает, что у пользователя не было активной подписки с картой.
+func (q *Queries) ClearSubscriptionPaymentMethod(ctx context.Context, userID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, clearSubscriptionPaymentMethod, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

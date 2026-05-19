@@ -32,6 +32,8 @@ var (
 	ErrSubscriptionNotCancelable = errors.New("billing subscription is not cancelable")
 	// ErrGenerationLimitExceeded возвращается, когда новый запуск генерации превысит доступный лимит карточек.
 	ErrGenerationLimitExceeded = errors.New("billing generation limit exceeded")
+	// ErrPaymentMethodNotFound возвращается, когда у пользователя нет привязанной карты для удаления.
+	ErrPaymentMethodNotFound = errors.New("billing payment method not found")
 )
 
 // GenerationLimitExceededError описывает, почему генерация не прошла проверку лимита.

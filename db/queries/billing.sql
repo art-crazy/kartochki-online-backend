@@ -71,6 +71,11 @@ select
     s.provider,
     s.provider_subscription_id,
     s.has_payment_method,
+    s.payment_method_type,
+    s.payment_method_last4,
+    s.payment_method_card_type,
+    s.payment_method_expiry_month,
+    s.payment_method_expiry_year,
     s.started_at,
     s.current_period_start,
     s.current_period_end,
@@ -355,6 +360,33 @@ where uq.id = (
     order by sub.period_start desc
     limit 1
 );
+
+-- name: SetSubscriptionCardDetails :exec
+-- Сохраняет реквизиты карты, которые ЮКасса вернула при первом успешном платеже.
+update subscriptions
+set payment_method_type         = @payment_method_type,
+    payment_method_last4        = @payment_method_last4,
+    payment_method_card_type    = @payment_method_card_type,
+    payment_method_expiry_month = @payment_method_expiry_month,
+    payment_method_expiry_year  = @payment_method_expiry_year,
+    updated_at                  = now()
+where id = @id;
+
+-- name: ClearSubscriptionPaymentMethod :execrows
+-- Удаляет привязанную карту и отключает автопродление.
+-- affected == 0 означает, что у пользователя не было активной подписки с картой.
+update subscriptions
+set has_payment_method          = false,
+    payment_method_type         = null,
+    payment_method_last4        = null,
+    payment_method_card_type    = null,
+    payment_method_expiry_month = null,
+    payment_method_expiry_year  = null,
+    renews_at                   = null,
+    updated_at                  = now()
+where user_id = @user_id
+  and status in ('active', 'scheduled_cancel')
+  and has_payment_method = true;
 
 -- name: GetSubscriptionByID :one
 select

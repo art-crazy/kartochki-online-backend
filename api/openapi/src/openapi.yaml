@@ -92,8 +92,10 @@ paths:
     $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing~1addons"
   /api/v1/billing/cancel:
     $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing~1cancel"
+  /api/v1/billing/payment-method:
+    $ref: "./paths/billing_payment_method.yaml#/paths/~1api~1v1~1billing~1payment-method"
   /api/v1/billing/webhook:
-    $ref: "./paths/billing.yaml#/paths/~1api~1v1~1billing~1webhook"
+    $ref: "./paths/billing_webhook.yaml#/paths/~1api~1v1~1billing~1webhook"
 
   /api/v1/public/blog:
     $ref: "./paths/blog.yaml#/paths/~1api~1v1~1public~1blog"
@@ -208,10 +210,16 @@ components:
       $ref: "./components/schemas/billing.yaml#/schemas/PurchaseAddonResponse"
     CancelSubscriptionResponse:
       $ref: "./components/schemas/billing.yaml#/schemas/CancelSubscriptionResponse"
+    DeletePaymentMethodResponse:
+      $ref: "./components/schemas/billing.yaml#/schemas/DeletePaymentMethodResponse"
+    BillingPaymentMethod:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingPaymentMethod"
+    BillingCard:
+      $ref: "./components/schemas/billing.yaml#/schemas/BillingCard"
     YooKassaWebhookEvent:
-      $ref: "./components/schemas/billing.yaml#/schemas/YooKassaWebhookEvent"
+      $ref: "./components/schemas/billing_webhook.yaml#/schemas/YooKassaWebhookEvent"
     YooKassaPaymentObject:
-      $ref: "./components/schemas/billing.yaml#/schemas/YooKassaPaymentObject"
+      $ref: "./components/schemas/billing_webhook.yaml#/schemas/YooKassaPaymentObject"
 
     SettingsResponse:
       $ref: "./components/schemas/settings.yaml#/schemas/SettingsResponse"

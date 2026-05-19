@@ -8,6 +8,23 @@ import (
 	"kartochki-online-backend/internal/dbgen"
 )
 
+// toSavedPaymentMethod преобразует поля карты из строки подписки в доменный тип.
+// Возвращает nil, если карта не привязана (last4 пустая).
+func toSavedPaymentMethod(row dbgen.GetCurrentSubscriptionByUserIDRow) *SavedPaymentMethod {
+	if !row.PaymentMethodLast4.Valid || row.PaymentMethodLast4.String == "" {
+		return nil
+	}
+	return &SavedPaymentMethod{
+		Type: row.PaymentMethodType.String,
+		Card: &SavedCard{
+			Last4:       row.PaymentMethodLast4.String,
+			CardType:    row.PaymentMethodCardType.String,
+			ExpiryMonth: row.PaymentMethodExpiryMonth.String,
+			ExpiryYear:  row.PaymentMethodExpiryYear.String,
+		},
+	}
+}
+
 // Get собирает текущее billing-состояние пользователя.
 func (s *Service) Get(ctx context.Context, userID string) (Billing, error) {
 	uid, err := parseUserID(userID)
@@ -51,6 +68,7 @@ func (s *Service) Get(ctx context.Context, userID string) (Billing, error) {
 			RenewsAt:         nullableTime(subscription.RenewsAt),
 			CancelsAt:        nullableTime(subscription.CancelsAt),
 			HasPaymentMethod: subscription.HasPaymentMethod,
+			PaymentMethod:    toSavedPaymentMethod(subscription),
 			Usage: Usage{
 				Value: int(usedCards),
 				Max:   int(usageQuota.CardsLimit),

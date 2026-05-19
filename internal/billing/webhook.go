@@ -47,6 +47,10 @@ type WebhookEvent struct {
 	ProviderPaymentID string
 	// ProviderPaymentMethodID — сохранённый способ оплаты ЮКасса для будущих автосписаний.
 	ProviderPaymentMethodID string
+	// PaymentMethodType — тип способа оплаты, например "bank_card".
+	PaymentMethodType string
+	// PaymentMethodCard — реквизиты карты, которые ЮКасса возвращает при первом сохранении.
+	PaymentMethodCard *WebhookPaymentCard
 	// EventType — тип события: payment.succeeded или payment.canceled.
 	EventType WebhookEventType
 	// PaidAt — время фактического списания (заполняется при payment.succeeded).
@@ -55,6 +59,14 @@ type WebhookEvent struct {
 	Amount WebhookPaymentAmount
 	// Metadata — параметры, которые мы передали провайдеру при создании платежа.
 	Metadata WebhookPaymentMetadata
+}
+
+// WebhookPaymentCard хранит реквизиты банковской карты из webhook-события.
+type WebhookPaymentCard struct {
+	Last4       string
+	CardType    string
+	ExpiryMonth string
+	ExpiryYear  string
 }
 
 // HandleWebhookEvent обрабатывает событие от платёжного провайдера.
@@ -153,7 +165,7 @@ func (s *Service) activateSubscription(ctx context.Context, q *dbgen.Queries, ev
 		PlanID:                 plan.ID,
 		Provider:               ProviderYooKassa,
 		ProviderSubscriptionID: toPgText(subscriptionProviderID(event)),
-		HasPaymentMethod:       false,
+		HasPaymentMethod:       event.ProviderPaymentMethodID != "",
 		StartedAt:              paidAt,
 		CurrentPeriodStart:     toTimestamp(periodStart),
 		CurrentPeriodEnd:       toTimestamp(periodEnd),
@@ -161,6 +173,19 @@ func (s *Service) activateSubscription(ctx context.Context, q *dbgen.Queries, ev
 	})
 	if err != nil {
 		return fmt.Errorf("upsert active subscription: %w", err)
+	}
+
+	if event.PaymentMethodCard != nil {
+		if err := q.SetSubscriptionCardDetails(ctx, dbgen.SetSubscriptionCardDetailsParams{
+			ID:                     sub.ID,
+			PaymentMethodType:      toPgText(event.PaymentMethodType),
+			PaymentMethodLast4:     toPgText(event.PaymentMethodCard.Last4),
+			PaymentMethodCardType:  toPgText(event.PaymentMethodCard.CardType),
+			PaymentMethodExpiryMonth: toPgText(event.PaymentMethodCard.ExpiryMonth),
+			PaymentMethodExpiryYear:  toPgText(event.PaymentMethodCard.ExpiryYear),
+		}); err != nil {
+			return fmt.Errorf("set subscription card details: %w", err)
+		}
 	}
 
 	if _, err := q.UpsertUsageQuotaForSubscription(ctx, dbgen.UpsertUsageQuotaForSubscriptionParams{

@@ -65,8 +65,18 @@ type PaymentObject struct {
 
 // PaymentMethod описывает способ оплаты внутри объекта платежа ЮКасса.
 type PaymentMethod struct {
-	ID    string `json:"id"`
-	Saved bool   `json:"saved"`
+	ID    string   `json:"id"`
+	Type  string   `json:"type"`
+	Saved bool     `json:"saved"`
+	Card  CardInfo `json:"card"`
+}
+
+// CardInfo содержит реквизиты банковской карты, которые ЮКасса возвращает при сохранении.
+type CardInfo struct {
+	Last4       string `json:"last4"`
+	CardType    string `json:"card_type"`
+	ExpiryMonth string `json:"expiry_month"`
+	ExpiryYear  string `json:"expiry_year"`
 }
 
 // PaymentAmount описывает сумму платежа.

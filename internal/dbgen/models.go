@@ -284,14 +284,24 @@ type Subscription struct {
 	Provider               string
 	ProviderSubscriptionID pgtype.Text
 	HasPaymentMethod       bool
-	StartedAt              pgtype.Timestamptz
-	CurrentPeriodStart     pgtype.Timestamptz
-	CurrentPeriodEnd       pgtype.Timestamptz
-	RenewsAt               pgtype.Timestamptz
-	CancelsAt              pgtype.Timestamptz
-	EndedAt                pgtype.Timestamptz
-	CreatedAt              pgtype.Timestamptz
-	UpdatedAt              pgtype.Timestamptz
+	// PaymentMethodType — тип способа оплаты, например "bank_card". NULL, если карта не привязана.
+	PaymentMethodType pgtype.Text
+	// PaymentMethodLast4 — последние 4 цифры карты.
+	PaymentMethodLast4 pgtype.Text
+	// PaymentMethodCardType — платёжная система: Visa, MasterCard и т.д.
+	PaymentMethodCardType pgtype.Text
+	// PaymentMethodExpiryMonth — месяц истечения срока карты.
+	PaymentMethodExpiryMonth pgtype.Text
+	// PaymentMethodExpiryYear — год истечения срока карты.
+	PaymentMethodExpiryYear pgtype.Text
+	StartedAt               pgtype.Timestamptz
+	CurrentPeriodStart      pgtype.Timestamptz
+	CurrentPeriodEnd        pgtype.Timestamptz
+	RenewsAt                pgtype.Timestamptz
+	CancelsAt               pgtype.Timestamptz
+	EndedAt                 pgtype.Timestamptz
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
 }
 
 // Снимок лимита на период подписки. cards_used пока хранится для будущей синхронизации.

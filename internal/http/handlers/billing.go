@@ -20,6 +20,7 @@ type billingService interface {
 	CreateCheckout(ctx context.Context, input billing.CheckoutInput) (billing.CheckoutResult, error)
 	PurchaseAddon(ctx context.Context, input billing.PurchaseAddonInput) (billing.PurchaseAddonResult, error)
 	CancelSubscription(ctx context.Context, userID string) error
+	RemovePaymentMethod(ctx context.Context, userID string) error
 }
 
 // BillingHandler обслуживает `/api/v1/billing` и связанные checkout-сценарии.
@@ -117,6 +118,23 @@ func (h BillingHandler) PurchaseAddon(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeletePaymentMethod удаляет привязанную карту и отключает автопродление.
+func (h BillingHandler) DeletePaymentMethod(w http.ResponseWriter, r *http.Request) {
+	user, ok := currentUserFromCtx(w, r)
+	if !ok {
+		return
+	}
+
+	if err := h.service.RemovePaymentMethod(r.Context(), user.ID); err != nil {
+		h.writeBillingError(w, r, err, "failed to remove payment method")
+		return
+	}
+
+	response.WriteJSON(w, r, http.StatusOK, openapi.DeletePaymentMethodResponse{
+		HasPaymentMethod: false,
+	})
+}
+
 // CancelSubscription отключает автопродление платной подписки.
 func (h BillingHandler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
 	user, ok := currentUserFromCtx(w, r)
@@ -163,6 +181,7 @@ func toBillingResponse(payload billing.Billing) openapi.BillingResponse {
 			RenewsAt:         payload.CurrentSubscription.RenewsAt,
 			CancelsAt:        payload.CurrentSubscription.CancelsAt,
 			HasPaymentMethod: payload.CurrentSubscription.HasPaymentMethod,
+			PaymentMethod:    toBillingPaymentMethod(payload.CurrentSubscription.PaymentMethod),
 			Usage: openapi.BillingUsage{
 				Value: payload.CurrentSubscription.Usage.Value,
 				Max:   payload.CurrentSubscription.Usage.Max,
@@ -170,6 +189,21 @@ func toBillingResponse(payload billing.Billing) openapi.BillingResponse {
 		},
 		Plans:  toBillingPlans(payload.Plans),
 		Addons: toBillingAddons(payload.Addons),
+	}
+}
+
+func toBillingPaymentMethod(pm *billing.SavedPaymentMethod) *openapi.BillingPaymentMethod {
+	if pm == nil || pm.Card == nil {
+		return nil
+	}
+	return &openapi.BillingPaymentMethod{
+		Type: pm.Type,
+		Card: openapi.BillingCard{
+			Last4:       pm.Card.Last4,
+			CardType:    pm.Card.CardType,
+			ExpiryMonth: pm.Card.ExpiryMonth,
+			ExpiryYear:  pm.Card.ExpiryYear,
+		},
 	}
 }
 
@@ -241,6 +275,8 @@ func (h BillingHandler) writeBillingError(w http.ResponseWriter, r *http.Request
 		response.WriteError(w, r, http.StatusConflict, "plan_already_active", "billing plan is already active")
 	case errors.Is(err, billing.ErrSubscriptionNotCancelable):
 		response.WriteError(w, r, http.StatusConflict, "subscription_not_cancelable", "subscription cannot be canceled")
+	case errors.Is(err, billing.ErrPaymentMethodNotFound):
+		response.WriteError(w, r, http.StatusNotFound, "payment_method_not_found", "no saved payment method found")
 	case errors.Is(err, billing.ErrCheckoutProviderNotConfigured):
 		response.WriteError(w, r, http.StatusNotImplemented, "checkout_not_configured", "checkout provider is not configured yet")
 	case errors.Is(err, billing.ErrCheckoutProviderFailed):

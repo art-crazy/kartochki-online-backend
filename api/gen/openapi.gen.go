@@ -168,14 +168,34 @@ type BillingResponse struct {
 	Plans               []BillingPlan       `json:"plans"`
 }
 
+// BillingCard defines model for BillingCard.
+type BillingCard struct {
+	CardType    string `json:"card_type"`
+	ExpiryMonth string `json:"expiry_month"`
+	ExpiryYear  string `json:"expiry_year"`
+	Last4       string `json:"last4"`
+}
+
+// BillingPaymentMethod defines model for BillingPaymentMethod.
+type BillingPaymentMethod struct {
+	Card BillingCard `json:"card"`
+	Type string      `json:"type"`
+}
+
 // BillingSubscription defines model for BillingSubscription.
 type BillingSubscription struct {
-	CancelsAt        *time.Time   `json:"cancels_at,omitempty"`
-	HasPaymentMethod bool         `json:"has_payment_method"`
-	PlanId           string       `json:"plan_id"`
-	PlanName         string       `json:"plan_name"`
-	RenewsAt         *time.Time   `json:"renews_at,omitempty"`
-	Usage            BillingUsage `json:"usage"`
+	CancelsAt        *time.Time            `json:"cancels_at,omitempty"`
+	HasPaymentMethod bool                  `json:"has_payment_method"`
+	PaymentMethod    *BillingPaymentMethod `json:"payment_method,omitempty"`
+	PlanId           string                `json:"plan_id"`
+	PlanName         string                `json:"plan_name"`
+	RenewsAt         *time.Time            `json:"renews_at,omitempty"`
+	Usage            BillingUsage          `json:"usage"`
+}
+
+// DeletePaymentMethodResponse defines model for DeletePaymentMethodResponse.
+type DeletePaymentMethodResponse struct {
+	HasPaymentMethod bool `json:"has_payment_method"`
 }
 
 // BillingUsage defines model for BillingUsage.
