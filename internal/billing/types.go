@@ -156,13 +156,15 @@ type AddonCheckoutInput struct {
 
 // RecurringPaymentInput описывает параметры автосписания за продление подписки.
 type RecurringPaymentInput struct {
-	UserID          string
-	PlanCode        string
-	Period          PlanPeriod
-	Amount          int
-	Currency        string
-	PaymentMethodID string
-	IdempotencyKey  string
+	UserID             string
+	CustomerEmail      string
+	PlanCode           string
+	Period             PlanPeriod
+	Amount             int
+	Currency           string
+	PaymentMethodID    string
+	ReceiptDescription string
+	IdempotencyKey     string
 }
 
 type noopCheckoutProvider struct{}

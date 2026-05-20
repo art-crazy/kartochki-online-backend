@@ -151,10 +151,17 @@ func eventMatchesPaymentStatus(eventType yookassa.EventType, status string) bool
 // Конвертация живёт в transport-слое, чтобы billing-домен не зависел от деталей провайдера.
 func yookassaEventToBilling(raw yookassa.WebhookEvent) (billing.WebhookEvent, error) {
 	// Нормализуем строки на входе, чтобы внутренняя логика billing не зависела от пробелов.
+	// Сохранённый способ оплаты есть только когда Saved == true.
+	// Просто ID присутствует у любого платежа, но не годится для автосписаний.
+	savedMethodID := ""
+	if raw.Object.PaymentMethod.Saved {
+		savedMethodID = strings.TrimSpace(raw.Object.PaymentMethod.ID)
+	}
+
 	event := billing.WebhookEvent{
 		ProviderPaymentID:       strings.TrimSpace(raw.Object.ID),
 		EventType:               billingWebhookEventType(raw),
-		ProviderPaymentMethodID: strings.TrimSpace(raw.Object.PaymentMethod.ID),
+		ProviderPaymentMethodID: savedMethodID,
 		PaymentMethodType:       strings.TrimSpace(raw.Object.PaymentMethod.Type),
 		Amount: billing.WebhookPaymentAmount{
 			Value:    strings.TrimSpace(raw.Object.Amount.Value),

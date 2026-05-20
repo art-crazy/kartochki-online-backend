@@ -43,6 +43,31 @@ func (q *Queries) AddAddonCardsToQuota(ctx context.Context, arg AddAddonCardsToQ
 	return result.RowsAffected(), nil
 }
 
+const clearSubscriptionPaymentMethod = `-- name: ClearSubscriptionPaymentMethod :execrows
+update subscriptions
+set has_payment_method          = false,
+    payment_method_type         = null,
+    payment_method_last4        = null,
+    payment_method_card_type    = null,
+    payment_method_expiry_month = null,
+    payment_method_expiry_year  = null,
+    renews_at                   = null,
+    updated_at                  = now()
+where user_id = $1
+  and status in ('active', 'scheduled_cancel')
+  and has_payment_method = true
+`
+
+// Удаляет привязанную карту и отключает автопродление.
+// affected == 0 означает, что у пользователя не было активной подписки с картой.
+func (q *Queries) ClearSubscriptionPaymentMethod(ctx context.Context, userID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, clearSubscriptionPaymentMethod, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countGeneratedCardsForUserInPeriod = `-- name: CountGeneratedCardsForUserInPeriod :one
 select count(*)
 from generated_cards gc
@@ -164,7 +189,7 @@ insert into subscriptions (
     $9,
     $10
 )
-returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, payment_method_type, payment_method_last4, payment_method_card_type, payment_method_expiry_month, payment_method_expiry_year, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at
+returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at, payment_method_type, payment_method_last4, payment_method_card_type, payment_method_expiry_month, payment_method_expiry_year
 `
 
 type CreateSubscriptionParams struct {
@@ -202,11 +227,6 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.Provider,
 		&i.ProviderSubscriptionID,
 		&i.HasPaymentMethod,
-		&i.PaymentMethodType,
-		&i.PaymentMethodLast4,
-		&i.PaymentMethodCardType,
-		&i.PaymentMethodExpiryMonth,
-		&i.PaymentMethodExpiryYear,
 		&i.StartedAt,
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
@@ -215,6 +235,11 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.EndedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PaymentMethodType,
+		&i.PaymentMethodLast4,
+		&i.PaymentMethodCardType,
+		&i.PaymentMethodExpiryMonth,
+		&i.PaymentMethodExpiryYear,
 	)
 	return i, err
 }
@@ -523,11 +548,6 @@ select
     provider,
     provider_subscription_id,
     has_payment_method,
-    payment_method_type,
-    payment_method_last4,
-    payment_method_card_type,
-    payment_method_expiry_month,
-    payment_method_expiry_year,
     started_at,
     current_period_start,
     current_period_end,
@@ -540,9 +560,27 @@ from subscriptions
 where id = $1
 `
 
-func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error) {
+type GetSubscriptionByIDRow struct {
+	ID                     uuid.UUID
+	UserID                 uuid.UUID
+	PlanID                 uuid.UUID
+	Status                 string
+	Provider               string
+	ProviderSubscriptionID pgtype.Text
+	HasPaymentMethod       bool
+	StartedAt              pgtype.Timestamptz
+	CurrentPeriodStart     pgtype.Timestamptz
+	CurrentPeriodEnd       pgtype.Timestamptz
+	RenewsAt               pgtype.Timestamptz
+	CancelsAt              pgtype.Timestamptz
+	EndedAt                pgtype.Timestamptz
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
+func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (GetSubscriptionByIDRow, error) {
 	row := q.db.QueryRow(ctx, getSubscriptionByID, id)
-	var i Subscription
+	var i GetSubscriptionByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -551,11 +589,6 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscr
 		&i.Provider,
 		&i.ProviderSubscriptionID,
 		&i.HasPaymentMethod,
-		&i.PaymentMethodType,
-		&i.PaymentMethodLast4,
-		&i.PaymentMethodCardType,
-		&i.PaymentMethodExpiryMonth,
-		&i.PaymentMethodExpiryYear,
 		&i.StartedAt,
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
@@ -673,11 +706,14 @@ select
     s.current_period_end,
     s.renews_at,
     p.code as plan_code,
+    p.name as plan_name,
     p.monthly_price,
     p.yearly_monthly_price,
-    p.cards_per_month
+    p.cards_per_month,
+    u.email as user_email
 from subscriptions s
 join plans p on p.id = s.plan_id
+join users u on u.id = s.user_id
 where s.status = 'active'
   and s.has_payment_method = true
   and s.provider = 'yookassa'
@@ -687,7 +723,7 @@ where s.status = 'active'
       select 1
       from payments pay
       where pay.subscription_id = s.id
-        and pay.kind = 'subscription'
+        and pay.kind in ('subscription', 'subscription_renewal')
         and pay.status = 'pending'
   )
 order by s.renews_at asc
@@ -709,9 +745,11 @@ type ListSubscriptionsDueForRenewalRow struct {
 	CurrentPeriodEnd       pgtype.Timestamptz
 	RenewsAt               pgtype.Timestamptz
 	PlanCode               string
+	PlanName               string
 	MonthlyPrice           int32
 	YearlyMonthlyPrice     pgtype.Int4
 	CardsPerMonth          int32
+	UserEmail              pgtype.Text
 }
 
 // Находим активные подписки, которым пора создать рекуррентный платёж.
@@ -735,9 +773,11 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context, arg ListSu
 			&i.CurrentPeriodEnd,
 			&i.RenewsAt,
 			&i.PlanCode,
+			&i.PlanName,
 			&i.MonthlyPrice,
 			&i.YearlyMonthlyPrice,
 			&i.CardsPerMonth,
+			&i.UserEmail,
 		); err != nil {
 			return nil, err
 		}
@@ -811,6 +851,39 @@ func (q *Queries) MarkSubscriptionScheduledCancel(ctx context.Context, arg MarkS
 	return result.RowsAffected(), nil
 }
 
+const setSubscriptionCardDetails = `-- name: SetSubscriptionCardDetails :exec
+update subscriptions
+set payment_method_type         = $1,
+    payment_method_last4        = $2,
+    payment_method_card_type    = $3,
+    payment_method_expiry_month = $4,
+    payment_method_expiry_year  = $5,
+    updated_at                  = now()
+where id = $6
+`
+
+type SetSubscriptionCardDetailsParams struct {
+	PaymentMethodType        pgtype.Text
+	PaymentMethodLast4       pgtype.Text
+	PaymentMethodCardType    pgtype.Text
+	PaymentMethodExpiryMonth pgtype.Text
+	PaymentMethodExpiryYear  pgtype.Text
+	ID                       uuid.UUID
+}
+
+// Сохраняет реквизиты карты, которые ЮКасса вернула при первом успешном платеже.
+func (q *Queries) SetSubscriptionCardDetails(ctx context.Context, arg SetSubscriptionCardDetailsParams) error {
+	_, err := q.db.Exec(ctx, setSubscriptionCardDetails,
+		arg.PaymentMethodType,
+		arg.PaymentMethodLast4,
+		arg.PaymentMethodCardType,
+		arg.PaymentMethodExpiryMonth,
+		arg.PaymentMethodExpiryYear,
+		arg.ID,
+	)
+	return err
+}
+
 const sumReservedGenerationCardsForUserInPeriod = `-- name: SumReservedGenerationCardsForUserInPeriod :one
 select coalesce(sum(card_count), 0)::bigint
 from generations
@@ -873,7 +946,7 @@ do update set
     renews_at                = excluded.renews_at,
     cancels_at               = null,
     updated_at               = now()
-returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, payment_method_type, payment_method_last4, payment_method_card_type, payment_method_expiry_month, payment_method_expiry_year, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at
+returning id, user_id, plan_id, status, provider, provider_subscription_id, has_payment_method, started_at, current_period_start, current_period_end, renews_at, cancels_at, ended_at, created_at, updated_at, payment_method_type, payment_method_last4, payment_method_card_type, payment_method_expiry_month, payment_method_expiry_year
 `
 
 type UpsertActiveSubscriptionParams struct {
@@ -911,11 +984,6 @@ func (q *Queries) UpsertActiveSubscription(ctx context.Context, arg UpsertActive
 		&i.Provider,
 		&i.ProviderSubscriptionID,
 		&i.HasPaymentMethod,
-		&i.PaymentMethodType,
-		&i.PaymentMethodLast4,
-		&i.PaymentMethodCardType,
-		&i.PaymentMethodExpiryMonth,
-		&i.PaymentMethodExpiryYear,
 		&i.StartedAt,
 		&i.CurrentPeriodStart,
 		&i.CurrentPeriodEnd,
@@ -924,6 +992,11 @@ func (q *Queries) UpsertActiveSubscription(ctx context.Context, arg UpsertActive
 		&i.EndedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PaymentMethodType,
+		&i.PaymentMethodLast4,
+		&i.PaymentMethodCardType,
+		&i.PaymentMethodExpiryMonth,
+		&i.PaymentMethodExpiryYear,
 	)
 	return i, err
 }
@@ -981,62 +1054,4 @@ func (q *Queries) UpsertUsageQuotaForSubscription(ctx context.Context, arg Upser
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const setSubscriptionCardDetails = `-- name: SetSubscriptionCardDetails :exec
-update subscriptions
-set payment_method_type         = $1,
-    payment_method_last4        = $2,
-    payment_method_card_type    = $3,
-    payment_method_expiry_month = $4,
-    payment_method_expiry_year  = $5,
-    updated_at                  = now()
-where id = $6
-`
-
-type SetSubscriptionCardDetailsParams struct {
-	PaymentMethodType        pgtype.Text
-	PaymentMethodLast4       pgtype.Text
-	PaymentMethodCardType    pgtype.Text
-	PaymentMethodExpiryMonth pgtype.Text
-	PaymentMethodExpiryYear  pgtype.Text
-	ID                       uuid.UUID
-}
-
-// Сохраняет реквизиты карты, которые ЮКасса вернула при первом успешном платеже.
-func (q *Queries) SetSubscriptionCardDetails(ctx context.Context, arg SetSubscriptionCardDetailsParams) error {
-	_, err := q.db.Exec(ctx, setSubscriptionCardDetails,
-		arg.PaymentMethodType,
-		arg.PaymentMethodLast4,
-		arg.PaymentMethodCardType,
-		arg.PaymentMethodExpiryMonth,
-		arg.PaymentMethodExpiryYear,
-		arg.ID,
-	)
-	return err
-}
-
-const clearSubscriptionPaymentMethod = `-- name: ClearSubscriptionPaymentMethod :execrows
-update subscriptions
-set has_payment_method          = false,
-    payment_method_type         = null,
-    payment_method_last4        = null,
-    payment_method_card_type    = null,
-    payment_method_expiry_month = null,
-    payment_method_expiry_year  = null,
-    renews_at                   = null,
-    updated_at                  = now()
-where user_id = $1
-  and status in ('active', 'scheduled_cancel')
-  and has_payment_method = true
-`
-
-// Удаляет привязанную карту и отключает автопродление.
-// affected == 0 означает, что у пользователя не было активной подписки с картой.
-func (q *Queries) ClearSubscriptionPaymentMethod(ctx context.Context, userID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, clearSubscriptionPaymentMethod, userID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }

@@ -65,8 +65,9 @@ func (c *Client) CreateSubscriptionCheckout(ctx context.Context, input Subscript
 			"type":       "redirect",
 			"return_url": checkoutReturnURL(c.returnURL, "billing_checkout", input.PlanCode),
 		},
-		"capture":     true,
-		"description": fmt.Sprintf("Подписка %s (%s)", input.PlanCode, input.Period),
+		"capture":              true,
+		"save_payment_method": true,
+		"description":         fmt.Sprintf("Подписка %s (%s)", input.PlanCode, input.Period),
 		"receipt":     paymentReceipt(input.CustomerEmail, receiptDescription(input.ReceiptDescription, "Подписка "+input.PlanCode), amountStr, input.Currency),
 		"metadata": map[string]string{
 			"user_id":   input.UserID,
@@ -107,9 +108,11 @@ func (c *Client) CreateAddonCheckout(ctx context.Context, input AddonCheckoutInp
 
 // CreateRecurringPayment создаёт автосписание по сохранённому payment_method_id без участия пользователя.
 func (c *Client) CreateRecurringPayment(ctx context.Context, input RecurringPaymentInput) (CheckoutSession, error) {
+	amountStr := formatAmount(input.Amount)
+
 	body := map[string]any{
 		"amount": map[string]string{
-			"value":    formatAmount(input.Amount),
+			"value":    amountStr,
 			"currency": input.Currency,
 		},
 		"capture":           true,
@@ -121,6 +124,11 @@ func (c *Client) CreateRecurringPayment(ctx context.Context, input RecurringPaym
 			"period":    string(input.Period),
 			"type":      "subscription_renewal",
 		},
+	}
+
+	// Чек обязателен только если у пользователя есть email (Telegram-пользователи могут быть без него).
+	if input.CustomerEmail != "" {
+		body["receipt"] = paymentReceipt(input.CustomerEmail, receiptDescription(input.ReceiptDescription, "Подписка "+input.PlanCode), amountStr, input.Currency)
 	}
 
 	return c.createPayment(ctx, body, input.IdempotencyKey, false)

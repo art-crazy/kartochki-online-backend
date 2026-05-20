@@ -58,7 +58,7 @@ func (s *Service) webhookPaymentCreateParams(ctx context.Context, q *dbgen.Queri
 	}
 
 	switch event.Metadata.Type {
-	case paymentTypeSubscription:
+	case paymentTypeSubscription, paymentTypeSubscriptionRenewal:
 		plan, err := q.GetBillingPlanByCode(ctx, event.Metadata.PlanCode)
 		if err != nil {
 			return dbgen.CreatePaymentParams{}, fmt.Errorf("get plan for webhook payment restore: %w", err)

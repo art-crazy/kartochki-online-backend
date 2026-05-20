@@ -49,13 +49,15 @@ func (s *Service) createRenewalPayment(ctx context.Context, row dbgen.ListSubscr
 	}
 
 	session, err := s.provider.CreateRecurringPayment(ctx, RecurringPaymentInput{
-		UserID:          row.UserID.String(),
-		PlanCode:        row.PlanCode,
-		Period:          period,
-		Amount:          amount,
-		Currency:        checkoutCurrencyRUB,
-		PaymentMethodID: row.ProviderSubscriptionID.String,
-		IdempotencyKey:  checkoutIdempotencyKey(row.ID.String(), row.CurrentPeriodEnd.Time.UTC().Format(time.RFC3339), string(period)),
+		UserID:             row.UserID.String(),
+		CustomerEmail:      row.UserEmail.String,
+		PlanCode:           row.PlanCode,
+		Period:             period,
+		Amount:             amount,
+		Currency:           checkoutCurrencyRUB,
+		PaymentMethodID:    row.ProviderSubscriptionID.String,
+		ReceiptDescription: row.PlanName,
+		IdempotencyKey:     checkoutIdempotencyKey(row.ID.String(), row.CurrentPeriodEnd.Time.UTC().Format(time.RFC3339), string(period)),
 	})
 	if err != nil {
 		return fmt.Errorf("%w: create recurring payment for subscription %s: %v", ErrCheckoutProviderFailed, row.ID, err)
@@ -67,7 +69,7 @@ func (s *Service) createRenewalPayment(ctx context.Context, row dbgen.ListSubscr
 		AddonProductID:    pgtype.UUID{},
 		Provider:          ProviderYooKassa,
 		ProviderPaymentID: toPgText(session.ProviderPaymentID),
-		Kind:              paymentTypeSubscription,
+		Kind:              paymentTypeSubscriptionRenewal,
 		Status:            paymentStatusPending,
 		Amount:            int32(amount),
 		Currency:          checkoutCurrencyRUB,

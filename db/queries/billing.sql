@@ -218,11 +218,14 @@ select
     s.current_period_end,
     s.renews_at,
     p.code as plan_code,
+    p.name as plan_name,
     p.monthly_price,
     p.yearly_monthly_price,
-    p.cards_per_month
+    p.cards_per_month,
+    u.email as user_email
 from subscriptions s
 join plans p on p.id = s.plan_id
+join users u on u.id = s.user_id
 where s.status = 'active'
   and s.has_payment_method = true
   and s.provider = 'yookassa'
@@ -232,7 +235,7 @@ where s.status = 'active'
       select 1
       from payments pay
       where pay.subscription_id = s.id
-        and pay.kind = 'subscription'
+        and pay.kind in ('subscription', 'subscription_renewal')
         and pay.status = 'pending'
   )
 order by s.renews_at asc

@@ -169,7 +169,8 @@ func (s *Service) activateSubscription(ctx context.Context, q *dbgen.Queries, ev
 		StartedAt:              paidAt,
 		CurrentPeriodStart:     toTimestamp(periodStart),
 		CurrentPeriodEnd:       toTimestamp(periodEnd),
-		RenewsAt:               pgtype.Timestamptz{},
+		// renews_at = конец периода: джоб продления запустит списание в этот момент.
+		RenewsAt: toTimestamp(periodEnd),
 	})
 	if err != nil {
 		return fmt.Errorf("upsert active subscription: %w", err)

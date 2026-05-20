@@ -140,13 +140,15 @@ func (a yookassaCheckoutAdapter) CreateAddonCheckout(ctx context.Context, input 
 // CreateRecurringPayment реализует billing.CheckoutProvider для автопродления подписки.
 func (a yookassaCheckoutAdapter) CreateRecurringPayment(ctx context.Context, input billing.RecurringPaymentInput) (billing.CheckoutSession, error) {
 	session, err := a.client.CreateRecurringPayment(ctx, yookassa.RecurringPaymentInput{
-		UserID:          input.UserID,
-		PlanCode:        input.PlanCode,
-		Period:          string(input.Period),
-		Amount:          input.Amount,
-		Currency:        input.Currency,
-		PaymentMethodID: input.PaymentMethodID,
-		IdempotencyKey:  input.IdempotencyKey,
+		UserID:             input.UserID,
+		CustomerEmail:      input.CustomerEmail,
+		PlanCode:           input.PlanCode,
+		Period:             string(input.Period),
+		Amount:             input.Amount,
+		Currency:           input.Currency,
+		PaymentMethodID:    input.PaymentMethodID,
+		ReceiptDescription: input.ReceiptDescription,
+		IdempotencyKey:     input.IdempotencyKey,
 	})
 	if err != nil {
 		return billing.CheckoutSession{}, err

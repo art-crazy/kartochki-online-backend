@@ -31,13 +31,15 @@ type AddonCheckoutInput struct {
 
 // RecurringPaymentInput — параметры для рекуррентного платежа без confirmation.
 type RecurringPaymentInput struct {
-	UserID          string
-	PlanCode        string
-	Period          string
-	Amount          int
-	Currency        string
-	PaymentMethodID string
-	IdempotencyKey  string
+	UserID             string
+	CustomerEmail      string
+	PlanCode           string
+	Period             string
+	Amount             int
+	Currency           string
+	PaymentMethodID    string
+	ReceiptDescription string
+	IdempotencyKey     string
 }
 
 // WebhookEvent описывает входящее уведомление от ЮКасса.
