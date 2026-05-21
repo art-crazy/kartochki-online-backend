@@ -28,6 +28,8 @@ var (
 	ErrCheckoutPersistenceFailed = errors.New("billing checkout persistence failed")
 	// ErrCheckoutPreparationFailed возвращается, когда backend не смог подготовить данные для checkout.
 	ErrCheckoutPreparationFailed = errors.New("billing checkout preparation failed")
+	// ErrCheckoutEmailRequired возвращается, когда для создания чека не хватает email пользователя.
+	ErrCheckoutEmailRequired = errors.New("billing checkout email is required")
 	// ErrSubscriptionNotCancelable возвращается, когда у пользователя нет платной подписки для отмены.
 	ErrSubscriptionNotCancelable = errors.New("billing subscription is not cancelable")
 	// ErrGenerationLimitExceeded возвращается, когда новый запуск генерации превысит доступный лимит карточек.

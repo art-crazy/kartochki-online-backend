@@ -151,7 +151,8 @@ func (s *Service) checkoutCustomerEmail(ctx context.Context, userID uuid.UUID) (
 
 	email := strings.TrimSpace(user.Email)
 	if email == "" {
-		return "", fmt.Errorf("%w: user email is required for yookassa receipt", ErrCheckoutPreparationFailed)
+		// ЮКасса требует email покупателя для фискального чека при обычном checkout.
+		return "", ErrCheckoutEmailRequired
 	}
 
 	return email, nil
