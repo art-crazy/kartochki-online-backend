@@ -72,6 +72,16 @@ set name = $2,
 where id = $1
 returning id, coalesce(email, '') as email, name, created_at, updated_at;
 
+-- name: AssignUserEmailIfMissing :one
+-- Заполняем email из checkout только для аккаунтов, у которых email ещё нет.
+-- Подтверждение не ставим: адрес нужен для чека, а не для восстановления доступа.
+update users
+set email = $2,
+    updated_at = now()
+where id = $1
+  and email is null
+returning id, coalesce(email, '') as email, name, created_at, updated_at;
+
 -- name: UpdateUserPassword :execrows
 -- Обновляем хэш пароля пользователя. Возвращает количество затронутых строк —
 -- 0 означает, что пользователь не найден.

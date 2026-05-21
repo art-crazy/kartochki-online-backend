@@ -2,8 +2,11 @@ package billing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
 
 	"kartochki-online-backend/internal/dbgen"
 )
@@ -32,8 +35,12 @@ func (s *Service) Get(ctx context.Context, userID string) (Billing, error) {
 		return Billing{}, ErrUserNotFound
 	}
 
-	if err := s.ensureUserExists(ctx, uid); err != nil {
-		return Billing{}, err
+	user, err := s.queries.GetAuthUserByID(ctx, uid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Billing{}, ErrUserNotFound
+		}
+		return Billing{}, fmt.Errorf("get billing user: %w", err)
 	}
 
 	subscription, usageQuota, err := s.getCurrentBillingSnapshot(ctx, uid)
@@ -76,5 +83,8 @@ func (s *Service) Get(ctx context.Context, userID string) (Billing, error) {
 		},
 		Plans:  toPlans(planRows, currentPlanCode),
 		Addons: toAddons(addonRows),
+		CheckoutRequirements: CheckoutRequirements{
+			EmailRequired: strings.TrimSpace(user.Email) == "",
+		},
 	}, nil
 }

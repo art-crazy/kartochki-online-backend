@@ -155,6 +155,7 @@ schemas:
       - current_subscription
       - plans
       - addons
+      - checkout_requirements
     properties:
       current_subscription:
         $ref: "#/schemas/BillingSubscription"
@@ -166,6 +167,18 @@ schemas:
         type: array
         items:
           $ref: "#/schemas/BillingAddon"
+      checkout_requirements:
+        $ref: "#/schemas/BillingCheckoutRequirements"
+
+  BillingCheckoutRequirements:
+    type: object
+    required:
+      - email_required
+    properties:
+      email_required:
+        type: boolean
+        description: Нужно ли запросить email перед созданием checkout.
+        example: true
 
   CreateCheckoutRequest:
     type: object
@@ -182,6 +195,11 @@ schemas:
           - monthly
           - yearly
         example: monthly
+      customer_email:
+        type: string
+        format: email
+        description: Email для чека ЮКасса, если в профиле пользователя email отсутствует.
+        example: ivan@example.com
 
   CreateCheckoutResponse:
     type: object
@@ -201,6 +219,11 @@ schemas:
       addon_id:
         type: string
         example: cards_100
+      customer_email:
+        type: string
+        format: email
+        description: Email для чека ЮКасса, если в профиле пользователя email отсутствует.
+        example: ivan@example.com
 
   PurchaseAddonResponse:
     type: object

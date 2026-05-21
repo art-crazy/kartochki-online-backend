@@ -143,6 +143,26 @@ type BillingAddon struct {
 	Title       string `json:"title"`
 }
 
+// BillingCard defines model for BillingCard.
+type BillingCard struct {
+	CardType    string `json:"card_type"`
+	ExpiryMonth string `json:"expiry_month"`
+	ExpiryYear  string `json:"expiry_year"`
+	Last4       string `json:"last4"`
+}
+
+// BillingCheckoutRequirements defines model for BillingCheckoutRequirements.
+type BillingCheckoutRequirements struct {
+	// EmailRequired Нужно ли запросить email перед созданием checkout.
+	EmailRequired bool `json:"email_required"`
+}
+
+// BillingPaymentMethod defines model for BillingPaymentMethod.
+type BillingPaymentMethod struct {
+	Card BillingCard `json:"card"`
+	Type string      `json:"type"`
+}
+
 // BillingPlan defines model for BillingPlan.
 type BillingPlan struct {
 	CardsPerMonth      int                  `json:"cards_per_month"`
@@ -163,23 +183,10 @@ type BillingPlanFeature struct {
 
 // BillingResponse defines model for BillingResponse.
 type BillingResponse struct {
-	Addons              []BillingAddon      `json:"addons"`
-	CurrentSubscription BillingSubscription `json:"current_subscription"`
-	Plans               []BillingPlan       `json:"plans"`
-}
-
-// BillingCard defines model for BillingCard.
-type BillingCard struct {
-	CardType    string `json:"card_type"`
-	ExpiryMonth string `json:"expiry_month"`
-	ExpiryYear  string `json:"expiry_year"`
-	Last4       string `json:"last4"`
-}
-
-// BillingPaymentMethod defines model for BillingPaymentMethod.
-type BillingPaymentMethod struct {
-	Card BillingCard `json:"card"`
-	Type string      `json:"type"`
+	Addons               []BillingAddon              `json:"addons"`
+	CheckoutRequirements BillingCheckoutRequirements `json:"checkout_requirements"`
+	CurrentSubscription  BillingSubscription         `json:"current_subscription"`
+	Plans                []BillingPlan               `json:"plans"`
 }
 
 // BillingSubscription defines model for BillingSubscription.
@@ -191,11 +198,6 @@ type BillingSubscription struct {
 	PlanName         string                `json:"plan_name"`
 	RenewsAt         *time.Time            `json:"renews_at,omitempty"`
 	Usage            BillingUsage          `json:"usage"`
-}
-
-// DeletePaymentMethodResponse defines model for DeletePaymentMethodResponse.
-type DeletePaymentMethodResponse struct {
-	HasPaymentMethod bool `json:"has_payment_method"`
 }
 
 // BillingUsage defines model for BillingUsage.
@@ -339,8 +341,10 @@ type ChangePasswordRequest struct {
 
 // CreateCheckoutRequest defines model for CreateCheckoutRequest.
 type CreateCheckoutRequest struct {
-	Period CreateCheckoutRequestPeriod `json:"period"`
-	PlanId string                      `json:"plan_id"`
+	// CustomerEmail Email для чека ЮКасса, если в профиле пользователя email отсутствует.
+	CustomerEmail *openapi_types.Email        `json:"customer_email,omitempty"`
+	Period        CreateCheckoutRequestPeriod `json:"period"`
+	PlanId        string                      `json:"plan_id"`
 }
 
 // CreateCheckoutRequestPeriod defines model for CreateCheckoutRequest.Period.
@@ -430,6 +434,11 @@ type DashboardStat struct {
 // DeleteAccountRequest defines model for DeleteAccountRequest.
 type DeleteAccountRequest struct {
 	ConfirmWord string `json:"confirm_word"`
+}
+
+// DeletePaymentMethodResponse defines model for DeletePaymentMethodResponse.
+type DeletePaymentMethodResponse struct {
+	HasPaymentMethod bool `json:"has_payment_method"`
 }
 
 // ErrorDetail defines model for ErrorDetail.
@@ -600,6 +609,9 @@ type ProjectResponse struct {
 // PurchaseAddonRequest defines model for PurchaseAddonRequest.
 type PurchaseAddonRequest struct {
 	AddonId string `json:"addon_id"`
+
+	// CustomerEmail Email для чека ЮКасса, если в профиле пользователя email отсутствует.
+	CustomerEmail *openapi_types.Email `json:"customer_email,omitempty"`
 }
 
 // PurchaseAddonResponse defines model for PurchaseAddonResponse.

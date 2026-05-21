@@ -30,6 +30,10 @@ var (
 	ErrCheckoutPreparationFailed = errors.New("billing checkout preparation failed")
 	// ErrCheckoutEmailRequired возвращается, когда для создания чека не хватает email пользователя.
 	ErrCheckoutEmailRequired = errors.New("billing checkout email is required")
+	// ErrCheckoutEmailInvalid возвращается, когда email для чека имеет некорректный формат.
+	ErrCheckoutEmailInvalid = errors.New("billing checkout email is invalid")
+	// ErrCheckoutEmailTaken возвращается, когда email для чека уже принадлежит другому пользователю.
+	ErrCheckoutEmailTaken = errors.New("billing checkout email is already taken")
 	// ErrSubscriptionNotCancelable возвращается, когда у пользователя нет платной подписки для отмены.
 	ErrSubscriptionNotCancelable = errors.New("billing subscription is not cancelable")
 	// ErrGenerationLimitExceeded возвращается, когда новый запуск генерации превысит доступный лимит карточек.

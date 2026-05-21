@@ -11,9 +11,15 @@ import (
 
 // Billing описывает агрегированный ответ для страницы `/app/billing`.
 type Billing struct {
-	CurrentSubscription Subscription
-	Plans               []Plan
-	Addons              []Addon
+	CurrentSubscription  Subscription
+	Plans                []Plan
+	Addons               []Addon
+	CheckoutRequirements CheckoutRequirements
+}
+
+// CheckoutRequirements описывает данные, которые нужно дозапросить перед оплатой.
+type CheckoutRequirements struct {
+	EmailRequired bool
 }
 
 // Subscription описывает текущую подписку пользователя и её usage.
@@ -86,9 +92,10 @@ const (
 
 // CheckoutInput описывает запрос на оплату тарифа.
 type CheckoutInput struct {
-	UserID string
-	PlanID string
-	Period PlanPeriod
+	UserID        string
+	PlanID        string
+	Period        PlanPeriod
+	CustomerEmail string
 }
 
 // CheckoutResult возвращает ссылку на hosted checkout.
@@ -98,8 +105,9 @@ type CheckoutResult struct {
 
 // PurchaseAddonInput описывает покупку разового пакета карточек.
 type PurchaseAddonInput struct {
-	UserID  string
-	AddonID string
+	UserID        string
+	AddonID       string
+	CustomerEmail string
 }
 
 // PurchaseAddonResult возвращает ссылку на checkout разового пакета.

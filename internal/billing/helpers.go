@@ -1,10 +1,12 @@
 package billing
 
 import (
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -42,4 +44,9 @@ func int32Value(value pgtype.Int4) int {
 		return 0
 	}
 	return int(value.Int32)
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

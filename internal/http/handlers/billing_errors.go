@@ -36,9 +36,19 @@ func (h BillingHandler) writeBillingError(w http.ResponseWriter, r *http.Request
 	case errors.Is(err, billing.ErrCheckoutPersistenceFailed):
 		response.WriteError(w, r, http.StatusInternalServerError, "checkout_persistence_error", err.Error())
 	case errors.Is(err, billing.ErrCheckoutEmailRequired):
-		response.WriteError(w, r, http.StatusConflict, "email_required", "Добавьте email в настройках профиля, чтобы перейти к оплате.", openapi.ErrorDetail{
-			Field:   strPtr("email"),
-			Message: "Email нужен для формирования чека ЮКасса.",
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+			Field:   strPtr("customer_email"),
+			Message: "field is required",
+		})
+	case errors.Is(err, billing.ErrCheckoutEmailInvalid):
+		response.WriteError(w, r, http.StatusBadRequest, "validation_error", "request validation failed", openapi.ErrorDetail{
+			Field:   strPtr("customer_email"),
+			Message: "must be a valid email",
+		})
+	case errors.Is(err, billing.ErrCheckoutEmailTaken):
+		response.WriteError(w, r, http.StatusConflict, "email_taken", "Этот email уже используется в другом аккаунте.", openapi.ErrorDetail{
+			Field:   strPtr("customer_email"),
+			Message: "Укажите другой email.",
 		})
 	case errors.Is(err, billing.ErrCheckoutPreparationFailed):
 		response.WriteError(w, r, http.StatusInternalServerError, "checkout_preparation_error", err.Error())

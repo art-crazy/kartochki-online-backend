@@ -12,6 +12,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const assignUserEmailIfMissing = `-- name: AssignUserEmailIfMissing :one
+update users
+set email = $2,
+    updated_at = now()
+where id = $1
+  and email is null
+returning id, coalesce(email, '') as email, name, created_at, updated_at
+`
+
+type AssignUserEmailIfMissingParams struct {
+	ID    uuid.UUID
+	Email pgtype.Text
+}
+
+type AssignUserEmailIfMissingRow struct {
+	ID        uuid.UUID
+	Email     string
+	Name      string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+// Заполняем email из checkout только для аккаунтов, у которых email ещё нет.
+// Подтверждение не ставим: адрес нужен для чека, а не для восстановления доступа.
+func (q *Queries) AssignUserEmailIfMissing(ctx context.Context, arg AssignUserEmailIfMissingParams) (AssignUserEmailIfMissingRow, error) {
+	row := q.db.QueryRow(ctx, assignUserEmailIfMissing, arg.ID, arg.Email)
+	var i AssignUserEmailIfMissingRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 insert into users (
     email,

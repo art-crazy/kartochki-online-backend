@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 
 	"github.com/google/uuid"
@@ -27,11 +28,6 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 		return CheckoutResult{}, ErrInvalidPlanPeriod
 	}
 
-	customerEmail, err := s.checkoutCustomerEmail(ctx, uid)
-	if err != nil {
-		return CheckoutResult{}, err
-	}
-
 	targetPlan, err := s.queries.GetBillingPlanByCode(ctx, strings.TrimSpace(input.PlanID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -51,6 +47,11 @@ func (s *Service) CreateCheckout(ctx context.Context, input CheckoutInput) (Chec
 	amount, err := amountForPeriod(targetPlan, period)
 	if err != nil {
 		return CheckoutResult{}, fmt.Errorf("%w: resolve amount for period: %v", ErrCheckoutPreparationFailed, err)
+	}
+
+	customerEmail, err := s.checkoutCustomerEmail(ctx, uid, input.CustomerEmail)
+	if err != nil {
+		return CheckoutResult{}, err
 	}
 
 	// Ключ уникален для каждой checkout-попытки, чтобы отменённый платёж не блокировал новый.
@@ -94,17 +95,17 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 		return PurchaseAddonResult{}, ErrUserNotFound
 	}
 
-	customerEmail, err := s.checkoutCustomerEmail(ctx, uid)
-	if err != nil {
-		return PurchaseAddonResult{}, err
-	}
-
 	addon, err := s.queries.GetAddonProductByCode(ctx, strings.TrimSpace(input.AddonID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return PurchaseAddonResult{}, ErrAddonNotFound
 		}
 		return PurchaseAddonResult{}, fmt.Errorf("%w: get billing addon by code: %v", ErrCheckoutPreparationFailed, err)
+	}
+
+	customerEmail, err := s.checkoutCustomerEmail(ctx, uid, input.CustomerEmail)
+	if err != nil {
+		return PurchaseAddonResult{}, err
 	}
 
 	// Для addon также создаём отдельную checkout-попытку на каждый клик оплаты.
@@ -140,7 +141,7 @@ func (s *Service) PurchaseAddon(ctx context.Context, input PurchaseAddonInput) (
 	return PurchaseAddonResult{CheckoutURL: session.CheckoutURL}, nil
 }
 
-func (s *Service) checkoutCustomerEmail(ctx context.Context, userID uuid.UUID) (string, error) {
+func (s *Service) checkoutCustomerEmail(ctx context.Context, userID uuid.UUID, requestedEmail string) (string, error) {
 	user, err := s.queries.GetAuthUserByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -151,11 +152,41 @@ func (s *Service) checkoutCustomerEmail(ctx context.Context, userID uuid.UUID) (
 
 	email := strings.TrimSpace(user.Email)
 	if email == "" {
-		// ЮКасса требует email покупателя для фискального чека при обычном checkout.
-		return "", ErrCheckoutEmailRequired
+		email = normalizeCheckoutEmail(requestedEmail)
+		if email == "" {
+			// ЮКасса требует email покупателя для фискального чека при обычном checkout.
+			return "", ErrCheckoutEmailRequired
+		}
+		if !isValidCheckoutEmail(email) {
+			return "", ErrCheckoutEmailInvalid
+		}
+
+		// Email из checkout сохраняем в профиль только если у пользователя его ещё нет.
+		// Подтверждение email здесь не ставим: адрес нужен для чека, а не для входа или сброса пароля.
+		if _, err := s.queries.AssignUserEmailIfMissing(ctx, dbgen.AssignUserEmailIfMissingParams{
+			ID:    userID,
+			Email: toPgText(email),
+		}); err != nil {
+			if isUniqueViolation(err) {
+				return "", ErrCheckoutEmailTaken
+			}
+			if errors.Is(err, pgx.ErrNoRows) {
+				return s.checkoutCustomerEmail(ctx, userID, "")
+			}
+			return "", fmt.Errorf("%w: save checkout email: %v", ErrCheckoutPreparationFailed, err)
+		}
 	}
 
 	return email, nil
+}
+
+func normalizeCheckoutEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func isValidCheckoutEmail(email string) bool {
+	parsed, err := mail.ParseAddress(email)
+	return err == nil && parsed.Address == email
 }
 
 // recordPendingPayment сохраняет созданный checkout в БД.

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/rs/zerolog"
 
 	openapi "kartochki-online-backend/api/gen"
@@ -70,9 +71,10 @@ func (h BillingHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.service.CreateCheckout(r.Context(), billing.CheckoutInput{
-		UserID: user.ID,
-		PlanID: req.PlanId,
-		Period: billing.PlanPeriod(req.Period),
+		UserID:        user.ID,
+		PlanID:        req.PlanId,
+		Period:        billing.PlanPeriod(req.Period),
+		CustomerEmail: checkoutEmailOrEmpty(req.CustomerEmail),
 	})
 	if err != nil {
 		h.writeBillingError(w, r, err, "failed to create billing checkout")
@@ -103,8 +105,9 @@ func (h BillingHandler) PurchaseAddon(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.service.PurchaseAddon(r.Context(), billing.PurchaseAddonInput{
-		UserID:  user.ID,
-		AddonID: req.AddonId,
+		UserID:        user.ID,
+		AddonID:       req.AddonId,
+		CustomerEmail: checkoutEmailOrEmpty(req.CustomerEmail),
 	})
 	if err != nil {
 		h.writeBillingError(w, r, err, "failed to create addon checkout")
@@ -159,16 +162,24 @@ func validateCreateCheckoutRequest(req openapi.CreateCheckoutRequest) []openapi.
 	if strings.TrimSpace(string(req.Period)) == "" {
 		details = append(details, openapi.ErrorDetail{Field: strPtr("period"), Message: "field is required"})
 	}
+	if email := checkoutEmailOrEmpty(req.CustomerEmail); email != "" && !isValidEmail(email) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("customer_email"), Message: "must be a valid email"})
+	}
 
 	return details
 }
 
 func validatePurchaseAddonRequest(req openapi.PurchaseAddonRequest) []openapi.ErrorDetail {
+	var details []openapi.ErrorDetail
+
 	if strings.TrimSpace(req.AddonId) == "" {
-		return []openapi.ErrorDetail{{Field: strPtr("addon_id"), Message: "field is required"}}
+		details = append(details, openapi.ErrorDetail{Field: strPtr("addon_id"), Message: "field is required"})
+	}
+	if email := checkoutEmailOrEmpty(req.CustomerEmail); email != "" && !isValidEmail(email) {
+		details = append(details, openapi.ErrorDetail{Field: strPtr("customer_email"), Message: "must be a valid email"})
 	}
 
-	return nil
+	return details
 }
 
 func toBillingResponse(payload billing.Billing) openapi.BillingResponse {
@@ -187,7 +198,18 @@ func toBillingResponse(payload billing.Billing) openapi.BillingResponse {
 		},
 		Plans:  toBillingPlans(payload.Plans),
 		Addons: toBillingAddons(payload.Addons),
+		CheckoutRequirements: openapi.BillingCheckoutRequirements{
+			EmailRequired: payload.CheckoutRequirements.EmailRequired,
+		},
 	}
+}
+
+func checkoutEmailOrEmpty(email *openapi_types.Email) string {
+	if email == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(*email))
 }
 
 func toBillingPaymentMethod(pm *billing.SavedPaymentMethod) *openapi.BillingPaymentMethod {
