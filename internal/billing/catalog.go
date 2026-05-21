@@ -41,7 +41,6 @@ var planCatalogByCode = map[string]planCatalogItem{
 		Features: []PlanFeature{
 			{Label: "1 карточка в месяц", Enabled: true},
 			{Label: "Тестовая оплата через ЮKassa", Enabled: true},
-			{Label: "Без автопродления", Enabled: true},
 		},
 	},
 	"free": {
