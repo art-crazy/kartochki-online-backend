@@ -80,7 +80,6 @@ func extractImageURLFromText(text string) string {
 type chatCompletionRequest struct {
 	Model       string       `json:"model"`
 	Messages    []message    `json:"messages"`
-	Modalities  []string     `json:"modalities"`
 	ImageConfig *imageConfig `json:"image_config,omitempty"`
 }
 
