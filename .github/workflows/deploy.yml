@@ -13,6 +13,10 @@ permissions:
 env:
   IMAGE_NAME: ghcr.io/art-crazy/kartochki-online-backend:latest
 
+concurrency:
+  group: kartochki-backend-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -121,8 +125,17 @@ jobs:
           REMOTE_SCRIPT
 
       - name: Deploy backend
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          ssh -i ~/.ssh/server_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} '
+          printf '%s' "$GH_TOKEN" | ssh -i ~/.ssh/server_key "$SERVER_USER@$SERVER_HOST" '
+            set -e
+            export DOCKER_CONFIG="$(mktemp -d /tmp/kartochki-registry.XXXXXX)"
+            cleanup_registry() { rm -rf -- "$DOCKER_CONFIG"; }
+            trap cleanup_registry EXIT
+            docker login ghcr.io -u art-crazy --password-stdin
             cd /opt/kartochki
             ./deploy.sh backend
           '
