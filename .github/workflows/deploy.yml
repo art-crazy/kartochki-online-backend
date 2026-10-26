@@ -47,12 +47,15 @@ jobs:
       - name: Configure SSH
         env:
           SERVER_DEPLOY_SSH_KEY: ${{ secrets.SERVER_DEPLOY_SSH_KEY }}
+          SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$SERVER_DEPLOY_SSH_KEY" > ~/.ssh/server_key
           chmod 600 ~/.ssh/server_key
-          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          test -n "$SERVER_KNOWN_HOSTS"
+          printf '%s\n' "$SERVER_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Write backend env
         env:
