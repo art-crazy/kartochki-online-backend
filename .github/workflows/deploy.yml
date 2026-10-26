@@ -111,10 +111,8 @@ jobs:
           ssh -i ~/.ssh/server_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} 'bash -s' <<'REMOTE_SCRIPT'
             set -e
             test -s /opt/kartochki/postgres.env
-            set -a
-            . /opt/kartochki/postgres.env
-            set +a
-            POSTGRES_DSN="$(python3 -c 'import os; from urllib.parse import quote; user=quote(os.environ["POSTGRES_USER"], safe=""); password=quote(os.environ["POSTGRES_PASSWORD"], safe=""); db=quote(os.environ["POSTGRES_DB"], safe=""); print(f"postgres://{user}:{password}@postgres:5432/{db}?sslmode=disable")')"
+            cd /opt/kartochki
+            POSTGRES_DSN="$(docker compose config --format json | python3 -c 'import json,sys; from urllib.parse import quote; env=json.load(sys.stdin)["services"]["postgres"]["environment"]; user=quote(env["POSTGRES_USER"], safe=""); password=quote(env["POSTGRES_PASSWORD"], safe=""); db=quote(env["POSTGRES_DB"], safe=""); print(f"postgres://{user}:{password}@postgres:5432/{db}?sslmode=disable")')"
             {
               cat /tmp/kartochki-backend.env
               printf "POSTGRES_DSN=%s\n" "$POSTGRES_DSN"
